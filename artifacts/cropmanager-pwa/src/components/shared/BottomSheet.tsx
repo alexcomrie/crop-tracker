@@ -9,7 +9,7 @@ interface BottomSheetProps {
   position?: 'bottom' | 'center';
 }
 
-export function BottomSheet({ open, onClose, title, children, position = 'bottom' }: BottomSheetProps) {
+export function BottomSheet({ open, onClose, title, children, position = 'center' }: BottomSheetProps) {
   if (position === 'center') {
     return (
       <Dialog open={open} onOpenChange={v => !v && onClose()}>

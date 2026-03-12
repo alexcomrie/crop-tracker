@@ -8,6 +8,7 @@ import { markReminderDone } from '../hooks/useReminders';
 import { CropForm } from '../components/crops/CropForm';
 import { PropForm } from '../components/props/PropForm';
 import { BottomSheet } from '../components/shared/BottomSheet';
+import { SuccessionGapReport } from '../components/reports/SuccessionGapReport';
 
 const TYPE_EMOJI: Record<string, string> = {
   harvest: '🥬',
@@ -39,12 +40,22 @@ export function DashboardScreen() {
   const [fabDate, setFabDate] = useState(today());
   const [showCropForm, setShowCropForm] = useState(false);
   const [showPropForm, setShowPropForm] = useState(false);
+  const [showSuccession, setShowSuccession] = useState(false);
 
   const isEmpty = dueReminders.length === 0 && harvestReady.length === 0 && transplantDue.length === 0;
 
   return (
     <div className="pb-24 pt-2 px-4 space-y-4">
       <WeatherWidget />
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowSuccession(true)}
+          className="text-xs px-3 py-1.5 rounded-full border border-green-300 bg-white text-green-700 hover:bg-green-50"
+        >
+          Succession Gap Analysis
+        </button>
+      </div>
 
       {/* Due Reminders */}
       {dueReminders.length > 0 && (
@@ -146,6 +157,10 @@ export function DashboardScreen() {
 
       <CropForm open={showCropForm} onClose={() => setShowCropForm(false)} date={fabDate} />
       <PropForm open={showPropForm} onClose={() => setShowPropForm(false)} date={fabDate} />
+
+      <BottomSheet open={showSuccession} onClose={() => setShowSuccession(false)} title="Succession Gap Analysis" position="center">
+        <SuccessionGapReport />
+      </BottomSheet>
     </div>
   );
 }

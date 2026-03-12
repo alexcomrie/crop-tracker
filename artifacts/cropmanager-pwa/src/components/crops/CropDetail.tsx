@@ -7,6 +7,7 @@ import db from '../../db/db';
 import type { Crop } from '../../types';
 import { parseDate, formatDateDisplay, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
+import { FertScheduleView } from './FertScheduleView';
 
 interface CropDetailProps {
   crop: Crop;
@@ -21,6 +22,7 @@ export function CropDetail({ crop, onClose, onUpdate }: CropDetailProps) {
   const stageLogs = useLiveQuery(() => db.stageLogs.where('trackingId').equals(crop.id).sortBy('date'), [crop.id]);
   const planted = parseDate(crop.plantingDate);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
+  const [showFert, setShowFert] = useState(false);
 
   const stages = [
     { label: 'Planted', date: crop.plantingDate, done: !!crop.plantingDate },
@@ -101,8 +103,17 @@ export function CropDetail({ crop, onClose, onUpdate }: CropDetailProps) {
           </div>
         )}
 
-        <Button className="w-full" onClick={onUpdate}>Update This Crop</Button>
+        <div className="flex gap-2">
+          <Button className="flex-1" onClick={onUpdate}>Update This Crop</Button>
+          <Button className="flex-1 bg-amber-500 hover:bg-amber-600" onClick={() => setShowFert(true)}>
+            Fertilizer Schedule
+          </Button>
+        </div>
       </div>
+
+      <BottomSheet open={showFert} onClose={() => setShowFert(false)} title="Fertilizer Schedule" position="center">
+        <FertScheduleView crop={crop} />
+      </BottomSheet>
     </BottomSheet>
   );
 }

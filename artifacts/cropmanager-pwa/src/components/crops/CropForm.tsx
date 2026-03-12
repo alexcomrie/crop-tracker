@@ -30,8 +30,7 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
-
-  const plantDate = date ?? today();
+  const [plantDate, setPlantDate] = useState<Date>(date ?? today());
   const cropKeys = Object.keys(cropDb).sort();
   const filtered = cropKeys.filter(k =>
     k.includes(search.toLowerCase()) || (cropDb[k]?.display_name ?? k).toLowerCase().includes(search.toLowerCase())
@@ -39,7 +38,7 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
   const selectedCropData = cropDb[cropKey];
 
   function reset() {
-    setStep(1); setCropKey(''); setVariety(''); setMethod(''); setTrayColors([]); setNotes(''); setSearch('');
+    setStep(1); setCropKey(''); setVariety(''); setMethod(''); setTrayColors([]); setNotes(''); setSearch(''); setPlantDate(date ?? today());
   }
 
   async function handleSave() {
@@ -99,7 +98,19 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
       <div className="pt-2 space-y-4">
         {step === 1 && (
           <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Step 1: Select Crop</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">Step 1: Select Crop & Date</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Input
+                type="date"
+                value={plantDate.toISOString().slice(0, 10)}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v) setPlantDate(new Date(v + 'T00:00:00'));
+                }}
+                className="w-40 text-sm"
+              />
+              <p className="text-xs text-muted-foreground">Planting date</p>
+            </div>
             <Input placeholder="Search crops..." value={search} onChange={e => setSearch(e.target.value)} className="mb-2" />
             <div className="max-h-60 overflow-y-auto space-y-1">
               {filtered.slice(0, 30).map(k => (

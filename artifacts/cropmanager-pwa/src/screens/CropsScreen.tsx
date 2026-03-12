@@ -21,7 +21,7 @@ export function CropsScreen() {
   return (
     <div className="pb-24 pt-2">
       {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto px-4 pb-2 whitespace-nowrap scrollbar-hide">
         {FILTERS.map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`shrink-0 px-3 py-1.5 rounded-full text-sm border ${filter === f ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 text-gray-700'}`}>

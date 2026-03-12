@@ -35,8 +35,16 @@ export function DataManagement() {
   async function handleClear() {
     if (clearInput !== 'CLEAR') return;
     await Promise.all([
-      db.crops.clear(), db.propagations.clear(), db.reminders.clear(),
-      db.stageLogs.clear(), db.harvestLogs.clear(), db.treatmentLogs.clear(),
+      db.crops.clear(),
+      db.propagations.clear(),
+      db.reminders.clear(),
+      db.stageLogs.clear(),
+      db.harvestLogs.clear(),
+      db.treatmentLogs.clear(),
+      db.cropDbAdjustments.clear(),
+      db.propDbAdjustments.clear(),
+      db.batchPlantingLogs.clear(),
+      db.cropSearchLogs.clear(),
     ]);
     setClearInput('');
     setShowClear(false);

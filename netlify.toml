@@ -1,0 +1,19 @@
+[build]
+  publish = "dist/client"
+  command = "npm run build && npm run generate-sitemap"
+
+[[redirects]]
+  from = "/api/google-script/*"
+  to = "https://script.google.com/macros/s/AKfycbzXttDdokt5xJjnkMvvvji7ibhl7z1HmOn91otBgTcYHsJdqCPYoeHg6YrWZV7U1kLz/exec/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript"

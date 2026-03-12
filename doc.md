@@ -14,6 +14,7 @@ The monorepo is organized as follows:
 -   `artifacts/`: Contains the deployable applications.
     -   `api-server/`: The backend Express.js application.
     -   `cropmanager-pwa/`: The frontend React PWA.
+    -   `mockup-sandbox/`: A sandbox for UI component development.
 -   `lib/`: Contains shared libraries used by the applications.
     -   `api-client-react/`: A React Query-based API client generated from the OpenAPI specification.
     -   `api-spec/`: The OpenAPI specification for the backend API.
@@ -28,7 +29,7 @@ The backend is an Express.js application written in TypeScript.
 -   **Framework:** Express.js
 -   **Dependencies:**
     -   `drizzle-orm`: A TypeScript ORM for database access.
-    -   `@workspace/db`: The local database schema package.
+    -   `@workspace/db`: The local database schema package (currently empty).
     -   `@workspace/api-zod`: The local Zod schemas package for API validation.
     -   `cors`, `cookie-parser`: Standard Express middleware.
 -   **API:**
@@ -46,15 +47,19 @@ The frontend is a Progressive Web App (PWA) built with React and Vite.
     -   **Tailwind CSS:** For styling.
     -   `lucide-react`: For icons.
 -   **State Management:**
-    -   **Zustand:** For global state management.
+    -   **Zustand:** For global state management and persistent settings.
     -   **TanStack Query:** For managing server state.
+    -   **Dexie (IndexedDB):** For local data storage, enabling offline functionality.
 -   **Forms:**
     -   **React Hook Form:** For form management.
     -   **Zod:** For form validation.
--   **Routing:** **Wouter**
+-   **Routing:** **Wouter** (for simple routing) and **React Router Dom**.
 -   **PWA:** The application is configured as a PWA using `vite-plugin-pwa`, allowing for offline functionality and installation on user devices.
 -   **API Client:** It uses a generated React Query client from the `@workspace/api-client-react` package to communicate with the backend.
--   **Offline Storage:** It uses `dexie` for IndexedDB, likely for offline data storage.
+-   **Synchronization:**
+    -   The app features a robust sync logic with a Google Apps Script (GAS) web app.
+    -   It builds payloads from local Dexie data and pushes them to GAS, or pulls updates from GAS to refresh the local database.
+-   **Offline Storage:** Extensively uses `dexie` for storing crops, propagations, reminders, and logs.
 
 ## Shared Libraries
 
@@ -69,11 +74,11 @@ The shared libraries promote code reuse and consistency between the frontend and
     -   Generates Zod schemas for validation (`api-zod`).
 -   **`db`:**
     -   Defines the database schema using **Drizzle ORM**.
-    -   The schema is currently undefined.
+    -   The schema is currently a placeholder and needs to be defined to support backend storage.
 
 ## Summary
 
-The Crop Manager application is a well-architected, modern web application. The use of a monorepo, OpenAPI, and code generation tools like Orval demonstrates a commitment to code quality, maintainability, and developer efficiency. The frontend is a feature-rich PWA with offline capabilities, and the backend is a solid foundation for a scalable API. The project is set up for success, with a clear separation of concerns and a robust development workflow.
+The Crop Manager application is a well-architected, modern web application. The use of a monorepo, OpenAPI, and code generation tools like Orval demonstrates a commitment to code quality, maintainability, and developer efficiency. The frontend is a feature-rich PWA with offline capabilities and a sophisticated synchronization mechanism with Google Apps Script. The backend is a solid foundation for a scalable API, currently awaiting database schema implementation to complement the frontend's capabilities.
 
 # Changes
 
@@ -82,3 +87,5 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Updated the frontend proxy to point to the backend on port 5001.
 - Added `cross-env` to ensure cross-platform compatibility for setting environment variables.
 - Created a `.env` file in the `cropmanager-pwa` directory to set the `PORT` and `BASE_PATH` environment variables.
+- Analyzed the PWA synchronization logic with Google Apps Script and local storage using Dexie.
+- Verified the monorepo structure and shared library generation workflow.

@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '../store/useAppStore';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 import { SyncPanel } from '../components/settings/SyncPanel';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
+  const { isInstallable, isInstalled, handleInstallClick } = usePWAInstall();
   const [local, setLocal] = useState<AppSettings>({ ...settings });
   const [saved, setSaved] = useState(false);
 
@@ -70,6 +72,29 @@ export function SettingsScreen() {
       </Button>
 
       <DataManagement />
+
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <h3 className="font-semibold text-green-800">App Status</h3>
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Installation</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${isInstalled ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+            {isInstalled ? '✅ Installed' : 'Not Installed'}
+          </span>
+        </div>
+        {!isInstalled && isInstallable && (
+          <Button
+            onClick={handleInstallClick}
+            className="w-full bg-green-600 hover:bg-green-700 text-white"
+          >
+            Install CropManager
+          </Button>
+        )}
+        {!isInstalled && !isInstallable && (
+          <p className="text-[10px] text-muted-foreground text-center">
+            To install, use your browser's "Add to Home Screen" option.
+          </p>
+        )}
+      </div>
 
       <div className="bg-gray-50 rounded-xl border p-4 text-xs text-muted-foreground">
         <p className="font-medium mb-1">About</p>

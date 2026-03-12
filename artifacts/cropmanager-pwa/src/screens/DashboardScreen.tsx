@@ -122,7 +122,7 @@ export function DashboardScreen() {
       </button>
 
       {/* FAB Sheet */}
-      <BottomSheet open={showFAB} onClose={() => setShowFAB(false)} title="Quick Add">
+      <BottomSheet open={showFAB} onClose={() => setShowFAB(false)} title="Quick Add" position="center">
         <div className="pt-2 space-y-3">
           <p className="text-sm text-muted-foreground text-center">Date: {formatDateShort(fabDate)}</p>
           <div className="flex gap-3">

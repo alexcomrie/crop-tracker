@@ -64,7 +64,7 @@ export function PropForm({ open, onClose, date }: PropFormProps) {
   }
 
   return (
-    <BottomSheet open={open} onClose={() => { reset(); onClose(); }} title="Log Propagation">
+    <BottomSheet open={open} onClose={() => { reset(); onClose(); }} title="Log Propagation" position="center">
       <div className="pt-2 space-y-4">
         {step === 1 && (
           <div>

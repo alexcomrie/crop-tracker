@@ -95,7 +95,7 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
   }
 
   return (
-    <BottomSheet open={open} onClose={() => { reset(); onClose(); }} title="Log New Crop">
+    <BottomSheet open={open} onClose={() => { reset(); onClose(); }} title="Log New Crop" position="center">
       <div className="pt-2 space-y-4">
         {step === 1 && (
           <div>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Full background fill for maskable safe zone -->
+  <rect width="512" height="512" fill="#2d6a2d"/>
+  <!-- Content scaled to ~80% centered (safe zone) -->
+  <g transform="translate(51.2, 51.2) scale(0.8)">
+    <circle cx="256" cy="210" r="112" fill="#4caf50"/>
+    <ellipse cx="203" cy="178" rx="53" ry="75" transform="rotate(-30 203 178)" fill="#388e3c"/>
+    <ellipse cx="309" cy="178" rx="53" ry="75" transform="rotate(30 309 178)" fill="#388e3c"/>
+    <rect x="245" y="232" width="22" height="134" rx="11" fill="#1b5e20"/>
+    <text x="256" y="444" text-anchor="middle" font-family="system-ui,sans-serif" font-size="48" font-weight="700" fill="white">CM</text>
+  </g>
+</svg>

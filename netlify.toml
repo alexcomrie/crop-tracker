@@ -1,14 +1,18 @@
 [build]
-  publish = "dist/client"
-  command = "npm run build && npm run generate-sitemap"
+  # Specify the path to the PWA build output
+  publish = "artifacts/cropmanager-pwa/dist"
+  # Use pnpm to build the workspace
+  command = "pnpm install && pnpm run build"
 
 [[redirects]]
-  from = "/api/google-script/*"
-  to = "https://script.google.com/macros/s/AKfycbzXttDdokt5xJjnkMvvvji7ibhl7z1HmOn91otBgTcYHsJdqCPYoeHg6YrWZV7U1kLz/exec/:splat"
+  # Redirect /api to the backend if needed, but the PWA mostly uses GAS
+  # This matches the vite proxy setup
+  from = "/api/*"
+  to = "http://localhost:5001/api/:splat"
   status = 200
-  force = true
 
 [[redirects]]
+  # Single Page Application (SPA) redirect
   from = "/*"
   to = "/index.html"
   status = 200
@@ -17,3 +21,9 @@
   for = "/*.js"
   [headers.values]
     Content-Type = "application/javascript"
+
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"

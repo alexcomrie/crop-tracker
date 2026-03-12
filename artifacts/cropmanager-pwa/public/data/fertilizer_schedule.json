@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "teas": {
+      "Compost Tea": "Broad-spectrum microbial inoculant. Builds beneficial soil biology and improves nutrient uptake.",
+      "Nettle Tea": "High nitrogen boost. Stimulates leafy growth, strengthens stems, and repels pests.",
+      "Banana Peel Tea": "Rich in potassium and phosphorus. Promotes flowering, fruit development, and root strength.",
+      "Moringa Tea": "Natural growth stimulant containing cytokinins. Increases yield and improves stress resistance.",
+      "Fish Emulsion": "Fast-acting nitrogen and trace minerals. Excellent for vegetative growth and root development."
+    },
+    "yeast_preparation": "Mix 5g active dry yeast with 1L warm water (not hot) plus 1 tablespoon molasses or sugar. Stir well and let ferment 2-4 hours at room temperature until bubbly. Use same day.",
+    "yeast_dosing": "Use yeast solution at 1:200 dilution — 5ml per 1 litre of water as soil drench. Apply monthly to introduce beneficial microorganisms. Do not apply as foliar.",
+    "dilution_note": "Final dilution = ratio of your concentrate to total water volume. Example: 1:50 means add 10ml concentrate to 490ml water = 500ml total solution. Always add concentrate to water, not water to concentrate.",
+    "thyme_oil_mosquito_control": "Add 5ml food-grade thyme oil to your spray mix. Apply around plant bases and surrounding soil at dusk for effective mosquito control. Safe for plants and edible crops when properly diluted.",
+    "application_tips": [
+      "Apply foliar sprays early morning (before 9am) or late evening (after 5pm) to avoid leaf burn from UV.",
+      "Never mix different teas in the same application — apply each separately with minimum 24 hour gap.",
+      "Always water soil thoroughly before applying any drench fertilizer to prevent root burn.",
+      "Check leaf colour: yellow leaves = nitrogen deficiency; purple tinge = phosphorus deficiency; brown leaf edges = potassium deficiency.",
+      "Stop all foliar feeding at least 2 weeks before harvest to avoid residue on edible parts.",
+      "Rotate between different products each application to prevent microbial resistance and ensure balanced nutrition.",
+      "Keep detailed records of application dates, dilutions, and plant responses to optimise your schedule."
+    ]
+  },
+  "tomato": {
+    "seedling": {
+      "foliar": {
+        "mix_parts": { "Compost Tea": "1 part", "Water": "50 parts" },
+        "final_dilution": "1:50",
+        "frequency": "Every 10-14 days",
+        "mixing_example": "10ml Compost Tea in 490ml water = 500ml foliar spray",
+        "notes": "Keep dilution light to avoid burning young seedlings"
+      },
+      "drench": {
+        "mix_parts": { "Fish Emulsion": "1 part", "Water": "100 parts" },
+        "final_dilution": "1:100",
+        "frequency": "Weekly",
+        "mixing_example": "5ml Fish Emulsion in 495ml water = 500ml drench",
+        "notes": "Apply 200ml per plant at base"
+      }
+    },
+    "mid_vegetative": {
+      "foliar": {
+        "mix_parts": { "Nettle Tea": "1 part", "Water": "30 parts" },
+        "final_dilution": "1:30",
+        "frequency": "Every 7-10 days",
+        "mixing_example": "15ml Nettle Tea in 485ml water = 500ml foliar spray"
+      },
+      "drench": {
+        "mix_parts": { "Compost Tea": "1 part", "Fish Emulsion": "0.5 part", "Water": "50 parts" },
+        "final_dilution": "1:50",
+        "frequency": "Every 10 days",
+        "mixing_example": "10ml Compost Tea + 5ml Fish Emulsion in 485ml water"
+      }
+    },
+    "flowering": {
+      "foliar": {
+        "mix_parts": { "Banana Peel Tea": "1 part", "Moringa Tea": "0.5 part", "Water": "20 parts" },
+        "final_dilution": "1:20",
+        "frequency": "Every 7 days",
+        "mixing_example": "25ml Banana Peel Tea + 12ml Moringa Tea in 463ml water"
+      },
+      "drench": {
+        "mix_parts": { "Banana Peel Tea": "1 part", "Water": "30 parts" },
+        "final_dilution": "1:30",
+        "frequency": "Every 7 days",
+        "mixing_example": "15ml Banana Peel Tea in 485ml water"
+      }
+    },
+    "fruiting": {
+      "foliar": {
+        "mix_parts": { "Banana Peel Tea": "2 parts", "Fish Emulsion": "0.5 part", "Water": "15 parts" },
+        "final_dilution": "1:15",
+        "frequency": "Every 5-7 days",
+        "mixing_example": "30ml Banana Peel Tea + 8ml Fish Emulsion in 462ml water"
+      },
+      "drench": {
+        "mix_parts": { "Banana Peel Tea": "1 part", "Compost Tea": "1 part", "Water": "20 parts" },
+        "final_dilution": "1:20",
+        "frequency": "Every 7 days",
+        "mixing_example": "12ml each Banana Peel + Compost Tea in 476ml water"
+      }
+    }
+  },
+  "pepper": {
+    "seedling": {
+      "foliar": { "final_dilution": "1:60", "frequency": "Every 14 days", "mixing_example": "8ml in 492ml water" },
+      "drench": { "final_dilution": "1:120", "frequency": "Every 14 days", "mixing_example": "4ml in 496ml water" }
+    },
+    "mid_vegetative": {
+      "foliar": { "final_dilution": "1:35", "frequency": "Every 7-10 days", "mixing_example": "14ml in 486ml water" },
+      "drench": { "final_dilution": "1:60", "frequency": "Every 10 days", "mixing_example": "8ml in 492ml water" }
+    },
+    "flowering": {
+      "foliar": { "final_dilution": "1:25", "frequency": "Every 7 days", "mixing_example": "20ml in 480ml water" },
+      "drench": { "final_dilution": "1:40", "frequency": "Every 7 days", "mixing_example": "12ml in 488ml water" }
+    },
+    "fruiting": {
+      "foliar": { "final_dilution": "1:20", "frequency": "Every 5-7 days", "mixing_example": "25ml in 475ml water" },
+      "drench": { "final_dilution": "1:30", "frequency": "Weekly", "mixing_example": "16ml in 484ml water" }
+    }
+  }
+}

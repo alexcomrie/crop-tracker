@@ -14,12 +14,12 @@ export async function importCSVData(file: File): Promise<ImportResult> {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      complete: async (results: Papa.ParseResult<any>) => {
         const errors: string[] = [];
         let count = 0;
 
         try {
-          for (const row of results.data as any[]) {
+          for (const row of results.data) {
             // Determine the type of data based on headers or a 'type' column
             // For now, let's assume we are importing 'crops' if 'cropName' exists
             if (row.cropName) {
@@ -54,7 +54,7 @@ export async function importCSVData(file: File): Promise<ImportResult> {
           resolve({ success: false, count, errors: [err.message] });
         }
       },
-      error: (error) => {
+      error: (error: Error) => {
         resolve({ success: false, count: 0, errors: [error.message] });
       }
     });

@@ -4,6 +4,10 @@
   # Use pnpm to build the workspace
   command = "pnpm install && pnpm run build"
 
+[build.environment]
+  PORT = "5173"
+  BASE_PATH = "/"
+
 [[redirects]]
   # Redirect /api to the backend if needed, but the PWA mostly uses GAS
   # This matches the vite proxy setup

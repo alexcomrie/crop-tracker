@@ -188,6 +188,7 @@ I have successfully implemented the Netlify Function proxy for your synchronizat
 - **Netlify Functions**: Created the [sync.mts](file:///c:/Users/ALEX/Desktop/Crop-Manager/netlify/functions/sync.mts) serverless function to securely proxy PWA requests to Google Apps Script.
 - **Dependencies**: Installed `@netlify/functions` in the [cropmanager-pwa](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/package.json) package to support the new serverless architecture.
 - **Sync Logic Update**: Updated [sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sync.ts) to include the required `action` parameter in its requests, ensuring the Netlify Function can correctly route "push" and "pull" operations.
+- **Dependency Resolution**: Installed `@netlify/functions` at the workspace root to resolve TypeScript type declaration errors in the [sync.mts](file:///c:/Users/ALEX/Desktop/Crop-Manager/netlify/functions/sync.mts) function.
 - **Deployment Ready**: All configurations in `netlify.toml` are now perfectly aligned with the Netlify Functions setup.
 
 **You:**

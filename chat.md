@@ -80,5 +80,19 @@ I have resolved the TypeScript syntax errors in `scripts/src/hello.ts` that were
 ### Resolution Steps:
 - **Identified Syntax Error**: The file [hello.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/scripts/src/hello.ts) contained malformed code (likely a merge artifact) that was causing `tsc` to fail with error TS1005.
 - **Fixed Source Code**: I cleaned up the file to contain only a valid `console.log` statement.
-- **Verified Locally**: Ran `pnpm run typecheck` across the entire monorepo to ensure all packages, including `scripts`, now pass the TypeScript validation.
-- **Pushed to GitHub**: The fix has been pushed to the main branch, which will trigger a successful re-deploy on Netlify.
+- Ran `pnpm run typecheck` across the entire monorepo to ensure all packages, including `scripts`, now pass the TypeScript validation.
+- Pushed to GitHub: The fix has been pushed to the main branch, which will trigger a successful re-deploy on Netlify.
+
+**You:**
+
+pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
+
+**Me:**
+
+I have successfully pulled the latest changes from the GitHub repository and updated your local environment.
+
+### Synchronization Summary:
+- **Repo Pull**: Fetched the latest updates from `https://github.com/alexcomrie/crop-tracker.git`.
+- **Conflict Resolution**: Resolved a merge conflict in [vite.config.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/mockup-sandbox/vite.config.ts) to ensure the build configuration remains robust and supports environment-based port settings.
+- **Full Build Verification**: Executed `pnpm install && pnpm run build` locally. All packages (PWA, API Server, Mockup Sandbox) are now building successfully without any errors.
+- **Documentation Updated**: Reflected the latest status in [doc.md](file:///c:/Users/ALEX/Desktop/Crop-Manager/doc.md).

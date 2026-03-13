@@ -98,3 +98,5 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Synchronized local environment with the latest changes from the GitHub repository (`https://github.com/alexcomrie/crop-tracker.git`).
 - Resolved merge conflicts in `artifacts/mockup-sandbox/vite.config.ts` to maintain robust build configurations and project structure.
 - Successfully performed a full workspace build (`pnpm install && pnpm run build`), confirming that all packages (PWA, API Server, Mockup Sandbox, and Scripts) are building correctly.
+- Configured synchronization with Google Apps Script (GAS) by updating the default settings in `useAppStore.ts` and the `.env` file with the provided Spreadsheet ID, Web App URL, and Sync Token.
+- Enhanced the `SettingsScreen` to automatically fill the GAS Sync Configuration from environment variables if the fields are empty and added a "Load from Env" button for easy configuration.

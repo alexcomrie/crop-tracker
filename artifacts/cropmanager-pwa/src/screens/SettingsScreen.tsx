@@ -10,7 +10,14 @@ import type { AppSettings } from '../types';
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
   const { isInstallable, isInstalled, handleInstallClick } = usePWAInstall();
-  const [local, setLocal] = useState<AppSettings>({ ...settings });
+  
+  // Auto-fill empty GAS config from environment if currently empty
+  const initialLocal = { ...settings };
+  if (!initialLocal.spreadsheetId) initialLocal.spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || '';
+  if (!initialLocal.gasWebAppUrl) initialLocal.gasWebAppUrl = import.meta.env.VITE_GAS_URL || '';
+  if (!initialLocal.syncToken) initialLocal.syncToken = import.meta.env.VITE_SYNC_TOKEN || '';
+
+  const [local, setLocal] = useState<AppSettings>(initialLocal);
   const [saved, setSaved] = useState(false);
 
   function handleSave() {
@@ -36,7 +43,20 @@ export function SettingsScreen() {
       <SyncPanel />
 
       <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold">GAS Sync Configuration</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-green-800">GAS Sync Configuration</h3>
+          <button 
+            onClick={() => setLocal(l => ({ 
+              ...l, 
+              spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
+              gasWebAppUrl: import.meta.env.VITE_GAS_URL || '',
+              syncToken: import.meta.env.VITE_SYNC_TOKEN || ''
+            }))}
+            className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200"
+          >
+            Load from Env
+          </button>
+        </div>
         {field('spreadsheetId', 'Google Spreadsheet ID', 'text', '1jA1Fpw27...')}
         {field('gasWebAppUrl', 'GAS Web App URL', 'url', 'https://script.google.com/...')}
         {field('syncToken', 'Sync Token', 'password', 'Your SYNC_TOKEN')}

@@ -81,7 +81,37 @@ I have resolved the TypeScript syntax errors in `scripts/src/hello.ts` that were
 - **Identified Syntax Error**: The file [hello.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/scripts/src/hello.ts) contained malformed code (likely a merge artifact) that was causing `tsc` to fail with error TS1005.
 - **Fixed Source Code**: I cleaned up the file to contain only a valid `console.log` statement.
 - Ran `pnpm run typecheck` across the entire monorepo to ensure all packages, including `scripts`, now pass the TypeScript validation.
-- Pushed to GitHub: The fix has been pushed to the main branch, which will trigger a successful re-deploy on Netlify.
+- **Pushed to GitHub**: The fix has been pushed to the main branch, which will trigger a successful re-deploy on Netlify.
+
+**You:**
+
+configure the web app to sync with GAS:
+
+Google Spreadsheet ID : 1TGpt9rvRUeQwnSxo6n8X271VeZW2m4m4nYwsi8iHBx8
+GAS Web App URL : `https://script.google.com/macros/s/AKfycbzSZhdgpaO_AAv6zWJxRKtIOWlzI4mqRzFP7jKSp_8-9PkT-qwCoHJT7qaEMG-5sFlLEA/exec`
+Sync Token : CropMgr_Alex_2026
+
+**Me:**
+
+I have successfully configured the web app to synchronize with your Google Apps Script (GAS).
+
+### Configuration Details:
+- **Default Settings Update**: I updated the [useAppStore.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/store/useAppStore.ts) file with the new Spreadsheet ID, GAS URL, and Sync Token as the default values for the application.
+- **Environment Variables**: I added these configuration details to the [.env](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/.env) file using Vite's environment variable convention (`VITE_...`) to ensure they are available during development and build time.
+- **Robustness**: The app will now automatically use these settings upon initialization, while still allowing for manual overrides in the Settings screen if needed.
+
+**You:**
+
+please make sure GAS Sync Configuration in settings is auto filled from `c:\Users\ALEX\Desktop\Crop-Manager\artifacts\cropmanager-pwa\.env`
+
+**Me:**
+
+I have updated the **Settings Screen** to ensure that the GAS Sync Configuration is automatically filled from your environment variables.
+
+### Key Changes:
+- **Auto-Fill Logic**: I modified [SettingsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/SettingsScreen.tsx) to automatically populate any empty GAS configuration fields using the values from your `.env` file upon opening the screen.
+- **Load from Env Button**: Added a "Load from Env" button in the GAS Sync Configuration section. This allows you to quickly restore the environment-defined values at any time.
+- **Persistence**: This approach ensures that even if you haven't saved your settings yet, the correct GAS configuration is ready to use, while still giving you full control to manually adjust them.
 
 **You:**
 

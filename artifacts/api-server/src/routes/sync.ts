@@ -9,7 +9,7 @@ const GAS_SYNC_TOKEN = process.env["GAS_SYNC_TOKEN"] || "";
  * GET /api/sync/health
  * Proxies the GAS health check so the PWA can confirm the endpoint is live.
  */
-router.get("/sync/health", async (_req: Request, res: Response) => {
+router.get("/health", async (_req: Request, res: Response) => {
   if (!GAS_SYNC_URL) {
     res.status(503).json({ success: false, error: "GAS_SYNC_URL not configured on server" });
     return;
@@ -29,7 +29,7 @@ router.get("/sync/health", async (_req: Request, res: Response) => {
  * Validates the token, then forwards the payload to GAS as a push action.
  * The server makes the GAS call — no CORS issue.
  */
-router.post("/sync/push", async (req: Request, res: Response) => {
+router.post("/push", async (req: Request, res: Response) => {
   if (!GAS_SYNC_URL || !GAS_SYNC_TOKEN) {
     res.status(503).json({ success: false, error: "GAS_SYNC_URL or GAS_SYNC_TOKEN not configured on server" });
     return;
@@ -60,7 +60,7 @@ router.post("/sync/push", async (req: Request, res: Response) => {
  * Body: { token: string }
  * Pulls all sheet data from GAS and returns it to the PWA.
  */
-router.post("/sync/pull", async (req: Request, res: Response) => {
+router.post("/pull", async (req: Request, res: Response) => {
   if (!GAS_SYNC_URL || !GAS_SYNC_TOKEN) {
     res.status(503).json({ success: false, error: "GAS_SYNC_URL or GAS_SYNC_TOKEN not configured on server" });
     return;

@@ -150,6 +150,20 @@ I have updated the synchronization logic in the PWA to use the backend proxy end
 
 **You:**
 
+The sync route at artifacts/api-server/src/routes/sync.ts exists...
+
+**Me:**
+
+I have resolved the issues with the backend synchronization routes and ensured the `api-server` correctly proxies requests to Google Apps Script.
+
+### Key Fixes:
+- **Environment Variable Loading**: Installed `dotenv` in [api-server/package.json](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/api-server/package.json) and updated [index.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/api-server/src/index.ts) to load the `.env` file at startup.
+- **Route Registration**: Corrected the route prefixing in [routes/index.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/api-server/src/routes/index.ts) and [routes/sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/api-server/src/routes/sync.ts) to ensure `/api/sync/health`, `/api/sync/push`, and `/api/sync/pull` are properly exposed.
+- **Server Configuration**: Verified [api-server/.env](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/api-server/.env) contains the correct `GAS_SYNC_URL` and `GAS_SYNC_TOKEN`.
+- **Endpoint Verification**: Confirmed that `GET /api/healthz` is working and the sync endpoints are correctly registered, resolving the previous "Cannot GET" errors.
+
+**You:**
+
 pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
 
 **Me:**

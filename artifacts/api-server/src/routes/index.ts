@@ -4,7 +4,7 @@ import syncRouter from "./sync";
 
 const router: IRouter = Router();
 
-router.use(healthRouter);
-router.use(syncRouter);
+router.use("/healthz", healthRouter);
+router.use("/sync", syncRouter);
 
 export default router;

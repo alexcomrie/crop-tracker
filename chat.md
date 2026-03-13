@@ -129,6 +129,27 @@ I have successfully updated the app to be fully offline-capable, using local dev
 
 **You:**
 
+Update src/lib/sync.ts in artifacts/cropmanager-pwa:
+
+Change all sync fetch calls from calling CONFIG.gasWebAppUrl directly to calling /api/sync/push and /api/sync/pull instead
+The push endpoint is: POST /api/sync/push with body { token, payload }
+The pull endpoint is: POST /api/sync/pull with body { token }
+The health check is: GET /api/sync/health
+Remove any direct GAS URL fetch calls — the Express proxy handles GAS communication
+The token is still read from useSettings().syncToken
+
+**Me:**
+
+I have updated the synchronization logic in the PWA to use the backend proxy endpoints instead of calling Google Apps Script directly.
+
+### Changes Summary:
+- **Proxy Endpoints**: Modified [sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sync.ts) to use `/api/sync/push` for data uploads and `/api/sync/pull` for data retrieval.
+- **Simplified Requests**: Removed direct dependencies on `gasWebAppUrl` within the sync functions, as the Express server now manages the GAS communication.
+- **Health Check**: Implemented `checkSyncHealth()` which calls the new `/api/sync/health` endpoint.
+- **Payload Consistency**: Ensured the `syncToken` is correctly passed in the request bodies as required by the new proxy endpoints.
+
+**You:**
+
 pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
 
 **Me:**

@@ -46,13 +46,12 @@ export async function pushToGAS(
   settings: AppSettings,
   onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; written?: Record<string, number>; error?: string }> {
-  if (!settings.gasWebAppUrl) return { success: false, error: 'GAS Web App URL not configured' };
   onProgress?.('Uploading records...');
   try {
-    const res = await fetch(settings.gasWebAppUrl, {
+    const res = await fetch('/api/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken, action: 'push', payload }),
+      body: JSON.stringify({ token: settings.syncToken, payload }),
     });
     const data = await res.json();
     if (data.success) {
@@ -78,12 +77,11 @@ export async function pushToGAS(
 }
 
 export async function pullFromGAS(settings: AppSettings): Promise<{ success: boolean; count?: number; error?: string }> {
-  if (!settings.gasWebAppUrl) return { success: false, error: 'GAS Web App URL not configured' };
   try {
-    const res = await fetch(settings.gasWebAppUrl, {
+    const res = await fetch('/api/sync/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken, action: 'pull', since: 0 }),
+      body: JSON.stringify({ token: settings.syncToken }),
     });
     const data = await res.json();
     if (!data.success) return { success: false, error: data.error };
@@ -123,4 +121,14 @@ export async function exportJsonBackup(): Promise<string> {
     db.treatmentLogs.toArray(),
   ]);
   return JSON.stringify({ exportedAt: new Date().toISOString(), crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs }, null, 2);
+}
+
+export async function checkSyncHealth(): Promise<{ success: boolean; status?: string; error?: string }> {
+  try {
+    const res = await fetch('/api/sync/health');
+    const data = await res.json();
+    return { success: res.ok, status: data.status, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
 }

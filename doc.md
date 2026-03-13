@@ -105,6 +105,7 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Added an **End-of-Day Auto-Sync** feature in the `TopBar` that triggers synchronization at the configured hour if the device is online.
 - Integrated a status indicator in the `TopBar` showing pending records and offline status for better user awareness.
 - Implemented **CSV Data Import** functionality, allowing users to upload local CSV files. The imported data is stored in the local Dexie database and automatically queued for synchronization with Google Apps Script (GAS).
+- Fixed a Vite build error by correctly installing `papaparse` and `uuid` as direct dependencies in the `cropmanager-pwa` package.
 - Updated PWA synchronization logic in `src/lib/sync.ts` to use local API proxy endpoints (`/api/sync/push`, `/api/sync/pull`, `/api/sync/health`) instead of direct Google Apps Script URL calls, centralizing communication through the Express backend.
 - Updated PWA synchronization logic in `src/lib/sync.ts` to use local API proxy endpoints (`/api/sync/push`, `/api/sync/pull`, `/api/sync/health`) instead of direct Google Apps Script URL calls, centralizing communication through the Express backend.
 - Configured the backend `api-server` to properly load environment variables using `dotenv`.

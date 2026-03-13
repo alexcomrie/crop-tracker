@@ -232,3 +232,16 @@ I have successfully implemented the CSV data import functionality. You can now u
 - **Sync Integration**: All imported records are marked with a `pending` sync status, ensuring they are automatically uploaded to your Google Spreadsheet during the next synchronization cycle.
 - **UI Component**: Added an "Import CSV Data" button to the **Data Management** section in the [SettingsScreen](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/SettingsScreen.tsx).
 - **Flexibility**: The importer currently supports both 'crops' and 'propagations' based on the presence of `cropName` or `plantName` headers in your CSV file.
+
+**You:**
+
+[plugin:vite:import-analysis] Failed to resolve import "papaparse" from "src/lib/csvImport.ts". Does the file exist?
+
+**Me:**
+
+I have resolved the Vite build error by ensuring `papaparse` and `uuid` are correctly installed in the PWA's package.
+
+### Fix Details:
+- **Dependency Installation**: Installed `papaparse`, `uuid`, and their corresponding TypeScript type declarations specifically in the [cropmanager-pwa](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/package.json) package using `pnpm --filter`.
+- **Workspace Synchronization**: Ensured the workspace correctly recognizes these new dependencies, resolving the "Failed to resolve import" error in the development server.
+- **Pushed to GitHub**: The updated dependency configuration has been committed and pushed to your repository.

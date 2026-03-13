@@ -1,10 +1,11 @@
-import { defineConfig } from "vite";
+import { defineConfig } from 'vite';
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 
+// Retrieve environment variables with fallback defaults
 const rawPort = process.env.PORT ?? "5173";
 const parsedPort = Number(rawPort);
 const port = Number.isNaN(parsedPort) || parsedPort <= 0 ? 5173 : parsedPort;

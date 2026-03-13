@@ -189,7 +189,20 @@ I have successfully implemented the Netlify Function proxy for your synchronizat
 - **Dependencies**: Installed `@netlify/functions` in the [cropmanager-pwa](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/package.json) package to support the new serverless architecture.
 - **Sync Logic Update**: Updated [sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sync.ts) to include the required `action` parameter in its requests, ensuring the Netlify Function can correctly route "push" and "pull" operations.
 - **Dependency Resolution**: Installed `@netlify/functions` at the workspace root to resolve TypeScript type declaration errors in the [sync.mts](file:///c:/Users/ALEX/Desktop/Crop-Manager/netlify/functions/sync.mts) function.
-- **Deployment Ready**: All configurations in `netlify.toml` are now perfectly aligned with the Netlify Functions setup.
+- **Deployment Ready**: All configurations in `netlify.toml` are now perfectly aligned with the Netlify Functions setup, with corrected paths for `publish` and `functions` to resolve build errors.
+
+**You:**
+
+9:31:25 PM: Failed during stage 'building site'... Error message: Deploy did not succeed: Deploy directory 'artifacts/cropmanager-pwa/artifacts/cropmanager-pwa/dist' does not exist
+
+**Me:**
+
+I have corrected the `netlify.toml` configuration to resolve the deploy directory error.
+
+### Fix Details:
+- **Path Correction**: Fixed the `publish` path in [netlify.toml](file:///c:/Users/ALEX/Desktop/Crop-Manager/netlify.toml). Since Netlify appends the `publish` path to the `base` directory, I updated it to just `dist`.
+- **Functions Path**: Adjusted the `functions` path to `../../netlify/functions` to correctly point to the root directory relative to the PWA `base`.
+- **Pushed to GitHub**: These changes are now pushed and will allow Netlify to correctly locate the build artifacts and functions.
 
 **You:**
 

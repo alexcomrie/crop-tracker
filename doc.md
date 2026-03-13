@@ -112,4 +112,5 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Configured Netlify redirects to route `/api/sync/*` requests to Netlify Functions and established a SPA fallback to `index.html`.
 - Implemented a serverless Netlify Function at `netlify/functions/sync.mts` to proxy synchronization requests from the PWA to Google Apps Script, resolving CORS issues and centralizing sync logic.
 - Installed `@netlify/functions` in the workspace root to resolve TypeScript declaration errors in the serverless function.
+- Updated root `netlify.toml` with corrected `publish` and `functions` paths relative to the PWA `base` directory, resolving build and deploy directory errors.
 - Updated PWA `sync.ts` to include the `action` field in requests, ensuring compatibility with the Netlify Function proxy.

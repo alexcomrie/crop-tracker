@@ -1,8 +1,8 @@
 [build]
   base    = "artifacts/cropmanager-pwa"
   command = "pnpm install && pnpm run build"
-  publish = "artifacts/cropmanager-pwa/dist"
-  functions = "netlify/functions"
+  publish = "dist"
+  functions = "../../netlify/functions"
 
 [build.environment]
   NODE_VERSION = "20"

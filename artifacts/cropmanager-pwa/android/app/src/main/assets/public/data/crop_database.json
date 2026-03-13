@@ -1,0 +1,1412 @@
+{
+  "callaloo": {
+    "display_name": "Callaloo",
+    "varieties": [
+      "Jamaica Green",
+      "Trinidad Green",
+      "Red-Stemmed",
+      "Broad Leaf"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 6,
+    "growing_time_days": 52,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 35,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      42
+    ],
+    "pest_spray_days": [
+      14,
+      35
+    ],
+    "planting_method": "Direct ground or seed bed",
+    "diseases": [
+      "Powdery mildew",
+      "Downy mildew",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Leaf miners",
+      "Flea beetles",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "pak choi": {
+    "display_name": "Pak Choi (Bok Choy)",
+    "varieties": [
+      "Standard Green",
+      "Baby Pak Choi",
+      "Purple Pak Choi"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 3,
+    "growing_time_days": 52,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 14,
+    "germination_days_min": 4,
+    "germination_days_max": 8,
+    "fungus_spray_days": [
+      20,
+      40
+    ],
+    "pest_spray_days": [
+      14,
+      35
+    ],
+    "planting_method": "Direct ground or seed tray",
+    "diseases": [
+      "Clubroot",
+      "Black rot",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cabbage worms",
+      "Aphids",
+      "Flea beetles",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "bok choy": {
+    "alias": "pak choi"
+  },
+  "cabbage": {
+    "display_name": "Cabbage",
+    "varieties": [
+      "Flat Dutch",
+      "Golden Acre",
+      "Red Cabbage",
+      "Savoy"
+    ],
+    "plant_type": "Brassica",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 95,
+    "transplant_days": 28,
+    "growing_from_transplant": 67,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45,
+      70
+    ],
+    "pest_spray_days": [
+      14,
+      35,
+      60
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Clubroot",
+      "Black rot",
+      "Fusarium wilt",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cabbage worms/loopers",
+      "Aphids",
+      "Cabbage root maggot",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "lettuce": {
+    "display_name": "Lettuce",
+    "varieties": [
+      "Romaine",
+      "Iceberg",
+      "Butterhead",
+      "Loose Leaf",
+      "Red Leaf"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 5,
+    "growing_time_days": 45,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 28,
+    "germination_days_min": 2,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      20,
+      38
+    ],
+    "pest_spray_days": [
+      14,
+      30
+    ],
+    "planting_method": "Direct ground or seed tray",
+    "diseases": [
+      "Downy mildew",
+      "Bottom rot",
+      "Lettuce mosaic virus",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Slugs and snails",
+      "Leaf miners",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "spinach": {
+    "display_name": "Spinach",
+    "varieties": [
+      "Smooth Leaf",
+      "Savoy",
+      "Semi-Savoy"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 4,
+    "growing_time_days": 45,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 21,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      18,
+      36
+    ],
+    "pest_spray_days": [
+      14,
+      30
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Downy mildew",
+      "Fusarium wilt",
+      "Leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Leaf miners",
+      "Slugs",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "kale": {
+    "display_name": "Kale",
+    "varieties": [
+      "Curly Kale",
+      "Tuscan (Lacinato)",
+      "Red Russian"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 8,
+    "growing_time_days": 65,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 49,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45
+    ],
+    "pest_spray_days": [
+      14,
+      35
+    ],
+    "planting_method": "Direct ground or seed tray",
+    "diseases": [
+      "Downy mildew",
+      "Black rot",
+      "Clubroot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cabbage worms",
+      "Aphids",
+      "Flea beetles",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "mustard greens": {
+    "display_name": "Mustard Greens",
+    "varieties": [
+      "Green Wave",
+      "Red Giant",
+      "Southern Giant"
+    ],
+    "plant_type": "Leafy Greens",
+    "number_of_weeks_harvest": 4,
+    "growing_time_days": 45,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 21,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      18,
+      36
+    ],
+    "pest_spray_days": [
+      14,
+      28
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Alternaria leaf spot",
+      "Downy mildew",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Flea beetles",
+      "Aphids",
+      "Cabbage worms",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "cauliflower": {
+    "display_name": "Cauliflower",
+    "varieties": [
+      "Snowball",
+      "Purple Cauliflower",
+      "Romanesco"
+    ],
+    "plant_type": "Brassica",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 77,
+    "transplant_days": 28,
+    "growing_from_transplant": 49,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45,
+      65
+    ],
+    "pest_spray_days": [
+      14,
+      35,
+      56
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Clubroot",
+      "Downy mildew",
+      "Bacterial soft rot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cabbage worms",
+      "Aphids",
+      "Cabbage root maggot",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "broccoli": {
+    "display_name": "Broccoli",
+    "varieties": [
+      "Calabrese",
+      "Sprouting Broccoli",
+      "Broccolini"
+    ],
+    "plant_type": "Brassica",
+    "number_of_weeks_harvest": 3,
+    "growing_time_days": 75,
+    "transplant_days": 28,
+    "growing_from_transplant": 47,
+    "harvest_interval": 7,
+    "batch_offset_days": 14,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45,
+      65
+    ],
+    "pest_spray_days": [
+      14,
+      35,
+      56
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Clubroot",
+      "Black rot",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cabbage worms",
+      "Aphids",
+      "Cabbage root maggot",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "tomato": {
+    "display_name": "Tomato",
+    "varieties": [
+      "Cherry",
+      "Beefsteak",
+      "Plum (Roma)",
+      "Heirloom",
+      "Sun Gold",
+      "Better Boy"
+    ],
+    "plant_type": "Fruiting Vegetable",
+    "number_of_weeks_harvest": 12,
+    "growing_time_days": 95,
+    "transplant_days": 21,
+    "growing_from_transplant": 74,
+    "harvest_interval": 7,
+    "batch_offset_days": 77,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      30,
+      50,
+      70,
+      90
+    ],
+    "pest_spray_days": [
+      25,
+      45,
+      65,
+      85
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Early blight",
+      "Late blight",
+      "Blossom end rot",
+      "Fusarium wilt",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Hornworms",
+      "Aphids",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "tomatoes": {
+    "alias": "tomato"
+  },
+  "sweet pepper": {
+    "display_name": "Sweet Pepper (Bell Pepper)",
+    "varieties": [
+      "California Wonder",
+      "Cubanelle",
+      "Banana Pepper",
+      "Red Bell",
+      "Yellow Bell"
+    ],
+    "plant_type": "Fruiting Vegetable",
+    "number_of_weeks_harvest": 10,
+    "growing_time_days": 96,
+    "transplant_days": 21,
+    "growing_from_transplant": 75,
+    "harvest_interval": 7,
+    "batch_offset_days": 63,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      30,
+      55,
+      80
+    ],
+    "pest_spray_days": [
+      25,
+      50,
+      75
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Bacterial spot",
+      "Blossom end rot",
+      "Phytophthora blight",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Thrips",
+      "Pepper weevils",
+      "Whiteflies"
+    ]
+  },
+  "bell pepper": {
+    "alias": "sweet pepper"
+  },
+  "pepper": {
+    "alias": "sweet pepper"
+  },
+  "hot pepper": {
+    "display_name": "Hot Pepper (Scotch Bonnet / Chili)",
+    "varieties": [
+      "Scotch Bonnet",
+      "Habanero",
+      "Cayenne",
+      "Thai Bird",
+      "Jalape\u00f1o",
+      "Congo Pepper"
+    ],
+    "plant_type": "Fruiting Vegetable",
+    "number_of_weeks_harvest": 10,
+    "growing_time_days": 108,
+    "transplant_days": 21,
+    "growing_from_transplant": 87,
+    "harvest_interval": 7,
+    "batch_offset_days": 63,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      30,
+      60,
+      90
+    ],
+    "pest_spray_days": [
+      25,
+      55,
+      85
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Bacterial spot",
+      "Anthracnose",
+      "Phytophthora blight",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Thrips",
+      "Mites",
+      "Whiteflies"
+    ]
+  },
+  "scotch bonnet": {
+    "alias": "hot pepper"
+  },
+  "chili": {
+    "alias": "hot pepper"
+  },
+  "eggplant": {
+    "display_name": "Eggplant (Aubergine)",
+    "varieties": [
+      "Black Beauty",
+      "Chinese Long",
+      "Italian",
+      "White Eggplant"
+    ],
+    "plant_type": "Fruiting Vegetable",
+    "number_of_weeks_harvest": 10,
+    "growing_time_days": 93,
+    "transplant_days": 21,
+    "growing_from_transplant": 72,
+    "harvest_interval": 7,
+    "batch_offset_days": 63,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      30,
+      55,
+      80
+    ],
+    "pest_spray_days": [
+      25,
+      50,
+      75
+    ],
+    "planting_method": "Seed tray then transplant",
+    "diseases": [
+      "Verticillium wilt",
+      "Phomopsis blight",
+      "Bacterial wilt",
+      "Root rot"
+    ],
+    "pests": [
+      "Flea beetles",
+      "Aphids",
+      "Spider mites",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "aubergine": {
+    "alias": "eggplant"
+  },
+  "okra": {
+    "display_name": "Okra",
+    "varieties": [
+      "Clemson Spineless",
+      "Burgundy",
+      "Dwarf",
+      "Louisiana Green Velvet"
+    ],
+    "plant_type": "Fruiting Vegetable",
+    "number_of_weeks_harvest": 10,
+    "growing_time_days": 57,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 63,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      21,
+      40
+    ],
+    "pest_spray_days": [
+      14,
+      35
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Powdery mildew",
+      "Fusarium wilt",
+      "Root-knot nematodes",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Stink bugs",
+      "Corn earworm",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "cucumber": {
+    "display_name": "Cucumber",
+    "varieties": [
+      "Slicing",
+      "Pickling",
+      "English Seedless",
+      "Lemon Cucumber"
+    ],
+    "plant_type": "Vine / Fruiting Vegetable",
+    "number_of_weeks_harvest": 4,
+    "growing_time_days": 70,
+    "transplant_days": 14,
+    "growing_from_transplant": 56,
+    "harvest_interval": 7,
+    "days_to_third_harvest": 84,
+    "batch_offset_days": 21,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      20,
+      40,
+      60
+    ],
+    "pest_spray_days": [
+      15,
+      35,
+      55
+    ],
+    "planting_method": "Direct ground or seed tray",
+    "diseases": [
+      "Powdery mildew",
+      "Bacterial wilt",
+      "Downy mildew",
+      "Bacterial leaf spot",
+      "Root rot"
+    ],
+    "pests": [
+      "Cucumber beetles",
+      "Aphids",
+      "Spider mites",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "cucumbers": {
+    "alias": "cucumber"
+  },
+  "pumpkin": {
+    "display_name": "Pumpkin",
+    "varieties": [
+      "Sugar Pumpkin",
+      "Atlantic Giant",
+      "Kabocha",
+      "Calabaza"
+    ],
+    "plant_type": "Vine Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 105,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45,
+      75
+    ],
+    "pest_spray_days": [
+      14,
+      40,
+      70
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Powdery mildew",
+      "Downy mildew",
+      "Phytophthora root rot",
+      "Bacterial leaf spot"
+    ],
+    "pests": [
+      "Squash vine borers",
+      "Aphids",
+      "Cucumber beetles",
+      "Whiteflies"
+    ]
+  },
+  "squash": {
+    "display_name": "Squash (Butternut / Zucchini)",
+    "varieties": [
+      "Butternut",
+      "Zucchini (Green)",
+      "Zucchini (Yellow)",
+      "Acorn",
+      "Spaghetti Squash"
+    ],
+    "plant_type": "Vine Crop",
+    "number_of_weeks_harvest": 6,
+    "growing_time_days": 52,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 35,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      18,
+      38,
+      55
+    ],
+    "pest_spray_days": [
+      14,
+      32,
+      50
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Powdery mildew",
+      "Squash mosaic virus",
+      "Downy mildew",
+      "Root rot"
+    ],
+    "pests": [
+      "Squash vine borers",
+      "Aphids",
+      "Cucumber beetles",
+      "Whiteflies"
+    ]
+  },
+  "zucchini": {
+    "alias": "squash"
+  },
+  "butternut": {
+    "alias": "squash"
+  },
+  "watermelon": {
+    "display_name": "Watermelon",
+    "varieties": [
+      "Sugar Baby",
+      "Crimson Sweet",
+      "Charleston Grey",
+      "Seedless"
+    ],
+    "plant_type": "Vine Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 80,
+    "transplant_days": 21,
+    "growing_from_transplant": 59,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 4,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      35,
+      49,
+      63
+    ],
+    "pest_spray_days": [
+      21,
+      42,
+      63
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Powdery mildew",
+      "Gummy stem blight",
+      "Downy mildew",
+      "Anthracnose",
+      "Fusarium wilt",
+      "Bacterial fruit blotch"
+    ],
+    "pests": [
+      "Cucumber beetles",
+      "Squash bugs",
+      "Aphids",
+      "Cutworms",
+      "Thrips",
+      "Cabbage loopers"
+    ]
+  },
+  "carrot": {
+    "display_name": "Carrot",
+    "varieties": [
+      "Nantes",
+      "Chantenay",
+      "Imperator",
+      "Danvers"
+    ],
+    "plant_type": "Root Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 70,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 10,
+    "germination_days_max": 17,
+    "fungus_spray_days": [
+      25,
+      50
+    ],
+    "pest_spray_days": [
+      20,
+      45
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Alternaria leaf blight",
+      "Powdery mildew",
+      "Root rot"
+    ],
+    "pests": [
+      "Carrot rust fly",
+      "Aphids",
+      "Wireworms"
+    ]
+  },
+  "beetroot": {
+    "display_name": "Beetroot",
+    "varieties": [
+      "Detroit Dark Red",
+      "Golden Beet",
+      "Chioggia",
+      "Bull's Blood"
+    ],
+    "plant_type": "Root Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 60,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 5,
+    "germination_days_max": 12,
+    "fungus_spray_days": [
+      20,
+      45
+    ],
+    "pest_spray_days": [
+      15,
+      38
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Cercospora leaf spot",
+      "Powdery mildew",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Leaf miners",
+      "Flea beetles"
+    ]
+  },
+  "beet": {
+    "alias": "beetroot"
+  },
+  "radish": {
+    "display_name": "Radish",
+    "varieties": [
+      "French Breakfast",
+      "Cherry Belle",
+      "Daikon",
+      "Black Spanish"
+    ],
+    "plant_type": "Root Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 25,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 3,
+    "germination_days_max": 7,
+    "fungus_spray_days": [
+      12
+    ],
+    "pest_spray_days": [
+      8
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Downy mildew",
+      "Black root",
+      "Root rot"
+    ],
+    "pests": [
+      "Flea beetles",
+      "Aphids",
+      "Root maggots"
+    ]
+  },
+  "corn": {
+    "display_name": "Corn (Maize)",
+    "varieties": [
+      "Sweet Yellow",
+      "Sweet White",
+      "Popcorn",
+      "Decorative"
+    ],
+    "plant_type": "Grain",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 80,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 3,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      21,
+      45,
+      65
+    ],
+    "pest_spray_days": [
+      14,
+      35,
+      55
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Gray leaf spot",
+      "Northern corn leaf blight",
+      "Common rust",
+      "Root rot"
+    ],
+    "pests": [
+      "Corn earworm",
+      "Fall armyworm",
+      "Aphids",
+      "Corn borer"
+    ]
+  },
+  "maize": {
+    "alias": "corn"
+  },
+  "red peas": {
+    "display_name": "Red Peas (Kidney Beans)",
+    "varieties": [
+      "Red Kidney",
+      "Dark Red Kidney",
+      "Light Red Kidney"
+    ],
+    "plant_type": "Legume",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 105,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 3,
+    "germination_days_max": 8,
+    "fungus_spray_days": [
+      25,
+      55,
+      80
+    ],
+    "pest_spray_days": [
+      20,
+      45,
+      70
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Bean rust",
+      "Angular leaf spot",
+      "Anthracnose",
+      "Root rot"
+    ],
+    "pests": [
+      "Bean beetle",
+      "Aphids",
+      "Whiteflies",
+      "Thrips"
+    ]
+  },
+  "kidney beans": {
+    "alias": "red peas"
+  },
+  "gungo peas": {
+    "display_name": "Gungo Peas (Pigeon Peas)",
+    "varieties": [
+      "Green Gungo",
+      "Brown Gungo",
+      "Black-Eyed Peas (related)"
+    ],
+    "plant_type": "Legume",
+    "number_of_weeks_harvest": 8,
+    "growing_time_days": 150,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 49,
+    "germination_days_min": 4,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      40,
+      80,
+      120
+    ],
+    "pest_spray_days": [
+      30,
+      70,
+      110
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Fusarium wilt",
+      "Sterility mosaic",
+      "Phytophthora blight",
+      "Root rot"
+    ],
+    "pests": [
+      "Pod borer",
+      "Aphids",
+      "Thrips",
+      "Whiteflies"
+    ]
+  },
+  "pigeon peas": {
+    "alias": "gungo peas"
+  },
+  "string beans": {
+    "display_name": "String Beans (Green Beans)",
+    "varieties": [
+      "Kentucky Wonder",
+      "Blue Lake",
+      "Yard Long",
+      "Romano",
+      "Purple Bean"
+    ],
+    "plant_type": "Legume",
+    "number_of_weeks_harvest": 4,
+    "growing_time_days": 57,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 21,
+    "germination_days_min": 4,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      18,
+      38
+    ],
+    "pest_spray_days": [
+      14,
+      32
+    ],
+    "planting_method": "Direct ground",
+    "diseases": [
+      "Bean rust",
+      "Anthracnose",
+      "Bacterial blight",
+      "Root rot"
+    ],
+    "pests": [
+      "Bean beetle",
+      "Aphids",
+      "Spider mites",
+      "Thrips"
+    ]
+  },
+  "green beans": {
+    "alias": "string beans"
+  },
+  "thyme": {
+    "display_name": "Thyme",
+    "varieties": [
+      "English Thyme",
+      "French Thyme",
+      "Lemon Thyme",
+      "Creeping Thyme"
+    ],
+    "plant_type": "Herb",
+    "number_of_weeks_harvest": 12,
+    "growing_time_days": 82,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 77,
+    "germination_days_min": 14,
+    "germination_days_max": 21,
+    "fungus_spray_days": [
+      30,
+      60
+    ],
+    "pest_spray_days": [
+      25,
+      55
+    ],
+    "planting_method": "Seed tray or cuttings",
+    "diseases": [
+      "Botrytis",
+      "Root rot",
+      "Powdery mildew"
+    ],
+    "pests": [
+      "Aphids",
+      "Spider mites",
+      "Thrips"
+    ]
+  },
+  "basil": {
+    "display_name": "Basil",
+    "varieties": [
+      "Sweet Basil",
+      "Genovese",
+      "Thai Basil",
+      "Lemon Basil",
+      "Purple Basil"
+    ],
+    "plant_type": "Herb",
+    "number_of_weeks_harvest": 8,
+    "growing_time_days": 75,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 49,
+    "germination_days_min": 5,
+    "germination_days_max": 10,
+    "fungus_spray_days": [
+      25,
+      50
+    ],
+    "pest_spray_days": [
+      20,
+      45
+    ],
+    "planting_method": "Seed tray or direct ground",
+    "diseases": [
+      "Fusarium wilt",
+      "Downy mildew",
+      "Root rot"
+    ],
+    "pests": [
+      "Aphids",
+      "Japanese beetles",
+      "Thrips"
+    ]
+  },
+  "onion": {
+    "display_name": "Onion",
+    "varieties": [
+      "Yellow Onion",
+      "Red Onion",
+      "White Onion",
+      "Sweet Onion"
+    ],
+    "plant_type": "Bulb",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 120,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      30,
+      60,
+      90
+    ],
+    "pest_spray_days": [
+      25,
+      55,
+      85
+    ],
+    "planting_method": "Direct ground or sets",
+    "diseases": [
+      "Purple blotch",
+      "Downy mildew",
+      "Botrytis neck rot",
+      "Root rot"
+    ],
+    "pests": [
+      "Onion thrips",
+      "Onion maggot",
+      "Aphids"
+    ]
+  },
+  "scallion": {
+    "display_name": "Scallion",
+    "varieties": [
+      "White Lisbon",
+      "Parade",
+      "Evergreen Hardy White"
+    ],
+    "plant_type": "Herb",
+    "number_of_weeks_harvest": 6,
+    "growing_time_days": 70,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 35,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      25,
+      50
+    ],
+    "pest_spray_days": [
+      20,
+      42
+    ],
+    "planting_method": "Direct ground or seed tray",
+    "diseases": [
+      "Downy mildew",
+      "Purple blotch",
+      "Root rot"
+    ],
+    "pests": [
+      "Thrips",
+      "Onion maggot",
+      "Aphids"
+    ]
+  },
+  "garlic": {
+    "display_name": "Garlic",
+    "varieties": [
+      "Softneck",
+      "Hardneck",
+      "Elephant Garlic",
+      "Creole Garlic"
+    ],
+    "plant_type": "Bulb",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 195,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      45,
+      100,
+      160
+    ],
+    "pest_spray_days": [
+      35,
+      90,
+      150
+    ],
+    "planting_method": "Cloves direct in ground",
+    "diseases": [
+      "White rot",
+      "Botrytis",
+      "Fusarium basal rot",
+      "Root rot"
+    ],
+    "pests": [
+      "Onion thrips",
+      "Nematodes",
+      "Mites"
+    ]
+  },
+  "sweet potato": {
+    "display_name": "Sweet Potato",
+    "varieties": [
+      "Beauregard",
+      "Jewel",
+      "White Sweet Potato",
+      "Purple Sweet Potato"
+    ],
+    "plant_type": "Root Crop",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 105,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 14,
+    "germination_days_max": 21,
+    "fungus_spray_days": [
+      30,
+      65,
+      90
+    ],
+    "pest_spray_days": [
+      25,
+      60,
+      85
+    ],
+    "planting_method": "Slips/cuttings planted in ground",
+    "diseases": [
+      "Sweet potato virus",
+      "Fusarium wilt",
+      "Root rot"
+    ],
+    "pests": [
+      "Sweet potato weevil",
+      "Aphids",
+      "Whiteflies"
+    ]
+  },
+  "lemongrass": {
+    "display_name": "Lemongrass (Fever Grass)",
+    "varieties": [
+      "East Indian",
+      "West Indian (Fever Grass)"
+    ],
+    "plant_type": "Herb",
+    "number_of_weeks_harvest": 24,
+    "growing_time_days": 105,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 161,
+    "germination_days_min": 14,
+    "germination_days_max": 21,
+    "fungus_spray_days": [
+      35,
+      70
+    ],
+    "pest_spray_days": [
+      28,
+      60
+    ],
+    "planting_method": "Division or stalks in water then ground",
+    "diseases": [
+      "Leaf blight",
+      "Root rot",
+      "Rust"
+    ],
+    "pests": [
+      "Aphids",
+      "Spider mites",
+      "Scale insects"
+    ]
+  },
+  "fever grass": {
+    "alias": "lemongrass"
+  },
+  "ginger": {
+    "display_name": "Ginger",
+    "varieties": [
+      "Common Ginger",
+      "Yellow Ginger",
+      "Blue Ring Ginger"
+    ],
+    "plant_type": "Rhizome",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 270,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 14,
+    "germination_days_max": 28,
+    "fungus_spray_days": [
+      60,
+      120,
+      200
+    ],
+    "pest_spray_days": [
+      45,
+      100,
+      180
+    ],
+    "planting_method": "Rhizome pieces in ground",
+    "diseases": [
+      "Bacterial wilt",
+      "Fusarium wilt",
+      "Root rot"
+    ],
+    "pests": [
+      "Ginger rhizome fly",
+      "Aphids",
+      "Spider mites"
+    ]
+  },
+  "cassava": {
+    "display_name": "Cassava (Yuca)",
+    "varieties": [
+      "Sweet Cassava",
+      "Bitter Cassava",
+      "TMS 30572"
+    ],
+    "plant_type": "Tuber",
+    "number_of_weeks_harvest": 1,
+    "growing_time_days": 300,
+    "transplant_days": null,
+    "growing_from_transplant": null,
+    "harvest_interval": 7,
+    "batch_offset_days": 7,
+    "germination_days_min": 7,
+    "germination_days_max": 14,
+    "fungus_spray_days": [
+      60,
+      120,
+      200
+    ],
+    "pest_spray_days": [
+      45,
+      100,
+      180
+    ],
+    "planting_method": "Stem cuttings in ground",
+    "diseases": [
+      "Cassava mosaic virus",
+      "Cassava bacterial blight",
+      "Root rot"
+    ],
+    "pests": [
+      "Cassava mealybug",
+      "Whiteflies",
+      "Spider mites"
+    ]
+  }
+}

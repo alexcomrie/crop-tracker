@@ -3,22 +3,27 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { SyncPanel } from '../components/settings/SyncPanel';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
+import { 
+  DownloadCloud, 
+  Info, 
+  ChevronDown, 
+  ChevronUp, 
+  MessageCircle, 
+  CloudRain, 
+  Save, 
+  Check,
+  Smartphone
+} from 'lucide-react';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
   const { isInstallable, isInstalled, handleInstallClick } = usePWAInstall();
   
-  // Auto-fill empty GAS config from environment if currently empty
-  const initialLocal = { ...settings };
-  if (!initialLocal.spreadsheetId) initialLocal.spreadsheetId = import.meta.env.VITE_SPREADSHEET_ID || '';
-  if (!initialLocal.gasWebAppUrl) initialLocal.gasWebAppUrl = import.meta.env.VITE_GAS_URL || '';
-  if (!initialLocal.syncToken) initialLocal.syncToken = import.meta.env.VITE_SYNC_TOKEN || '';
-
-  const [local, setLocal] = useState<AppSettings>(initialLocal);
+  const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [sheetsExpanded, setSheetsExpanded] = useState(false);
 
   function handleSave() {
     updateSettings(local);
@@ -26,102 +31,136 @@ export function SettingsScreen() {
     setTimeout(() => setSaved(false), 2000);
   }
 
-  const field = (key: keyof AppSettings, label: string, type = 'text', placeholder = '') => (
-    <div>
-      <label className="text-xs font-medium text-muted-foreground mb-1 block">{label}</label>
+  const field = (key: keyof AppSettings, label: string, type = 'text', placeholder = '', hint = '') => (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground block">{label}</label>
       <Input
         type={type}
         value={String((local as any)[key] ?? '')}
         placeholder={placeholder}
         onChange={e => setLocal(l => ({ ...l, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
+        className="h-10"
       />
+      {hint && <p className="text-[10px] text-muted-foreground leading-tight italic">{hint}</p>}
     </div>
   );
 
   return (
-    <div className="pb-24 pt-2 px-4 space-y-4">
-      <SyncPanel />
+    <div className="pb-24 pt-2 px-4 space-y-4 max-w-md mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Settings</h1>
 
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-green-800">GAS Sync Configuration</h3>
-          <button 
-            onClick={() => setLocal(l => ({ 
-              ...l, 
-              spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '',
-              gasWebAppUrl: import.meta.env.VITE_GAS_URL || '',
-              syncToken: import.meta.env.VITE_SYNC_TOKEN || ''
-            }))}
-            className="text-[10px] font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200"
-          >
-            Load from Env
-          </button>
+      {/* Google Sheets Import */}
+      <div className="bg-white rounded-xl border p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <DownloadCloud className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Google Sheets Import</h3>
         </div>
-        {field('spreadsheetId', 'Google Spreadsheet ID', 'text', '1jA1Fpw27...')}
-        {field('gasWebAppUrl', 'GAS Web App URL', 'url', 'https://script.google.com/...')}
-        {field('syncToken', 'Sync Token', 'password', 'Your SYNC_TOKEN')}
-        {field('telegramChatId', 'Telegram Chat ID')}
-      </div>
 
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold">Weather</h3>
-        {field('weatherLat', 'Latitude', 'number')}
-        {field('weatherLon', 'Longitude', 'number')}
-        {field('weatherLocation', 'Location Name')}
-        {field('rainThresholdMm', 'Rain Threshold (mm)', 'number')}
-      </div>
-
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold">Learning & Sync</h3>
-        {field('learningThreshold', 'Learning Threshold (samples)', 'number')}
-        {field('monthsOfPlantingDates', 'Months of Planting Dates', 'number')}
-        {field('autoSyncHour', 'Auto-sync Hour (0-23)', 'number')}
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">Auto-sync Enabled</label>
-          <button
-            onClick={() => setLocal(l => ({ ...l, syncEnabled: !l.syncEnabled }))}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border ${local.syncEnabled ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
-          >
-            {local.syncEnabled ? '✅ Enabled' : 'Disabled'}
-          </button>
+        <div className="flex items-start gap-2 bg-gray-50 rounded-lg p-3 border border-gray-100">
+          <Info className="w-3.5 h-3.5 text-gray-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-gray-600 leading-normal">
+            Publish each sheet tab via <span className="font-medium">File › Share › Publish to web</span>, 
+            choose CSV format, and paste the URL below. Leave blank to skip that table.
+          </p>
         </div>
+
+        {field('cropsSheetUrl', 'Crops Sheet URL', 'text', 'https://docs.google.com/spreadsheets/d/e/.../pub?output=csv')}
+
+        <button 
+          onClick={() => setSheetsExpanded(!sheetsExpanded)}
+          className="flex items-center gap-1.5 text-xs font-medium text-green-700 py-1"
+        >
+          {sheetsExpanded ? 'Hide additional sheets' : 'Show additional sheet URLs'}
+          {sheetsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+
+        {sheetsExpanded && (
+          <div className="space-y-3 pt-1">
+            {field('propagationsSheetUrl', 'Propagations Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('remindersSheetUrl', 'Reminders Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('stageLogsSheetUrl', 'Stage Logs Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('harvestLogsSheetUrl', 'Harvest Logs Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('treatmentLogsSheetUrl', 'Treatment Logs Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('cropDbAdjustmentSheetUrl', 'Crop Adjustments Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('propDbAdjustmentSheetUrl', 'Prop Adjustments Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('batchPlantingLogSheetUrl', 'Batch Planting Sheet URL', 'text', '...pub?output=csv&gid=...')}
+            {field('cropSearchLogSheetUrl', 'Crop Search Sheet URL', 'text', '...pub?output=csv&gid=...')}
+          </div>
+        )}
+
+        <DataManagement />
       </div>
 
-      <Button className="w-full bg-green-700" onClick={handleSave}>
-        {saved ? '✅ Saved!' : 'Save Settings'}
-      </Button>
+      {/* Telegram */}
+      <div className="bg-white rounded-xl border p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <MessageCircle className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Telegram Notifications</h3>
+        </div>
+        {field('telegramToken', 'Bot Token', 'password', '8785143281:AAE...')}
+        {field('telegramChatId', 'Chat ID', 'text', '5837914244')}
+      </div>
 
-      <DataManagement />
+      {/* Weather */}
+      <div className="bg-white rounded-xl border p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <CloudRain className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Weather</h3>
+        </div>
+        {field('weatherLocation', 'Location Name', 'text', 'Saint Ann\'s Bay')}
+        <div className="grid grid-cols-2 gap-3">
+          {field('weatherLat', 'Latitude', 'number', '18.4358')}
+          {field('weatherLon', 'Longitude', 'number', '-77.2010')}
+        </div>
+        {field('rainThresholdMm', 'Rain Threshold (mm)', 'number', '5', 'Spraying is not recommended when rain exceeds this amount')}
+      </div>
 
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold text-green-800">App Status</h3>
+      {/* App Status & Installation */}
+      <div className="bg-white rounded-xl border p-4 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Smartphone className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">App Status</h3>
+        </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Installation</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${isInstalled ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-            {isInstalled ? '✅ Installed' : 'Not Installed'}
+          <span className="text-xs font-medium">Installation</span>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isInstalled ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+            {isInstalled ? 'Installed' : 'Not Installed'}
           </span>
         </div>
         {!isInstalled && isInstallable && (
-          <Button
-            onClick={handleInstallClick}
-            className="w-full bg-green-600 hover:bg-green-700 text-white"
-          >
+          <Button variant="outline" className="w-full h-10 text-xs gap-2" onClick={handleInstallClick}>
+            <Smartphone className="w-4 h-4" />
             Install CropManager
           </Button>
         )}
-        {!isInstalled && !isInstallable && (
-          <p className="text-[10px] text-muted-foreground text-center">
-            To install, use your browser's "Add to Home Screen" option.
-          </p>
-        )}
       </div>
 
-      <div className="bg-gray-50 rounded-xl border p-4 text-xs text-muted-foreground">
-        <p className="font-medium mb-1">About</p>
-        <p>CropManager PWA v1.0</p>
-        <p>Mirrors CropManager v9.13 GAS Bot</p>
-        <p>Saint Ann's Bay, Jamaica 🇯🇲</p>
+      {/* Learning & Sync */}
+      <div className="bg-white rounded-xl border p-4 space-y-4">
+        <h3 className="font-semibold text-sm">Learning & Sync</h3>
+        <div className="grid grid-cols-2 gap-3">
+          {field('learningThreshold', 'Learning (samples)', 'number')}
+          {field('monthsOfPlantingDates', 'Months (history)', 'number')}
+        </div>
+        {field('autoSyncHour', 'Auto-sync Hour (0-23)', 'number')}
+        <div className="flex items-center justify-between pt-1">
+          <label className="text-xs font-medium text-muted-foreground block">Auto-sync Enabled</label>
+          <button
+            onClick={() => setLocal(l => ({ ...l, syncEnabled: !l.syncEnabled }))}
+            className={`px-4 py-1.5 rounded-full text-[10px] font-bold border transition-colors ${local.syncEnabled ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-600 border-gray-300'}`}
+          >
+            {local.syncEnabled ? '✅ ENABLED' : 'DISABLED'}
+          </button>
+        </div>
       </div>
+
+      <Button 
+        className={`w-full h-12 gap-2 text-sm font-bold shadow-md transition-all ${saved ? 'bg-green-600' : 'bg-green-700 hover:bg-green-800'}`} 
+        onClick={handleSave}
+      >
+        {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+        {saved ? 'SAVED!' : 'SAVE SETTINGS'}
+      </Button>
     </div>
   );
 }

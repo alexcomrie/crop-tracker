@@ -102,7 +102,71 @@ export function generateCropReminders(
     ));
   });
 
+  // Fertilizer repeating reminders (firtilizer.md logic)
+  const fertReminders = generateFertilizerReminders(crop, cropData, adjustments, chatId, threshold);
+  reminders.push(...fertReminders);
+
   return reminders;
+}
+
+export function generateFertilizerReminders(
+  crop: Crop,
+  cropData: CropData,
+  adjustments: CropDbAdjustment[],
+  chatId: string,
+  threshold = 3
+): Reminder[] {
+  const reminders: Reminder[] = [];
+  const planted = parseDate(crop.plantingDate);
+  if (!planted) return reminders;
+
+  const growingTime = cropData.growing_time_days || 60;
+  const transplantDays = cropData.transplant_days || 21;
+  const harvestDate = calculateHarvestDate(crop, cropData, adjustments, threshold) || addDays(planted, growingTime);
+  const transplantDate = calculateTransplantDate(planted, null, cropData, adjustments, crop.cropName.toLowerCase(), crop.variety, threshold) || addDays(planted, transplantDays);
+
+  const stages = [
+    { name: 'Seedling', start: planted, end: transplantDate, interval: 7, emoji: '🌱' },
+    { name: 'Mid-Veg', start: transplantDate, end: addDays(planted, Math.floor(growingTime * 0.35)), interval: 10, emoji: '🌿' },
+    { name: 'Flowering', start: addDays(planted, Math.floor(growingTime * 0.35)), end: addDays(planted, Math.floor(growingTime * 0.60)), interval: 10, emoji: '🌸' },
+    { name: 'Fruiting', start: addDays(planted, Math.floor(growingTime * 0.60)), end: harvestDate, interval: 14, emoji: '🍅' },
+  ];
+
+  stages.forEach(stage => {
+    let current = stage.start;
+    let appNum = 1;
+    const totalApps = Math.max(1, Math.ceil(daysBetween(stage.start, stage.end) / stage.interval));
+
+    while (current < stage.end) {
+      const nextDate = addDays(current, stage.interval);
+      const isFirstOfStage = appNum === 1;
+      
+      let body = `${isFirstOfStage ? '🚀 New growth stage — switch to this mix\n' : ''}`;
+      body += `Application ${appNum} of ~${totalApps}\n`;
+      body += `Apply today: ${formatDateShort(current)}\n`;
+      if (nextDate < stage.end) {
+        body += `Next application: ${formatDateShort(nextDate)}\n`;
+      }
+      body += `\nMix for ${stage.name} stage: See Fertilizer guide in app.`;
+
+      reminders.push(makeReminder(
+        'fert_application', crop.cropName, crop.id,
+        current,
+        `${stage.emoji} Fertilizer: ${stage.name} - ${crop.cropName}`,
+        body,
+        chatId
+      ));
+
+      current = nextDate;
+      appNum++;
+    }
+  });
+
+  return reminders;
+}
+
+function daysBetween(d1: Date, d2: Date): number {
+  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function generatePropReminders(

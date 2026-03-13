@@ -3,10 +3,18 @@ import { persist } from 'zustand/middleware';
 import type { AppSettings, CropDatabase, FertDatabase } from '../types';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  spreadsheetId: import.meta.env.VITE_SPREADSHEET_ID || '1TGpt9rvRUeQwnSxo6n8X271VeZW2m4m4nYwsi8iHBx8',
-  gasWebAppUrl: import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbzSZhdgpaO_AAv6zWJxRKtIOWlzI4mqRzFP7jKSp_8-9PkT-qwCoHJT7qaEMG-5sFlLEA/exec',
-  syncToken: import.meta.env.VITE_SYNC_TOKEN || 'CropMgr_Alex_2026',
-  telegramChatId: '5837914224',
+  cropsSheetUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2ozY2amP92pxMxyTIuvJsZYegfd69941Ic-RDTmfl-xi-yADUws_v6Qyyda34vM6jnoOaIrJ-00gH/pub?output=csv',
+  propagationsSheetUrl: '',
+  remindersSheetUrl: '',
+  stageLogsSheetUrl: '',
+  harvestLogsSheetUrl: '',
+  treatmentLogsSheetUrl: '',
+  cropDbAdjustmentSheetUrl: '',
+  propDbAdjustmentSheetUrl: '',
+  batchPlantingLogSheetUrl: '',
+  cropSearchLogSheetUrl: '',
+  telegramToken: '8785143281:AAEheLMeADsaHftaPEB9CP8boc0--mHgjLQ',
+  telegramChatId: '5837914244',
   weatherLat: 18.4358,
   weatherLon: -77.2010,
   weatherLocation: "Saint Ann's Bay",
@@ -48,7 +56,12 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'cropmanager_settings',
-      partialize: (s) => ({ settings: s.settings, lastSyncAt: s.lastSyncAt }),
+      partialize: (s) => ({ 
+        settings: s.settings, 
+        lastSyncAt: s.lastSyncAt,
+        cropDb: s.cropDb,
+        fertDb: s.fertDb
+      }),
     }
   )
 );

@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
-import { pullFromGAS, exportJsonBackup } from '../../lib/sync';
+import { pullFromSheets, exportJsonBackup } from '../../lib/sync';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
 
@@ -16,11 +16,11 @@ export function DataManagement() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePull() {
-    if (!confirm('This will replace ALL local data with data from Google Sheets. Continue?')) return;
+    if (!confirm('This will replace ALL local data with data from your published Google Sheets. Continue?')) return;
     setPulling(true);
-    setPullMsg('Pulling...');
-    const result = await pullFromGAS(settings);
-    setPullMsg(result.success ? `✅ Pulled ${result.count} records` : `❌ ${result.error}`);
+    setPullMsg('Importing...');
+    const result = await pullFromSheets(settings);
+    setPullMsg(result.success ? `✅ Imported ${result.count} records` : `❌ ${result.error}`);
     setPulling(false);
   }
 
@@ -32,7 +32,7 @@ export function DataManagement() {
     setPullMsg('Importing CSV...');
     const result = await importCSVData(file);
     if (result.success) {
-      setPullMsg(`✅ Imported ${result.count} CSV records. They will sync with GAS at the end of the day.`);
+      setPullMsg(`✅ Imported ${result.count} CSV records. They will sync with Google Sheets.`);
     } else {
       setPullMsg(`❌ Import failed: ${result.errors.join(', ')}`);
     }
@@ -75,8 +75,8 @@ export function DataManagement() {
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h3 className="font-semibold">Data Management</h3>
 
-        <Button variant="outline" className="w-full" onClick={handlePull} disabled={pulling || !settings.gasWebAppUrl}>
-          {pulling ? '⏳ Pulling...' : '📥 Pull from Sheets'}
+        <Button variant="outline" className="w-full" onClick={handlePull} disabled={pulling}>
+          {pulling ? '⏳ Importing...' : '📥 Import from Sheets'}
         </Button>
         {pullMsg && <p className="text-sm text-center text-muted-foreground">{pullMsg}</p>}
 

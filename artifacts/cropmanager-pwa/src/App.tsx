@@ -9,12 +9,16 @@ import { PropagationsScreen } from './screens/PropagationsScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { useAppStore } from './store/useAppStore';
+import { useTelegramReminders } from './hooks/useTelegramReminders';
 import type { CropDatabase, FertDatabase } from './types';
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   const { activeTab, setCropDb, setFertDb } = useAppStore();
+  
+  // Initialize Telegram notification service
+  useTelegramReminders();
 
   // Load JSON databases on startup
   useEffect(() => {

@@ -47,6 +47,19 @@ const CONFIG = {
   RAIN_THRESHOLD_MM: 5,
 };
 
+const SYNC_SHEETS = {
+  crops:             { name: 'Crops',                   idCol: 0 },
+  propagations:      { name: 'Propagations',            idCol: 0 },
+  reminders:         { name: 'Reminders',               idCol: 0 },
+  stageLogs:         { name: 'StageLogs',               idCol: 0 },
+  harvestLogs:       { name: 'HarvestLogs',             idCol: 0 },
+  treatmentLogs:     { name: 'TreatmentLogs',           idCol: 0 },
+  cropDbAdjustments: { name: 'CropDatabase_Adjustments', idCol: 0 },
+  propDbAdjustments: { name: 'PropDatabase_Adjustments', idCol: 0 },
+  batchPlantingLogs: { name: 'BatchPlantingLog',         idCol: 0 },
+  cropSearchLogs:    { name: 'CropSearchLog',            idCol: 0 },
+};
+
 
 
 // ══════════════════════════════════════════════════════
@@ -1239,9 +1252,92 @@ function testBotConnection() {
   Logger.log(json.ok ? "✅ Test message sent!" : "❌ Failed: " + JSON.stringify(json));
 }
 
-// doGet kept for compatibility — not needed for polling
+// ══════════════════════════════════════════════════════
+//  SYNC API (Web App Endpoints)
+// ══════════════════════════════════════════════════════
+
 function doGet(e) {
-  return ContentService.createTextOutput("CropManager v9 is running (polling mode).");
+  const action = e.parameter.action;
+  if (action === 'health') return _res({ status: 'CropManager Sync API OK', version: CONFIG.SCRIPT_VERSION });
+  if (action === 'pull') {
+    const token = e.parameter.token;
+    const scriptToken = PropertiesService.getScriptProperties().getProperty('SYNC_TOKEN');
+    if (token !== scriptToken) return _res({ success: false, error: 'Unauthorized' });
+    return _res(pullHandler());
+  }
+  return _res({ status: 'CropManager v9 is running (polling mode).' });
+}
+
+function doPost(e) {
+  let body;
+  // Support both application/json and application/x-www-form-urlencoded
+  if (e.postData.type === 'application/json') {
+    body = JSON.parse(e.postData.contents);
+  } else {
+    body = e.parameter;
+    if (body.payload && typeof body.payload === 'string') {
+      try { body.payload = JSON.parse(body.payload); } catch(err) {}
+    }
+  }
+
+  const scriptToken = PropertiesService.getScriptProperties().getProperty('SYNC_TOKEN');
+  if (body.token !== scriptToken) return _res({ success: false, error: 'Unauthorized' });
+  
+  if (body.action === 'push') return _res(pushHandler(body.payload));
+  return _res({ success: false, error: 'Unknown action' });
+}
+
+function pushHandler(payload) {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const written = {}; 
+  const errors = [];
+  
+  Object.keys(SYNC_SHEETS).forEach(function(key) {
+    const records = payload[key] || [];
+    const cfg = SYNC_SHEETS[key];
+    written[key] = 0;
+    records.forEach(function(rec) {
+      try { 
+        _upsertRow(ss, cfg.name, cfg.idCol, rec); 
+        written[key]++; 
+      } catch(err) { 
+        errors.push(cfg.name + ':' + rec[0] + ':' + err.message); 
+      }
+    });
+  });
+  return { success: true, written: written, errors: errors };
+}
+
+function pullHandler() {
+  const ss = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+  const result = {};
+  Object.keys(SYNC_SHEETS).forEach(function(key) {
+    const sheet = ss.getSheetByName(SYNC_SHEETS[key].name);
+    result[key] = sheet ? sheet.getDataRange().getValues().slice(1).filter(function(r){ return r[0]; }) : [];
+  });
+  return { success: true, data: result };
+}
+
+function _upsertRow(ss, sheetName, idCol, rowArr) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    // Add header row if needed
+    // sheet.appendRow([...]);
+  }
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idCol]) === String(rowArr[idCol])) {
+      sheet.getRange(i+1, 1, 1, rowArr.length).setValues([rowArr]);
+      return;
+    }
+  }
+  sheet.appendRow(rowArr);
+}
+
+function _res(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 

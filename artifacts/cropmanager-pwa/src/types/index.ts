@@ -49,6 +49,7 @@ export interface Reminder {
   subject: string;
   body: string;
   sent: boolean;
+  telegramSent?: boolean;
   chatId: string;
   syncStatus: 'clean' | 'pending';
   updatedAt: number;
@@ -150,9 +151,17 @@ export interface CropSearchLog {
 }
 
 export interface AppSettings {
-  spreadsheetId: string;
-  gasWebAppUrl: string;
-  syncToken: string;
+  cropsSheetUrl: string;
+  propagationsSheetUrl: string;
+  remindersSheetUrl: string;
+  stageLogsSheetUrl: string;
+  harvestLogsSheetUrl: string;
+  treatmentLogsSheetUrl: string;
+  cropDbAdjustmentSheetUrl: string;
+  propDbAdjustmentSheetUrl: string;
+  batchPlantingLogSheetUrl: string;
+  cropSearchLogSheetUrl: string;
+  telegramToken: string;
   telegramChatId: string;
   weatherLat: number;
   weatherLon: number;

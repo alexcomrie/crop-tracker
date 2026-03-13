@@ -16,13 +16,14 @@ export class CropManagerDB extends Dexie {
   propDbAdjustments!: Table<PropDbAdjustment>;
   batchPlantingLogs!: Table<BatchPlantingLog>;
   cropSearchLogs!: Table<CropSearchLog>;
+  successionGaps!: Table<{ id: string; data: any; updatedAt: number }>;
 
   constructor() {
     super('CropManagerDB');
     this.version(1).stores({
       crops: 'id, cropName, status, plantStage, syncStatus, updatedAt',
       propagations: 'id, plantName, status, syncStatus, updatedAt',
-      reminders: 'id, trackingId, type, sendDate, sent, syncStatus, updatedAt',
+      reminders: 'id, trackingId, type, sendDate, sent, telegramSent, syncStatus, updatedAt',
       stageLogs: 'id, trackingId, date, syncStatus, updatedAt',
       harvestLogs: 'id, cropTrackingId, harvestDate, syncStatus, updatedAt',
       treatmentLogs: 'id, cropId, date, type, syncStatus, updatedAt',
@@ -30,6 +31,7 @@ export class CropManagerDB extends Dexie {
       propDbAdjustments: 'id, plantKey, method, syncStatus, updatedAt',
       batchPlantingLogs: 'id, cropTrackingId, batchPlantingDate, syncStatus, updatedAt',
       cropSearchLogs: 'id, cropKey, searchDate, syncStatus, updatedAt',
+      successionGaps: 'id, updatedAt',
     });
   }
 }

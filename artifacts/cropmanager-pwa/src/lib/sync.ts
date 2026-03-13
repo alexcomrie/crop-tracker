@@ -1,5 +1,20 @@
-import type { AppSettings } from '../types';
 import db from '../db/db';
+import { fetchCsv, mappers } from './sheets';
+import type { AppSettings } from '../types';
+
+export async function getPendingCount(): Promise<number> {
+  const counts = await Promise.all([
+    db.crops.where('syncStatus').equals('pending').count(),
+    db.propagations.where('syncStatus').equals('pending').count(),
+    db.reminders.where('syncStatus').equals('pending').count(),
+    db.stageLogs.where('syncStatus').equals('pending').count(),
+    db.harvestLogs.where('syncStatus').equals('pending').count(),
+    db.treatmentLogs.where('syncStatus').equals('pending').count(),
+  ]);
+  return counts.reduce((a, b) => a + b, 0);
+}
+
+import { CONFIG } from './config';
 
 export async function buildSyncPayload() {
   const [crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs, cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs] = await Promise.all([
@@ -29,30 +44,23 @@ export async function buildSyncPayload() {
   };
 }
 
-export async function getPendingCount(): Promise<number> {
-  const counts = await Promise.all([
-    db.crops.where('syncStatus').equals('pending').count(),
-    db.propagations.where('syncStatus').equals('pending').count(),
-    db.reminders.where('syncStatus').equals('pending').count(),
-    db.stageLogs.where('syncStatus').equals('pending').count(),
-    db.harvestLogs.where('syncStatus').equals('pending').count(),
-    db.treatmentLogs.where('syncStatus').equals('pending').count(),
-  ]);
-  return counts.reduce((a, b) => a + b, 0);
-}
-
-export async function pushToGAS(
+export async function pushToSheets(
   payload: Awaited<ReturnType<typeof buildSyncPayload>>,
-  settings: AppSettings,
   onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; written?: Record<string, number>; error?: string }> {
   onProgress?.('Uploading records...');
   try {
-    const res = await fetch('/api/sync/push', {
+    const formData = new URLSearchParams();
+    formData.append('token', CONFIG.SYNC_TOKEN);
+    formData.append('action', 'push');
+    formData.append('payload', JSON.stringify(payload));
+
+    const res = await fetch(CONFIG.SYNC_WEB_APP_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken, action: 'push', payload }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
     });
+
     const data = await res.json();
     if (data.success) {
       // Mark all as clean
@@ -70,42 +78,57 @@ export async function pushToGAS(
       ]);
       return { success: true, written: data.written };
     }
-    return { success: false, error: data.error ?? 'Unknown GAS error' };
+    return { success: false, error: data.error ?? 'Unknown error' };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
 }
 
-export async function pullFromGAS(settings: AppSettings): Promise<{ success: boolean; count?: number; error?: string }> {
+export async function pullFromSheets(settings: AppSettings): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    const res = await fetch('/api/sync/pull', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken, action: 'pull' }),
-    });
-    const data = await res.json();
-    if (!data.success) return { success: false, error: data.error };
+    const [
+      crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs, 
+      cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs
+    ] = await Promise.all([
+      fetchCsv(settings.cropsSheetUrl, mappers.crop),
+      fetchCsv(settings.propagationsSheetUrl, mappers.propagation),
+      fetchCsv(settings.remindersSheetUrl, mappers.reminder),
+      fetchCsv(settings.stageLogsSheetUrl, mappers.stageLog),
+      fetchCsv(settings.harvestLogsSheetUrl, mappers.harvestLog),
+      fetchCsv(settings.treatmentLogsSheetUrl, mappers.treatmentLog),
+      fetchCsv(settings.cropDbAdjustmentSheetUrl, mappers.cropDbAdjustment),
+      fetchCsv(settings.propDbAdjustmentSheetUrl, mappers.propDbAdjustment),
+      fetchCsv(settings.batchPlantingLogSheetUrl, mappers.batchPlantingLog),
+      fetchCsv(settings.cropSearchLogSheetUrl, mappers.cropSearchLog),
+    ]);
 
     const now = Date.now();
-    await db.transaction('rw', [db.crops, db.propagations, db.reminders, db.stageLogs, db.harvestLogs, db.treatmentLogs, db.cropDbAdjustments, db.propDbAdjustments, db.batchPlantingLogs, db.cropSearchLogs], async () => {
-      await Promise.all([db.crops.clear(), db.propagations.clear(), db.reminders.clear(), db.stageLogs.clear(), db.harvestLogs.clear(), db.treatmentLogs.clear(), db.cropDbAdjustments.clear(), db.propDbAdjustments.clear(), db.batchPlantingLogs.clear(), db.cropSearchLogs.clear()]);
-      const d = data.data;
-      if (d.crops) await db.crops.bulkAdd(d.crops.map((r: any[]) => ({ id: r[0], cropName: r[1] ?? '', variety: r[2] ?? '', plantingMethod: r[3] ?? '', plantStage: r[4] ?? '', plantingDate: r[5] ?? '', transplantDateScheduled: r[6] ?? '', transplantDateActual: r[7] ?? '', germinationDate: r[8] ?? '', harvestDateEstimated: r[9] ?? '', harvestDateActual: r[10] ?? '', nextConsistentPlanting: r[11] ?? '', batchNumber: r[12] ?? 0, fungusSprayDates: r[13] ?? '', pestSprayDates: r[14] ?? '', status: r[15] ?? 'Active', notes: r[16] ?? '', daysSeedGerm: r[17] ?? 0, daysGermTransplant: r[18] ?? 0, daysTransplantHarvest: r[19] ?? 0, telegramChatId: r[20] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.propagations) await db.propagations.bulkAdd(d.propagations.map((r: any[]) => ({ id: r[0], plantName: r[1] ?? '', propagationDate: r[2] ?? '', propagationMethod: r[3] ?? '', notes: r[4] ?? '', expectedRootingStart: r[5] ?? '', expectedRootingEnd: r[6] ?? '', actualRootingDate: r[7] ?? '', daysToRootActual: r[8] ?? 0, status: r[9] ?? 'Propagating', telegramChatId: r[10] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.reminders) await db.reminders.bulkAdd(d.reminders.map((r: any[]) => ({ id: r[0], type: r[1] ?? '', cropPlantName: r[2] ?? '', trackingId: r[3] ?? '', sendDate: r[4] ?? '', subject: r[5] ?? '', body: r[6] ?? '', sent: Boolean(r[7]), chatId: r[8] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.stageLogs) await db.stageLogs.bulkAdd(d.stageLogs.map((r: any[]) => ({ id: `${r[0]}:${r[5] ?? ''}:${r[3]}->${r[4]}`, trackingId: r[0] ?? '', cropName: r[1] ?? '', variety: r[2] ?? '', stageFrom: r[3] ?? '', stageTo: r[4] ?? '', date: r[5] ?? '', daysElapsed: r[6] ?? 0, method: r[7] ?? '', notes: r[8] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.harvestLogs) await db.harvestLogs.bulkAdd(d.harvestLogs.map((r: any[]) => ({ id: `${r[0]}:${r[2] ?? 0}`, cropTrackingId: r[0] ?? '', cropName: r[1] ?? '', harvestNumber: r[2] ?? 0, harvestDate: r[3] ?? '', daysFromPlanting: r[4] ?? 0, deviationFromDb: r[5] ?? 0, notes: r[6] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.treatmentLogs) await db.treatmentLogs.bulkAdd(d.treatmentLogs.map((r: any[]) => ({ id: `${r[0]}:${r[2] ?? ''}:${r[4] ?? ''}`, cropId: r[0] ?? '', cropName: r[1] ?? '', date: r[2] ?? '', daysFromPlanting: r[3] ?? 0, type: r[4] ?? '', product: r[5] ?? '', notes: r[6] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.cropDbAdjustments) await db.cropDbAdjustments.bulkAdd(d.cropDbAdjustments.map((r: any[]) => ({ id: `${r[0]}::${r[1] ?? ''}::${r[2] ?? ''}`, cropKey: r[0] ?? '', variety: r[1] ?? '', field: r[2] ?? '', databaseDefault: r[3] ?? 0, yourAverage: r[4] ?? 0, sampleCount: r[5] ?? 0, useCustom: String(r[6] ?? ''), lastUpdated: String(r[7] ?? ''), syncStatus: 'clean', updatedAt: now })));
-      if (d.propDbAdjustments) await db.propDbAdjustments.bulkAdd(d.propDbAdjustments.map((r: any[]) => ({ id: `${r[0]}::${r[1] ?? ''}`, plantKey: r[0] ?? '', method: r[1] ?? '', dbDefaultRootingDays: r[2] ?? 0, yourAverage: r[3] ?? 0, sampleCount: r[4] ?? 0, useCustom: String(r[5] ?? ''), lastUpdated: String(r[6] ?? ''), syncStatus: 'clean', updatedAt: now })));
-      if (d.batchPlantingLogs) await db.batchPlantingLogs.bulkAdd(d.batchPlantingLogs.map((r: any[]) => ({ id: `${r[0]}:${r[2] ?? 0}`, cropTrackingId: r[0] ?? '', cropName: r[1] ?? '', batchNumber: r[2] ?? 1, batchPlantingDate: r[3] ?? '', confirmedPlantedDate: r[4] ?? '', nextBatchDate: r[5] ?? '', status: r[6] ?? '', notes: r[7] ?? '', syncStatus: 'clean', updatedAt: now })));
-      if (d.cropSearchLogs) await db.cropSearchLogs.bulkAdd(d.cropSearchLogs.map((r: any[]) => ({ id: `${r[0]}:${r[1] ?? ''}`, cropKey: r[0] ?? '', searchDate: r[1] ?? '', growingTimeFound: r[2] ?? 0, germinationDaysMin: r[3] ?? 0, germinationDaysMax: r[4] ?? 0, sourceSummary: r[5] ?? '', appliedToTracker: Boolean(r[6]), syncStatus: 'clean', updatedAt: now })));
+    await db.transaction('rw', [
+      db.crops, db.propagations, db.reminders, db.stageLogs, db.harvestLogs, 
+      db.treatmentLogs, db.cropDbAdjustments, db.propDbAdjustments, 
+      db.batchPlantingLogs, db.cropSearchLogs
+    ], async () => {
+      await Promise.all([
+        db.crops.clear(), db.propagations.clear(), db.reminders.clear(), 
+        db.stageLogs.clear(), db.harvestLogs.clear(), db.treatmentLogs.clear(), 
+        db.cropDbAdjustments.clear(), db.propDbAdjustments.clear(), 
+        db.batchPlantingLogs.clear(), db.cropSearchLogs.clear()
+      ]);
+      
+      if (crops.length) await db.crops.bulkAdd(crops);
+      if (propagations.length) await db.propagations.bulkAdd(propagations);
+      if (reminders.length) await db.reminders.bulkAdd(reminders);
+      if (stageLogs.length) await db.stageLogs.bulkAdd(stageLogs);
+      if (harvestLogs.length) await db.harvestLogs.bulkAdd(harvestLogs);
+      if (treatmentLogs.length) await db.treatmentLogs.bulkAdd(treatmentLogs);
+      if (cropDbAdjustments.length) await db.cropDbAdjustments.bulkAdd(cropDbAdjustments);
+      if (propDbAdjustments.length) await db.propDbAdjustments.bulkAdd(propDbAdjustments);
+      if (batchPlantingLogs.length) await db.batchPlantingLogs.bulkAdd(batchPlantingLogs);
+      if (cropSearchLogs.length) await db.cropSearchLogs.bulkAdd(cropSearchLogs);
     });
 
-    let count = 0;
-    if (data.data.crops) count += data.data.crops.length;
-    if (data.data.propagations) count += data.data.propagations.length;
-    return { success: true, count };
+    const total = crops.length + propagations.length + reminders.length + stageLogs.length + harvestLogs.length + treatmentLogs.length;
+    return { success: true, count: total };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -125,7 +148,8 @@ export async function exportJsonBackup(): Promise<string> {
 
 export async function checkSyncHealth(): Promise<{ success: boolean; status?: string; error?: string }> {
   try {
-    const res = await fetch('/api/sync/health');
+    const params = new URLSearchParams({ action: 'health' });
+    const res = await fetch(`${CONFIG.SYNC_WEB_APP_URL}?${params.toString()}`);
     const data = await res.json();
     return { success: res.ok, status: data.status, error: data.error };
   } catch (err: any) {

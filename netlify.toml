@@ -7,17 +7,6 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# Redirect all /api/sync/* to the Netlify Function
-[[redirects]]
-  from   = "/api/sync"
-  to     = "/.netlify/functions/sync"
-  status = 200
-
-[[redirects]]
-  from   = "/api/sync/*"
-  to     = "/.netlify/functions/sync"
-  status = 200
-
 # SPA fallback — all other routes serve index.html
 [[redirects]]
   from   = "/*"

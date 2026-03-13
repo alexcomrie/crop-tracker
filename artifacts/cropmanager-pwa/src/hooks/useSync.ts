@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useSyncStore } from '../store/useSyncStore';
 import { useAppStore } from '../store/useAppStore';
-import { buildSyncPayload, pushToGAS, getPendingCount } from '../lib/sync';
+import { buildSyncPayload, pushToSheets, getPendingCount } from '../lib/sync';
 
 export function useSync() {
   const { pendingCount, isSyncing, syncErrors, setPendingCount, setIsSyncing, setSyncProgress, addSyncError, clearSyncErrors, setLastSyncAt } = useSyncStore();
@@ -27,7 +27,7 @@ export function useSync() {
       const payload = await buildSyncPayload();
       const totalRecords = Object.values(payload).reduce((a, arr) => a + (arr as any[]).length, 0);
       setSyncProgress(`Uploading ${totalRecords} records...`);
-      const result = await pushToGAS(payload, settings, setSyncProgress);
+      const result = await pushToSheets(payload, setSyncProgress);
       if (result.success) {
         const ts = Date.now();
         setLastSyncAt(ts);

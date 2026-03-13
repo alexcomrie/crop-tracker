@@ -115,6 +115,20 @@ I have updated the **Settings Screen** to ensure that the GAS Sync Configuration
 
 **You:**
 
+i want to now make sure the app work competely offline and using the storage local device it is indtalled on, and sync with GAS at the end of the day, and also use C:\Users\ALEX\Desktop\Crop-Manager\file\sprout.png `c:\Users\ALEX\Desktop\Crop-Manager\file\sprout.png` as the app icon
+
+**Me:**
+
+I have successfully updated the app to be fully offline-capable, using local device storage via **Dexie (IndexedDB)**, and implemented an end-of-day synchronization feature. I've also updated the app icons to use the custom [sprout.png](file:///c:/Users/ALEX/Desktop/Crop-Manager/file/sprout.png).
+
+### Key Features Implemented:
+- **Custom App Icon**: Replaced all PWA icons (192x192 and 512x512) with the provided [sprout.png](file:///c:/Users/ALEX/Desktop/Crop-Manager/file/sprout.png) for a personalized look.
+- **Offline Storage**: The app now utilizes **Dexie (IndexedDB)** as the primary data store on the local device, ensuring all crop and propagation data is available without an internet connection.
+- **End-of-Day Sync**: Integrated a background check in the [TopBar.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/layout/TopBar.tsx) that automatically triggers a sync with Google Apps Script (GAS) when the device is online during the configured auto-sync hour.
+- **Offline Indicators**: Added a cloud-off icon and a "pending records" counter in the top bar to provide real-time feedback on synchronization status and network connectivity.
+
+**You:**
+
 pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
 
 **Me:**

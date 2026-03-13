@@ -23,10 +23,12 @@ interface AppStore {
   cropDb: CropDatabase;
   fertDb: FertDatabase;
   activeTab: string;
+  lastSyncAt: number;
   updateSettings: (patch: Partial<AppSettings>) => void;
   setCropDb: (db: CropDatabase) => void;
   setFertDb: (db: FertDatabase) => void;
   setActiveTab: (tab: string) => void;
+  setLastSyncAt: (ts: number) => void;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -36,15 +38,17 @@ export const useAppStore = create<AppStore>()(
       cropDb: {},
       fertDb: {},
       activeTab: 'dashboard',
+      lastSyncAt: 0,
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
       setCropDb: (db) => set({ cropDb: db }),
       setFertDb: (db) => set({ fertDb: db }),
       setActiveTab: (tab) => set({ activeTab: tab }),
+      setLastSyncAt: (ts) => set({ lastSyncAt: ts }),
     }),
     {
       name: 'cropmanager_settings',
-      partialize: (s) => ({ settings: s.settings }),
+      partialize: (s) => ({ settings: s.settings, lastSyncAt: s.lastSyncAt }),
     }
   )
 );

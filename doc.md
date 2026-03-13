@@ -100,3 +100,7 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Successfully performed a full workspace build (`pnpm install && pnpm run build`), confirming that all packages (PWA, API Server, Mockup Sandbox, and Scripts) are building correctly.
 - Configured synchronization with Google Apps Script (GAS) by updating the default settings in `useAppStore.ts` and the `.env` file with the provided Spreadsheet ID, Web App URL, and Sync Token.
 - Enhanced the `SettingsScreen` to automatically fill the GAS Sync Configuration from environment variables if the fields are empty and added a "Load from Env" button for easy configuration.
+- Replaced default PWA icons with the custom [sprout.png](file:///c:/Users/ALEX/Desktop/Crop-Manager/file/sprout.png).
+- Implemented an offline-first storage strategy using **Dexie (IndexedDB)** for local device data persistence.
+- Added an **End-of-Day Auto-Sync** feature in the `TopBar` that triggers synchronization at the configured hour if the device is online.
+- Integrated a status indicator in the `TopBar` showing pending records and offline status for better user awareness.

@@ -164,6 +164,20 @@ I have resolved the issues with the backend synchronization routes and ensured t
 
 **You:**
 
+# netlify.toml — place in project ROOT...
+
+**Me:**
+
+I have updated the root `netlify.toml` with the optimized build and redirect configurations for your monorepo.
+
+### Configuration Updates:
+- **Build Settings**: Set the base directory to `artifacts/cropmanager-pwa` and the publish directory to `dist`.
+- **Sync Redirects**: Added redirects to route all `/api/sync/*` traffic to Netlify Functions, ensuring the PWA's synchronization logic works seamlessly in the production environment.
+- **SPA Support**: Maintained the SPA fallback redirect to `index.html` for all other routes.
+- **Node Version**: Explicitly pinned the build environment to Node.js version 20.
+
+**You:**
+
 pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
 
 **Me:**

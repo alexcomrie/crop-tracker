@@ -108,3 +108,5 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Configured the backend `api-server` to properly load environment variables using `dotenv`.
 - Updated backend route registration to ensure `/api/sync/*` and `/api/healthz` endpoints are correctly exposed and operational.
 - Verified that the backend successfully proxies requests to Google Apps Script, resolving initial "Cannot GET" and 503 errors.
+- Updated root `netlify.toml` with optimized build configurations for the PWA monorepo, specifying the base directory, build command, and publish directory.
+- Configured Netlify redirects to route `/api/sync/*` requests to Netlify Functions and established a SPA fallback to `index.html`.

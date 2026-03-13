@@ -1,33 +1,25 @@
 [build]
-  # Specify the path to the PWA build output
-  publish = "artifacts/cropmanager-pwa/dist"
-  # Use pnpm to build the workspace
+  base    = "artifacts/cropmanager-pwa"
   command = "pnpm install && pnpm run build"
+  publish = "artifacts/cropmanager-pwa/dist"
+  functions = "netlify/functions"
 
 [build.environment]
-  PORT = "5173"
-  BASE_PATH = "/"
+  NODE_VERSION = "20"
 
+# Redirect all /api/sync/* to the Netlify Function
 [[redirects]]
-  # Redirect /api to the backend if needed, but the PWA mostly uses GAS
-  # This matches the vite proxy setup
-  from = "/api/*"
-  to = "http://localhost:5001/api/:splat"
+  from   = "/api/sync"
+  to     = "/.netlify/functions/sync"
   status = 200
 
 [[redirects]]
-  # Single Page Application (SPA) redirect
-  from = "/*"
-  to = "/index.html"
+  from   = "/api/sync/*"
+  to     = "/.netlify/functions/sync"
   status = 200
 
-[[headers]]
-  for = "/*.js"
-  [headers.values]
-    Content-Type = "application/javascript"
-
-[[headers]]
-  for = "/service-worker.js"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-    Service-Worker-Allowed = "/"
+# SPA fallback — all other routes serve index.html
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

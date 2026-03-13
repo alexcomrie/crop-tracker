@@ -51,7 +51,7 @@ export async function pushToGAS(
     const res = await fetch('/api/sync/push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken, payload }),
+      body: JSON.stringify({ token: settings.syncToken, action: 'push', payload }),
     });
     const data = await res.json();
     if (data.success) {
@@ -81,7 +81,7 @@ export async function pullFromGAS(settings: AppSettings): Promise<{ success: boo
     const res = await fetch('/api/sync/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: settings.syncToken }),
+      body: JSON.stringify({ token: settings.syncToken, action: 'pull' }),
     });
     const data = await res.json();
     if (!data.success) return { success: false, error: data.error };

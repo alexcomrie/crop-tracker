@@ -70,6 +70,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@netlify/functions": "^5.1.3",
     "@replit/vite-plugin-cartographer": "catalog:",
     "@replit/vite-plugin-dev-banner": "catalog:",
     "@replit/vite-plugin-runtime-error-modal": "catalog:",

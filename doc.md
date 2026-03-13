@@ -110,3 +110,5 @@ The Crop Manager application is a well-architected, modern web application. The 
 - Verified that the backend successfully proxies requests to Google Apps Script, resolving initial "Cannot GET" and 503 errors.
 - Updated root `netlify.toml` with optimized build configurations for the PWA monorepo, specifying the base directory, build command, and publish directory.
 - Configured Netlify redirects to route `/api/sync/*` requests to Netlify Functions and established a SPA fallback to `index.html`.
+- Implemented a serverless Netlify Function at `netlify/functions/sync.mts` to proxy synchronization requests from the PWA to Google Apps Script, resolving CORS issues and centralizing sync logic.
+- Updated PWA `sync.ts` to include the `action` field in requests, ensuring compatibility with the Netlify Function proxy.

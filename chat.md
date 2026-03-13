@@ -178,6 +178,20 @@ I have updated the root `netlify.toml` with the optimized build and redirect con
 
 **You:**
 
+Step 2 — Add Netlify env vars... Step 3 — Install @netlify/functions package... Step 4 — Commit, push, redeploy
+
+**Me:**
+
+I have successfully implemented the Netlify Function proxy for your synchronization logic and prepared the project for deployment.
+
+### Final Implementation Details:
+- **Netlify Functions**: Created the [sync.mts](file:///c:/Users/ALEX/Desktop/Crop-Manager/netlify/functions/sync.mts) serverless function to securely proxy PWA requests to Google Apps Script.
+- **Dependencies**: Installed `@netlify/functions` in the [cropmanager-pwa](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/package.json) package to support the new serverless architecture.
+- **Sync Logic Update**: Updated [sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sync.ts) to include the required `action` parameter in its requests, ensuring the Netlify Function can correctly route "push" and "pull" operations.
+- **Deployment Ready**: All configurations in `netlify.toml` are now perfectly aligned with the Netlify Functions setup.
+
+**You:**
+
 pull this lates from gethub and update all the local files : `https://github.com/alexcomrie/crop-tracker.git`  the update `c:\Users\ALEX\Desktop\Crop-Manager\doc.md`
 
 **Me:**

@@ -217,3 +217,18 @@ I have successfully pulled the latest changes from the GitHub repository and upd
 - **Conflict Resolution**: Resolved a merge conflict in [vite.config.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/mockup-sandbox/vite.config.ts) to ensure the build configuration remains robust and supports environment-based port settings.
 - **Full Build Verification**: Executed `pnpm install && pnpm run build` locally. All packages (PWA, API Server, Mockup Sandbox) are now building successfully without any errors.
 - **Documentation Updated**: Reflected the latest status in [doc.md](file:///c:/Users/ALEX/Desktop/Crop-Manager/doc.md).
+
+**You:**
+
+i want the app be able to pull the all the information from a csv file on a local device, if i download the file it should sync with via GAS, and store it in the local database
+
+**Me:**
+
+I have successfully implemented the CSV data import functionality. You can now upload CSV files directly from your local device to populate your local database and sync with Google Apps Script.
+
+### Implementation Highlights:
+- **CSV Parsing**: Integrated `papaparse` for robust client-side CSV processing.
+- **Local Storage**: Created a new [csvImport.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/csvImport.ts) utility that parses CSV rows and stores them directly into your local **Dexie (IndexedDB)** database.
+- **Sync Integration**: All imported records are marked with a `pending` sync status, ensuring they are automatically uploaded to your Google Spreadsheet during the next synchronization cycle.
+- **UI Component**: Added an "Import CSV Data" button to the **Data Management** section in the [SettingsScreen](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/SettingsScreen.tsx).
+- **Flexibility**: The importer currently supports both 'crops' and 'propagations' based on the presence of `cropName` or `plantName` headers in your CSV file.

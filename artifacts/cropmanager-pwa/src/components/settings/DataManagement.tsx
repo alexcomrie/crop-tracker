@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
 import { pullFromGAS, exportJsonBackup } from '../../lib/sync';
+import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
 
 export function DataManagement() {
@@ -11,6 +12,8 @@ export function DataManagement() {
   const [pullMsg, setPullMsg] = useState('');
   const [clearInput, setClearInput] = useState('');
   const [showClear, setShowClear] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handlePull() {
     if (!confirm('This will replace ALL local data with data from Google Sheets. Continue?')) return;
@@ -19,6 +22,22 @@ export function DataManagement() {
     const result = await pullFromGAS(settings);
     setPullMsg(result.success ? `✅ Pulled ${result.count} records` : `❌ ${result.error}`);
     setPulling(false);
+  }
+
+  async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setPullMsg('Importing CSV...');
+    const result = await importCSVData(file);
+    if (result.success) {
+      setPullMsg(`✅ Imported ${result.count} CSV records. They will sync with GAS at the end of the day.`);
+    } else {
+      setPullMsg(`❌ Import failed: ${result.errors.join(', ')}`);
+    }
+    setImporting(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handleExport() {
@@ -64,6 +83,25 @@ export function DataManagement() {
         <Button variant="outline" className="w-full" onClick={handleExport}>
           📦 Export JSON Backup
         </Button>
+
+        <div className="relative">
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleCSVImport}
+            className="hidden"
+            id="csv-upload"
+            ref={fileInputRef}
+          />
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? '⏳ Importing...' : '📄 Import CSV Data'}
+          </Button>
+        </div>
 
         <button
           className="w-full text-sm text-red-600 py-2 border border-red-200 rounded-lg hover:bg-red-50"

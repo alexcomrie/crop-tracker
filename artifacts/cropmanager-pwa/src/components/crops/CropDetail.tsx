@@ -5,11 +5,14 @@ import { Button } from '@/components/ui/button';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import type { Crop } from '../../types';
-import { parseDate, formatDateDisplay, daysBetween, today } from '../../lib/dates';
+import { parseDate, formatDateDisplay, daysBetween, today, formatDateShort } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
 import { FertScheduleView } from './FertScheduleView';
 
-import { Trash2, Edit3 } from 'lucide-react';
+import { Trash2, Edit3, Info, Calendar as CalendarIcon, Repeat } from 'lucide-react';
+import { useAppStore } from '../../store/useAppStore';
+import { resolveCropData } from '../../lib/cropDb';
+import { calculateBatchPlantingDates } from '../../lib/reminders';
 
 interface CropDetailProps {
   crop: Crop;
@@ -22,11 +25,16 @@ interface CropDetailProps {
 const STAGE_ORDER = ['Seed', 'Germinated', 'Seedling', 'Transplanted', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
 
 export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDetailProps) {
+  const { cropDb } = useAppStore();
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('cropId').equals(crop.id).sortBy('date'), [crop.id]);
   const stageLogs = useLiveQuery(() => db.stageLogs.where('trackingId').equals(crop.id).sortBy('date'), [crop.id]);
+  const [showFert, setShowFert] = useState(false);
+
+  const cropData = resolveCropData(cropDb, crop.cropName);
+  const batchDates = crop.isContinuous && cropData ? calculateBatchPlantingDates(crop, cropData, 2) : [];
+  
   const planted = parseDate(crop.plantingDate);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
-  const [showFert, setShowFert] = useState(false);
 
   const stages = [
     { label: 'Planted', date: crop.plantingDate, done: !!crop.plantingDate },
@@ -60,6 +68,32 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
           </div>
         </div>
 
+        {batchDates.length > 0 && (
+          <div className="bg-amber-50 rounded-xl border border-amber-100 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-amber-800">
+              <Repeat className="w-4 h-4" />
+              <p className="text-[10px] font-bold uppercase tracking-widest">Continuous Batch Schedule</p>
+            </div>
+            <div className="space-y-2">
+              {batchDates.map(b => (
+                <div key={b.batchNumber} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 border border-amber-100/50">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-amber-900">Batch #{b.batchNumber}</span>
+                    <span className="text-[10px] text-amber-700 uppercase font-medium">Planting Date</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-bold text-amber-900">{formatDateShort(b.date)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-start gap-2 bg-amber-100/50 rounded-lg p-2">
+              <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[9px] text-amber-700 leading-tight">Reminders are set for 1 day before each batch date.</p>
+            </div>
+          </div>
+        )}
+
         {(crop.fungusSprayDates || crop.pestSprayDates) && (
           <div className="bg-amber-50 rounded-lg p-3 text-sm">
             <p className="font-medium mb-1">Spray Schedule</p>
@@ -92,21 +126,6 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
           </div>
         )}
 
-        {stageLogs && stageLogs.length > 0 && (
-          <div>
-            <p className="font-medium text-sm mb-2">Stage Log</p>
-            <div className="space-y-1">
-              {stageLogs.map(s => (
-                <div key={s.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-3 py-2">
-                  <span className="text-muted-foreground">{s.stageFrom} →</span>
-                  <span className="font-medium">{s.stageTo}</span>
-                  <span className="text-muted-foreground ml-auto">{s.date}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         <div className="flex gap-2">
           <Button className="flex-1" onClick={onUpdate}>Update Status</Button>
           <Button variant="outline" className="border-gray-200" onClick={onEdit}>
@@ -122,7 +141,9 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
       </div>
 
       <BottomSheet open={showFert} onClose={() => setShowFert(false)} title="Fertilizer Schedule" position="center">
-        <FertScheduleView crop={crop} />
+        <div className="py-4">
+          <FertScheduleView crop={crop} />
+        </div>
       </BottomSheet>
     </BottomSheet>
   );

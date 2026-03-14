@@ -127,12 +127,12 @@ export function generateContinuousPlantingReminders(
   const batchDates = calculateBatchPlantingDates(crop, cropData);
   
   batchDates.forEach(batch => {
-    const reminderDate = addDays(batch.date, -3);
+    const reminderDate = addDays(batch.date, -1);
     reminders.push(makeReminder(
       'next_batch_planting', crop.cropName, crop.id,
       reminderDate,
-      `📅 Next Batch Planting: ${crop.cropName} (Batch #${batch.batchNumber})`,
-      `Time to plant your next batch of ${crop.cropName} in 3 days (${formatDateShort(batch.date)}).\n\nReply with 'planted ${crop.id} ${batch.batchNumber}' when done to update.`,
+      `📅 Batch Planting Reminder: ${crop.cropName} (Batch #${batch.batchNumber})`,
+      `Tomorrow is the planting date for ${crop.cropName} Batch #${batch.batchNumber} (${formatDateShort(batch.date)}).\n\nReply with 'planted ${crop.id} ${batch.batchNumber}' when done to update.`,
       chatId
     ));
   });

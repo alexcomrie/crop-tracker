@@ -3,16 +3,24 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { useAppStore } from '../../store/useAppStore';
 import { buildSuccessionGapData, type WeekGapData } from '../../lib/succession';
-import type { Crop } from '../../types';
+import { resolveCropData } from '../../lib/cropDb';
+import type { Crop, CropData } from '../../types';
 import { formatDateShort } from '../../lib/dates';
 
 export function SuccessionGapReport() {
-  const crops = useLiveQuery(() => db.crops.toArray(), []) as Crop[] | null;
+  const crops = useLiveQuery(() => db.crops.where('status').equals('Active').toArray()) as Crop[] | null;
   const { cropDb } = useAppStore();
 
   const cachedAnalysis = useLiveQuery(() => db.successionGaps.get('latest'), []);
   
-  const currentWeeks = crops && crops.length > 0 ? buildSuccessionGapData(crops, cropDb, 12) : null;
+  // Cast cropDb to the expected record type for the analysis function
+   const cropDataOnly = Object.keys(cropDb).reduce((acc, key) => {
+     const data = resolveCropData(cropDb, key);
+     if (data) acc[key] = data;
+     return acc;
+   }, {} as Record<string, CropData>);
+
+  const currentWeeks = crops && crops.length > 0 ? buildSuccessionGapData(crops, cropDataOnly, 12) : null;
   const weeks = currentWeeks || cachedAnalysis?.data || [];
 
   // Store the analysis data locally whenever it changes

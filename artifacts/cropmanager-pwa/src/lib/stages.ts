@@ -9,6 +9,7 @@ export function processStageChange(
   date: Date,
   cropData: CropData,
   adjustments: CropDbAdjustment[],
+  existingHarvestLogs: HarvestLog[] = [],
   threshold = 3
 ): { updatedCrop: Crop; stageLog: StageLog; harvestLog?: HarvestLog } {
   const dateStr = formatDateShort(date);
@@ -71,18 +72,21 @@ export function processStageChange(
   let harvestLog: HarvestLog | undefined;
   if (newStage === 'Harvested') {
     updatedCrop.harvestDateActual = dateStr;
-    updatedCrop.status = 'Harvested';
+    if (!crop.isContinuous) {
+      updatedCrop.status = 'Harvested';
+    }
     const transplanted = parseDate(crop.transplantDateActual || crop.transplantDateScheduled);
     if (transplanted) {
       updatedCrop.daysTransplantHarvest = daysBetween(transplanted, date);
     }
     const estHarvest = parseDate(crop.harvestDateEstimated);
     const deviation = estHarvest ? daysBetween(estHarvest, date) : 0;
+    const harvestCount = existingHarvestLogs.length + 1;
     harvestLog = {
       id: generateId('HL'),
       cropTrackingId: crop.id,
       cropName: crop.cropName,
-      harvestNumber: 1,
+      harvestNumber: harvestCount,
       harvestDate: dateStr,
       daysFromPlanting: planted ? daysBetween(planted, date) : 0,
       deviationFromDb: deviation,

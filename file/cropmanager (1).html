@@ -1,0 +1,2031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>CropManager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green: #2d6a2d;
+  --green-light: #3d8b3d;
+  --green-pale: #e8f5e8;
+  --green-mid: #c2e0c2;
+  --amber: #d97706;
+  --amber-pale: #fef3c7;
+  --red: #dc2626;
+  --red-pale: #fee2e2;
+  --blue: #1d4ed8;
+  --blue-pale: #dbeafe;
+  --purple: #7c3aed;
+  --purple-pale: #ede9fe;
+  --text: #1a1a1a;
+  --text-2: #555;
+  --text-3: #888;
+  --border: #e0e0e0;
+  --border-2: #d0d0d0;
+  --bg: #f5f5f0;
+  --surface: #ffffff;
+  --surface-2: #f9f9f6;
+  --nav-h: 64px;
+  --header-h: 56px;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; }
+
+/* ── APP SHELL ── */
+#app { display: flex; flex-direction: column; height: 100%; max-width: 480px; margin: 0 auto; background: var(--bg); position: relative; overflow: hidden; box-shadow: 0 0 0 1px var(--border); }
+
+/* ── HEADER ── */
+.header { height: var(--header-h); background: var(--green); display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; z-index: 10; }
+.header-icon { font-size: 20px; }
+.header-title { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.3px; flex: 1; }
+.header-badge { background: rgba(255,255,255,0.25); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px; font-family: 'DM Mono', monospace; }
+.header-action { background: rgba(255,255,255,0.15); border: none; color: #fff; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.15s; }
+.header-action:hover { background: rgba(255,255,255,0.25); }
+
+/* ── CONTENT AREA ── */
+.content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.content::-webkit-scrollbar { width: 3px; }
+.content::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+/* ── BOTTOM NAV ── */
+.nav { height: var(--nav-h); background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-shrink: 0; z-index: 20; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: none; background: none; cursor: pointer; color: var(--text-3); font-family: inherit; padding: 8px 0; transition: color 0.15s; -webkit-tap-highlight-color: transparent; }
+.nav-btn.active { color: var(--green); }
+.nav-btn svg { width: 22px; height: 22px; }
+.nav-label { font-size: 10px; font-weight: 500; letter-spacing: 0.3px; }
+.nav-btn.active .nav-icon-bg { background: var(--green-pale); border-radius: 8px; padding: 2px 10px; }
+
+/* ── PAGES ── */
+.page { display: none; height: 100%; }
+.page.active { display: flex; flex-direction: column; height: 100%; }
+
+/* ══════════════════════════════════════════
+   DASHBOARD PAGE
+══════════════════════════════════════════ */
+.dash-scroll { flex: 1; overflow-y: auto; padding: 16px; gap: 14px; display: flex; flex-direction: column; }
+.weather-card { background: linear-gradient(135deg, var(--green) 0%, #3d7a3d 100%); border-radius: var(--radius); padding: 16px; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+.weather-left h2 { font-size: 28px; font-weight: 600; line-height: 1; }
+.weather-left p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+.weather-right { text-align: right; }
+.weather-right .rain { font-size: 22px; }
+.weather-right p { font-size: 12px; opacity: 0.75; margin-top: 4px; }
+.section-label { font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 8px; }
+.today-card { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; border: 1px solid var(--border); }
+.today-date { font-size: 13px; font-weight: 600; color: var(--green); margin-bottom: 10px; }
+.today-item { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.today-item:last-child { border-bottom: none; padding-bottom: 0; }
+.today-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.today-dot.fert { background: #16a34a; }
+.today-dot.germ { background: #d97706; }
+.today-dot.spray { background: #7c3aed; }
+.today-dot.harvest { background: #dc2626; }
+.today-text { font-size: 13px; flex: 1; }
+.today-tag { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 6px; }
+.tag-fert { background: #dcfce7; color: #15803d; }
+.tag-germ { background: var(--amber-pale); color: var(--amber); }
+.tag-spray { background: var(--purple-pale); color: var(--purple); }
+.tag-harvest { background: var(--red-pale); color: var(--red); }
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stat-card { background: var(--surface); border-radius: var(--radius); padding: 14px 12px; border: 1px solid var(--border); text-align: center; }
+.stat-num { font-size: 26px; font-weight: 600; line-height: 1; color: var(--green); }
+.stat-lbl { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+/* ══════════════════════════════════════════
+   CROPS PAGE  
+══════════════════════════════════════════ */
+.crops-search { padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; gap: 10px; }
+.search-wrap { flex: 1; position: relative; }
+.search-wrap input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px 9px 34px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+.search-wrap input:focus { border-color: var(--green); }
+.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-3); font-size: 14px; pointer-events: none; }
+.filter-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; font-size: 13px; font-weight: 500; color: var(--text-2); cursor: pointer; white-space: nowrap; font-family: inherit; }
+.filter-btn.on { background: var(--green-pale); border-color: var(--green); color: var(--green); }
+.crop-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.crop-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 12px; }
+.crop-card:active { transform: scale(0.985); }
+.crop-avatar { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.crop-info { flex: 1; min-width: 0; }
+.crop-name { font-size: 14px; font-weight: 600; }
+.crop-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.crop-badge { font-size: 11px; font-weight: 500; padding: 2px 7px; border-radius: 6px; background: var(--green-pale); color: var(--green); }
+.crop-arrow { color: var(--text-3); font-size: 16px; }
+
+/* ══════════════════════════════════════════
+   MORE PAGE
+══════════════════════════════════════════ */
+.more-scroll { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.more-section-title { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.8px; margin: 8px 0 6px; }
+.more-section-title:first-child { margin-top: 0; }
+.more-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.15s; width: 100%; text-align: left; font-family: inherit; }
+.more-btn:active { transform: scale(0.985); background: var(--surface-2); }
+.more-btn-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.icon-green { background: var(--green-pale); }
+.icon-amber { background: var(--amber-pale); }
+.icon-blue { background: var(--blue-pale); }
+.icon-purple { background: var(--purple-pale); }
+.icon-red { background: var(--red-pale); }
+.more-btn-text { flex: 1; }
+.more-btn-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.more-btn-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.more-btn-arrow { color: var(--text-3); font-size: 18px; }
+
+/* ══════════════════════════════════════════
+   PANEL (slide-in overlay)
+══════════════════════════════════════════ */
+.panel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); display: flex; flex-direction: column; z-index: 50; transform: translateX(100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); }
+.panel.open { transform: translateX(0); }
+.panel-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 16px; height: var(--header-h); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.panel-back { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; color: var(--text-2); flex-shrink: 0; border: none; transition: background 0.15s; }
+.panel-back:hover { background: var(--border); }
+.panel-title { font-size: 16px; font-weight: 600; flex: 1; }
+.panel-actions { display: flex; gap: 8px; }
+.btn-primary { background: var(--green); color: #fff; border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; transition: background 0.15s; }
+.btn-primary:hover { background: var(--green-light); }
+.btn-secondary { background: var(--bg); color: var(--text-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+.btn-secondary:hover { background: var(--border); }
+.btn-danger { background: var(--red-pale); color: var(--red); border: 1px solid #fca5a5; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+.btn-danger:hover { background: #fecaca; }
+
+/* ── CROP DB PANEL ── */
+.crop-db-layout { display: flex; flex: 1; overflow: hidden; }
+.crop-db-sidebar { width: 140px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; display: flex; flex-direction: column; }
+.sidebar-search { padding: 10px; border-bottom: 1px solid var(--border); }
+.sidebar-search input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 12px; outline: none; font-family: inherit; }
+.sidebar-search input:focus { border-color: var(--green); }
+.crop-sidebar-item { padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; display: flex; flex-direction: column; gap: 2px; }
+.crop-sidebar-item:hover { background: var(--green-pale); }
+.crop-sidebar-item.active { background: var(--green-pale); border-left: 3px solid var(--green); }
+.crop-sidebar-item.alias-item { opacity: 0.6; }
+.csi-name { font-size: 12px; font-weight: 500; color: var(--text); line-height: 1.2; }
+.csi-type { font-size: 10px; color: var(--text-3); }
+.crop-db-detail { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.no-select { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--text-3); }
+.no-select-icon { font-size: 40px; }
+.no-select p { font-size: 14px; text-align: center; max-width: 200px; line-height: 1.5; }
+
+/* Form elements */
+.field-group { display: flex; flex-direction: column; gap: 10px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.5px; }
+.field input, .field select, .field textarea { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px; font-size: 13px; font-family: inherit; outline: none; color: var(--text); transition: border-color 0.15s; width: 100%; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--green); }
+.field textarea { resize: vertical; min-height: 70px; }
+.field input[type="number"] { font-family: 'DM Mono', monospace; }
+.days-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+
+/* Tags input */
+.tags-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 40px; cursor: text; }
+.tags-wrap:focus-within { border-color: var(--green); }
+.tag-chip { background: var(--green-pale); color: var(--green); border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.tag-chip.disease { background: var(--red-pale); color: var(--red); }
+.tag-chip.pest { background: var(--amber-pale); color: var(--amber); }
+.tag-chip .chip-remove { cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.7; }
+.tag-chip .chip-remove:hover { opacity: 1; }
+.tags-wrap input { border: none; outline: none; font-size: 13px; font-family: inherit; background: transparent; min-width: 80px; flex: 1; padding: 2px 4px; }
+.spray-days-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.spray-day-chip { background: var(--purple-pale); color: var(--purple); border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+.spray-day-chip .chip-remove { cursor: pointer; font-size: 14px; opacity: 0.7; }
+.add-day-row { display: flex; gap: 8px; align-items: center; }
+.add-day-row input { width: 70px; }
+
+/* Card section inside detail */
+.detail-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.detail-section-header { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.detail-section-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.detail-section-body { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Continuous harvest toggle */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; }
+.toggle-label { font-size: 13px; font-weight: 500; }
+.toggle-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border-2); border-radius: 24px; cursor: pointer; transition: background 0.2s; }
+.toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: white; border-radius: 50%; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.toggle input:checked + .toggle-slider { background: var(--green); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+/* New crop form */
+.new-crop-form { padding: 16px; display: flex; flex-direction: column; gap: 16px; flex: 1; overflow-y: auto; }
+
+/* Alias badge */
+.alias-badge { background: var(--blue-pale); color: var(--blue); border-radius: 8px; padding: 12px 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+.alias-badge-icon { font-size: 20px; }
+
+/* ══════════════════════════════════════════
+   FERT DB PANEL
+══════════════════════════════════════════ */
+.fert-crop-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.fert-crop-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.15s; }
+.fert-crop-card:active { transform: scale(0.985); }
+.fert-detail { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.stage-tabs { display: flex; gap: 6px; padding: 12px 0 0; }
+.stage-tab { flex: 1; padding: 8px 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--text-3); text-align: center; transition: all 0.15s; }
+.stage-tab.active { background: var(--green-pale); border-color: var(--green); color: var(--green); }
+.mix-bars { display: flex; flex-direction: column; gap: 8px; }
+.mix-bar-row { display: flex; align-items: center; gap: 10px; }
+.mix-bar-label { font-size: 12px; color: var(--text-2); width: 110px; flex-shrink: 0; }
+.mix-bar-wrap { flex: 1; background: var(--border); border-radius: 4px; height: 6px; overflow: hidden; }
+.mix-bar-fill { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.3s; }
+.mix-bar-fill.zero { background: var(--border-2); }
+.mix-bar-val { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text-3); width: 20px; text-align: right; }
+.mix-parts-inputs { display: flex; flex-direction: column; gap: 8px; }
+.mix-part-row { display: flex; align-items: center; gap: 10px; }
+.mix-part-label { font-size: 12px; color: var(--text-2); flex: 1; }
+.mix-part-input { width: 60px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 13px; font-family: 'DM Mono', monospace; outline: none; text-align: center; }
+.mix-part-input:focus { border-color: var(--green); }
+
+/* ══════════════════════════════════════════
+   CALENDAR PANEL
+══════════════════════════════════════════ */
+.cal-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.cal-nav-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.15s; border: none; }
+.cal-nav-btn:hover { background: var(--border); }
+.cal-month { font-size: 15px; font-weight: 600; }
+.cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; padding: 10px 16px 6px; }
+.cal-day-lbl { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-3); }
+.cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; padding: 0 16px 12px; }
+.cal-cell { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; transition: background 0.12s; position: relative; font-size: 13px; }
+.cal-cell:hover { background: var(--green-pale); }
+.cal-cell.today { background: var(--green); color: #fff; font-weight: 600; }
+.cal-cell.has-event::after { content: ''; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--amber); }
+.cal-cell.today.has-event::after { background: #fff; }
+.cal-cell.other-month { color: var(--text-3); }
+.cal-events { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.cal-event-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; gap: 12px; align-items: flex-start; }
+.cal-event-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.cal-event-info h4 { font-size: 13px; font-weight: 600; }
+.cal-event-info p { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+/* ══════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════ */
+.toast { position: absolute; bottom: 80px; left: 16px; right: 16px; background: #1a1a1a; color: #fff; border-radius: 10px; padding: 12px 16px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; z-index: 100; transform: translateY(20px); opacity: 0; transition: all 0.25s; pointer-events: none; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast-icon { font-size: 16px; }
+
+/* ══════════════════════════════════════════
+   MISC
+══════════════════════════════════════════ */
+.divider { height: 1px; background: var(--border); margin: 4px 0; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 10px; color: var(--text-3); padding: 40px 20px; }
+.empty-state-icon { font-size: 36px; }
+.empty-state p { font-size: 14px; text-align: center; line-height: 1.5; }
+.loading { display: flex; align-items: center; justify-content: center; padding: 40px; }
+.spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.chip-count { font-size: 11px; background: var(--green); color: #fff; border-radius: 10px; padding: 1px 6px; font-weight: 600; }
+
+/* ── REMINDER TYPE BUTTONS ── */
+.rem-type-btn { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 10px 8px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; color: var(--text-2); text-align: center; transition: all 0.15s; }
+.rem-type-btn:hover { background: var(--green-pale); border-color: var(--green-mid); }
+.rem-type-btn.active { background: var(--green-pale); border-color: var(--green); color: var(--green); font-weight: 600; }
+
+/* ── REMINDER CARDS ── */
+.rem-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; }
+.rem-card.overdue { border-left: 3px solid var(--red); }
+.rem-card.today-due { border-left: 3px solid var(--amber); }
+.rem-card.done-card { opacity: 0.55; }
+.rem-card-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.rem-card-body { flex: 1; min-width: 0; }
+.rem-card-title { font-size: 13px; font-weight: 600; }
+.rem-card-sub   { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.rem-card-date  { font-size: 11px; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rem-card-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+.rem-done-btn { background: var(--green-pale); border: 1px solid var(--green-mid); color: var(--green); border-radius: 7px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.rem-snooze-btn { background: var(--bg); border: 1px solid var(--border); color: var(--text-3); border-radius: 7px; padding: 5px 10px; font-size: 11px; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.badge-overdue  { background: var(--red-pale); color: var(--red); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px; }
+.badge-today-d  { background: var(--amber-pale); color: var(--amber); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px; }
+.badge-done-g   { background: var(--green-pale); color: var(--green); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px; }
+.badge-upcoming { background: var(--blue-pale); color: var(--blue); font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 5px; }
+
+/* ── HERBICIDE CARDS ── */
+.herb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; transition: all 0.15s; }
+.herb-card:active { transform: scale(0.985); }
+.herb-card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.herb-card-title { font-size: 14px; font-weight: 600; }
+.herb-card-sub   { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.herb-card-body  { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.herb-progress   { height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.herb-progress-bar { height: 100%; border-radius: 4px; background: var(--green); transition: width 0.4s; }
+.herb-progress-bar.warn { background: var(--amber); }
+.herb-chip { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
+.herb-status-active    { background: var(--amber-pale); color: var(--amber); }
+.herb-status-effective { background: var(--green-pale); color: var(--green); }
+.herb-status-check     { background: var(--purple-pale); color: var(--purple); }
+.herb-meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.outcome-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.outcome-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.outcome-btn:hover { background: var(--green-pale); border-color: var(--green); }
+.outcome-btn.selected { background: var(--green-pale); border-color: var(--green); color: var(--green); font-weight: 600; }
+.list-group-label { font-size: 10px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 0 6px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <span class="header-icon">🌱</span>
+    <span class="header-title">CropManager</span>
+    <span class="header-badge" id="header-badge">v9</span>
+  </div>
+
+  <!-- CONTENT AREA -->
+  <div class="content" id="main-content">
+
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="dash-scroll">
+        <div class="weather-card">
+          <div class="weather-left">
+            <h2>30° · 1mm</h2>
+            <p>Saint Ann's Bay · Today</p>
+          </div>
+          <div class="weather-right">
+            <div class="rain">🌦</div>
+            <p>Partly cloudy</p>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Today — Fri 13 Mar</div>
+          <div class="today-card">
+            <div class="today-item">
+              <div class="today-dot fert"></div>
+              <span class="today-text">Fertilizer: Seedling — Tomato</span>
+              <span class="today-tag tag-fert">Fert</span>
+            </div>
+            <div class="today-item">
+              <div class="today-dot germ"></div>
+              <span class="today-text">Germination Check — Callaloo</span>
+              <span class="today-tag tag-germ">Germ</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Overview</div>
+          <div class="stat-row">
+            <div class="stat-card"><div class="stat-num">8</div><div class="stat-lbl">Active crops</div></div>
+            <div class="stat-card"><div class="stat-num">3</div><div class="stat-lbl">Due this week</div></div>
+            <div class="stat-card"><div class="stat-num">34</div><div class="stat-lbl">DB entries</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="section-label">Upcoming</div>
+          <div class="today-card">
+            <div class="today-item">
+              <div class="today-dot germ"></div>
+              <span class="today-text">Wed 18 Mar · Germination Check — Tomato</span>
+              <span class="today-tag tag-germ">Germ</span>
+            </div>
+            <div class="today-item">
+              <div class="today-dot harvest"></div>
+              <span class="today-text">Fri 21 Mar · Harvest — Callaloo</span>
+              <span class="today-tag tag-harvest">Harvest</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CROPS PAGE -->
+    <div class="page" id="page-crops">
+      <div class="crops-search">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="crop-search" placeholder="Search crops…" oninput="filterCrops()">
+        </div>
+        <button class="filter-btn" id="filter-alias-btn" onclick="toggleAliasFilter()">Aliases</button>
+      </div>
+      <div class="crop-list" id="crop-list"></div>
+    </div>
+
+    <!-- PROPS PAGE -->
+    <div class="page" id="page-props">
+      <div class="empty-state">
+        <div class="empty-state-icon">🌿</div>
+        <p>Propagation tracking coming soon</p>
+      </div>
+    </div>
+
+    <!-- MORE PAGE -->
+    <div class="page" id="page-more">
+      <div class="more-scroll">
+        <div class="more-section-title">Databases</div>
+        <button class="more-btn" onclick="openPanel('panel-crop-db')">
+          <div class="more-btn-icon icon-green">🌱</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">Crop Database</div>
+            <div class="more-btn-sub">View and edit crop timings, varieties, sprays</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+        <button class="more-btn" onclick="openPanel('panel-fert-db')">
+          <div class="more-btn-icon icon-amber">🧪</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">Fertilizer Database</div>
+            <div class="more-btn-sub">Edit 5-tea mix ratios per crop &amp; stage</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+        <button class="more-btn" onclick="openPanel('panel-herb')">
+          <div class="more-btn-icon icon-red">🌿</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">Herbicide Schedule</div>
+            <div class="more-btn-sub">Manage herbicide application timing</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+        <button class="more-btn" onclick="openPanel('panel-reminders')">
+          <div class="more-btn-icon icon-purple">🔔</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">Reminders</div>
+            <div class="more-btn-sub">View and manage queued Telegram reminders</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+        <div class="more-section-title">Schedule</div>
+        <button class="more-btn" onclick="openPanel('panel-calendar')">
+          <div class="more-btn-icon icon-green">📅</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">Calendar</div>
+            <div class="more-btn-sub">View all upcoming events and tasks</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="nav">
+    <button class="nav-btn active" id="nav-dashboard" onclick="switchPage('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-btn" id="nav-crops" onclick="switchPage('crops')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10"/><path d="M12 2v10l4-4"/></svg>
+      <span class="nav-label">Crops</span>
+    </button>
+    <button class="nav-btn" id="nav-props" onclick="switchPage('props')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-6"/></svg>
+      <span class="nav-label">Props</span>
+    </button>
+    <button class="nav-btn" id="nav-more" onclick="switchPage('more')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/></svg>
+      <span class="nav-label">More</span>
+    </button>
+  </nav>
+
+  <!-- ═══════════════════════════════════
+       PANEL: CROP DATABASE
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-crop-db">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-crop-db')">‹</button>
+      <span class="panel-title">🌱 Crop Database</span>
+      <div class="panel-actions">
+        <button class="btn-primary" onclick="openNewCropForm()">+ Add</button>
+      </div>
+    </div>
+    <div class="crop-db-layout">
+      <!-- Sidebar list -->
+      <div class="crop-db-sidebar">
+        <div class="sidebar-search">
+          <input type="text" id="db-sidebar-search" placeholder="Filter…" oninput="filterSidebar()">
+        </div>
+        <div id="crop-db-sidebar-list"></div>
+      </div>
+      <!-- Detail editor -->
+      <div class="crop-db-detail" id="crop-db-detail">
+        <div class="no-select">
+          <div class="no-select-icon">👈</div>
+          <p>Select a crop from the list to view and edit its details</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       PANEL: FERTILIZER DATABASE
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-fert-db">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-fert-db')">‹</button>
+      <span class="panel-title">🧪 Fertilizer Database</span>
+    </div>
+    <!-- Sub-panel: crop list -->
+    <div id="fert-list-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div class="crops-search" style="background:var(--bg);padding:10px 16px;">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="fert-search" placeholder="Search crops…" oninput="filterFertList()">
+        </div>
+      </div>
+      <div class="fert-crop-list" id="fert-crop-list"></div>
+    </div>
+    <!-- Sub-panel: crop fert detail -->
+    <div id="fert-detail-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;height:48px;">
+        <button class="panel-back" style="width:28px;height:28px;font-size:16px;" onclick="closeFertDetail()">‹</button>
+        <span style="font-size:14px;font-weight:600;" id="fert-detail-title">Callaloo</span>
+        <button class="btn-primary" style="margin-left:auto;padding:6px 12px;font-size:12px;" onclick="saveFertCrop()">Save</button>
+      </div>
+      <div class="fert-detail" id="fert-detail-body"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       PANEL: HERBICIDE SCHEDULE
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-herb">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-herb')">‹</button>
+      <span class="panel-title">🌿 Herbicide Schedule</span>
+      <div class="panel-actions">
+        <button class="btn-primary" onclick="openHerbForm()">+ Log</button>
+      </div>
+    </div>
+    <!-- List view -->
+    <div id="herb-list-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <!-- Filter tabs -->
+      <div style="display:flex;gap:6px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;">
+        <button class="stage-tab active" id="herb-tab-all"    onclick="herbFilter('all')">All</button>
+        <button class="stage-tab"        id="herb-tab-active" onclick="herbFilter('active')">Active</button>
+        <button class="stage-tab"        id="herb-tab-done"   onclick="herbFilter('done')">Completed</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;" id="herb-log-list"></div>
+    </div>
+    <!-- Add / Edit form view -->
+    <div id="herb-form-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;height:48px;flex-shrink:0;">
+        <button class="panel-back" style="width:28px;height:28px;font-size:16px;" onclick="closeHerbForm()">‹</button>
+        <span style="font-size:14px;font-weight:600;" id="herb-form-title">Log Herbicide Application</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">🌿 Herbicide Details</div></div>
+          <div class="detail-section-body">
+            <div class="field"><label>Product Name</label>
+              <input type="text" id="herb-product" placeholder="e.g. Roundup, Gramoxone, Karmex">
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Active Ingredient</label>
+                <input type="text" id="herb-ingredient" placeholder="e.g. Glyphosate">
+              </div>
+              <div class="field"><label>Mode of Action</label>
+                <select id="herb-mode">
+                  <option value="">Select…</option>
+                  <option>Contact (burns on contact)</option>
+                  <option>Systemic (absorbed, translocated)</option>
+                  <option>Pre-emergent (prevents germination)</option>
+                  <option>Post-emergent (kills existing weeds)</option>
+                  <option>Selective (targets specific weeds)</option>
+                  <option>Non-selective (kills all vegetation)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Mix Rate (ml/L)</label>
+                <input type="number" id="herb-rate" placeholder="e.g. 10">
+              </div>
+              <div class="field"><label>Total Volume Applied (L)</label>
+                <input type="number" id="herb-volume" placeholder="e.g. 5">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">📍 Application Info</div></div>
+          <div class="detail-section-body">
+            <div class="field"><label>Target Area / Crop Block</label>
+              <input type="text" id="herb-area" placeholder="e.g. Back field, Pepper bed, Entire garden">
+            </div>
+            <div class="field"><label>Target Weeds (what you're killing)</label>
+              <input type="text" id="herb-target" placeholder="e.g. Nut grass, Broadleaf, General weeds">
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Date Applied</label>
+                <input type="date" id="herb-date-applied">
+              </div>
+              <div class="field"><label>Time Applied</label>
+                <input type="time" id="herb-time-applied">
+              </div>
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Weather at Time</label>
+                <select id="herb-weather">
+                  <option value="">Select…</option>
+                  <option>Sunny, dry</option>
+                  <option>Partly cloudy</option>
+                  <option>Overcast, dry</option>
+                  <option>Light rain after</option>
+                  <option>Windy</option>
+                </select>
+              </div>
+              <div class="field"><label>Re-entry Interval (hrs)</label>
+                <input type="number" id="herb-reentry" placeholder="e.g. 24">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">⏱ Effectiveness Tracking</div></div>
+          <div class="detail-section-body">
+            <div class="field-row">
+              <div class="field"><label>Expected Days to Work</label>
+                <input type="number" id="herb-days-expected" placeholder="e.g. 7">
+              </div>
+              <div class="field"><label>Check-back Reminder (days)</label>
+                <input type="number" id="herb-reminder-days" placeholder="e.g. 10">
+              </div>
+            </div>
+            <div class="field"><label>Notes</label>
+              <textarea id="herb-notes" placeholder="Any observations, dilution notes, areas to re-treat…" style="min-height:70px;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding-bottom:24px;">
+          <button class="btn-primary" style="flex:1;" onclick="saveHerbEntry()">💾 Save Application</button>
+          <button class="btn-secondary" onclick="closeHerbForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <!-- Detail / outcome view -->
+    <div id="herb-detail-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;height:48px;flex-shrink:0;">
+        <button class="panel-back" style="width:28px;height:28px;font-size:16px;" onclick="closeHerbDetail()">‹</button>
+        <span style="font-size:14px;font-weight:600;" id="herb-detail-title">Application Detail</span>
+        <button class="btn-secondary" style="margin-left:auto;padding:6px 12px;font-size:12px;" onclick="editHerbEntry()">Edit</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;" id="herb-detail-body"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       PANEL: REMINDERS
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-reminders">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-reminders')">‹</button>
+      <span class="panel-title">🔔 Manual Reminders</span>
+      <div class="panel-actions">
+        <button class="btn-primary" onclick="openReminderForm()">+ New</button>
+      </div>
+    </div>
+    <!-- Reminder list -->
+    <div id="rem-list-view" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="display:flex;gap:6px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;">
+        <button class="stage-tab active" id="rem-tab-upcoming" onclick="remFilter('upcoming')">Upcoming</button>
+        <button class="stage-tab"        id="rem-tab-all"      onclick="remFilter('all')">All</button>
+        <button class="stage-tab"        id="rem-tab-done"     onclick="remFilter('done')">Done</button>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px;" id="rem-list"></div>
+    </div>
+    <!-- Reminder form -->
+    <div id="rem-form-view" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:0 16px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:10px;height:48px;flex-shrink:0;">
+        <button class="panel-back" style="width:28px;height:28px;font-size:16px;" onclick="closeReminderForm()">‹</button>
+        <span style="font-size:14px;font-weight:600;" id="rem-form-title">New Manual Reminder</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">🌱 Plant / Crop</div></div>
+          <div class="detail-section-body">
+            <div class="field"><label>Plant Name (or description)</label>
+              <input type="text" id="rem-plant" placeholder="e.g. Peppers (back bed), Mystery squash, Front tomatoes">
+            </div>
+            <div class="field-row">
+              <div class="field"><label>Estimated Stage</label>
+                <select id="rem-stage">
+                  <option value="">Unknown / Not sure</option>
+                  <option>Seedling</option>
+                  <option>Mid-Vegetative</option>
+                  <option>Flowering</option>
+                  <option>Fruiting</option>
+                  <option>Near harvest</option>
+                </select>
+              </div>
+              <div class="field"><label>Approximate Plant Age</label>
+                <input type="text" id="rem-age" placeholder="e.g. ~6 weeks, 2 months">
+              </div>
+            </div>
+            <div class="field"><label>Location / Notes</label>
+              <input type="text" id="rem-location" placeholder="e.g. Back bed row 2, Pot near fence">
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">🔔 Reminder Type</div></div>
+          <div class="detail-section-body">
+            <div class="field"><label>What to do</label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px;" id="rem-type-grid">
+                <button class="rem-type-btn active" data-type="fungicide" onclick="selectRemType(this)">🍄 Fungicide spray</button>
+                <button class="rem-type-btn" data-type="pesticide" onclick="selectRemType(this)">🐛 Pesticide spray</button>
+                <button class="rem-type-btn" data-type="fertilizer" onclick="selectRemType(this)">🧪 Fertilizer</button>
+                <button class="rem-type-btn" data-type="water" onclick="selectRemType(this)">💧 Watering check</button>
+                <button class="rem-type-btn" data-type="inspect" onclick="selectRemType(this)">🔍 Inspect plant</button>
+                <button class="rem-type-btn" data-type="harvest" onclick="selectRemType(this)">🥬 Check harvest</button>
+                <button class="rem-type-btn" data-type="prune" onclick="selectRemType(this)">✂️ Prune / train</button>
+                <button class="rem-type-btn" data-type="custom" onclick="selectRemType(this)">📝 Custom task</button>
+              </div>
+            </div>
+            <div class="field" id="rem-custom-field" style="display:none;">
+              <label>Custom Task Description</label>
+              <input type="text" id="rem-custom-text" placeholder="Describe what to do…">
+            </div>
+            <div class="field" id="rem-product-field">
+              <label>Product to Use <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+              <input type="text" id="rem-product" placeholder="e.g. Copper fungicide, Neem oil, Organic tea">
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">📅 Schedule</div></div>
+          <div class="detail-section-body">
+            <div class="field-row">
+              <div class="field"><label>Due Date</label>
+                <input type="date" id="rem-due-date">
+              </div>
+              <div class="field"><label>Due Time <span style="color:var(--text-3);font-weight:400">(optional)</span></label>
+                <input type="time" id="rem-due-time">
+              </div>
+            </div>
+            <div class="field"><label>Repeat</label>
+              <select id="rem-repeat">
+                <option value="none">No repeat — one time only</option>
+                <option value="3">Every 3 days</option>
+                <option value="7">Every 7 days (weekly)</option>
+                <option value="10">Every 10 days</option>
+                <option value="14">Every 14 days (fortnightly)</option>
+                <option value="21">Every 21 days</option>
+                <option value="custom">Custom interval…</option>
+              </select>
+            </div>
+            <div class="field" id="rem-custom-interval-field" style="display:none;">
+              <label>Custom Interval (days)</label>
+              <input type="number" id="rem-interval-days" placeholder="e.g. 5" min="1">
+            </div>
+            <div class="field" id="rem-repeat-end-field" style="display:none;">
+              <label>Stop repeating after (optional date)</label>
+              <input type="date" id="rem-repeat-end">
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <div class="detail-section-header"><div class="detail-section-title">📝 Extra Notes</div></div>
+          <div class="detail-section-body">
+            <div class="field">
+              <textarea id="rem-notes" placeholder="Any extra context — last spray date, observations, what product worked before…" style="min-height:80px;"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;padding-bottom:24px;">
+          <button class="btn-primary" style="flex:1;" onclick="saveReminder()">💾 Save Reminder</button>
+          <button class="btn-secondary" onclick="closeReminderForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════
+       PANEL: CALENDAR
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-calendar">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-calendar')">‹</button>
+      <span class="panel-title">📅 Calendar</span>
+    </div>
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+      <span class="cal-month" id="cal-month-label">March 2026</span>
+      <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+    </div>
+    <div class="cal-days-header">
+      <div class="cal-day-lbl">Su</div><div class="cal-day-lbl">Mo</div><div class="cal-day-lbl">Tu</div>
+      <div class="cal-day-lbl">We</div><div class="cal-day-lbl">Th</div><div class="cal-day-lbl">Fr</div>
+      <div class="cal-day-lbl">Sa</div>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div class="cal-events" id="cal-events">
+      <div class="section-label">Fri 13 Mar — Today</div>
+      <div class="cal-event-card">
+        <div class="cal-event-dot" style="background:var(--green)"></div>
+        <div class="cal-event-info"><h4>Fertilizer: Seedling — Tomato</h4><p>Apply organic tea mix at seedling stage</p></div>
+      </div>
+      <div class="cal-event-card">
+        <div class="cal-event-dot" style="background:var(--amber)"></div>
+        <div class="cal-event-info"><h4>Germination Check — Callaloo</h4><p>Check for germination signs</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"><span class="toast-icon" id="toast-icon">✅</span><span id="toast-msg">Saved</span></div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  EMBEDDED CROP DATABASE (from crop_database.json)
+// ══════════════════════════════════════════
+const CROP_DB_INITIAL = {"callaloo":{"display_name":"Callaloo","varieties":["Jamaica Green","Trinidad Green","Red-Stemmed","Broad Leaf"],"plant_type":"Leafy Greens","number_of_weeks_harvest":6,"growing_time_days":52,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":35,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,42],"pest_spray_days":[14,35],"planting_method":"Direct ground or seed bed","diseases":["Powdery mildew","Downy mildew","Bacterial leaf spot","Root rot"],"pests":["Aphids","Leaf miners","Flea beetles","Whiteflies","Thrips"]},"pak choi":{"display_name":"Pak Choi (Bok Choy)","varieties":["Standard Green","Baby Pak Choi","Purple Pak Choi"],"plant_type":"Leafy Greens","number_of_weeks_harvest":3,"growing_time_days":52,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":14,"germination_days_min":4,"germination_days_max":8,"fungus_spray_days":[20,40],"pest_spray_days":[14,35],"planting_method":"Direct ground or seed tray","diseases":["Clubroot","Black rot","Bacterial leaf spot","Root rot"],"pests":["Cabbage worms","Aphids","Flea beetles","Whiteflies","Thrips"]},"bok choy":{"alias":"pak choi"},"cabbage":{"display_name":"Cabbage","varieties":["Flat Dutch","Golden Acre","Red Cabbage","Savoy"],"plant_type":"Brassica","number_of_weeks_harvest":1,"growing_time_days":95,"transplant_days":28,"growing_from_transplant":67,"harvest_interval":7,"batch_offset_days":7,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45,70],"pest_spray_days":[14,35,60],"planting_method":"Seed tray then transplant","diseases":["Clubroot","Black rot","Fusarium wilt","Bacterial leaf spot","Root rot"],"pests":["Cabbage worms/loopers","Aphids","Cabbage root maggot","Whiteflies","Thrips"]},"lettuce":{"display_name":"Lettuce","varieties":["Romaine","Iceberg","Butterhead","Loose Leaf","Red Leaf"],"plant_type":"Leafy Greens","number_of_weeks_harvest":5,"growing_time_days":45,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":28,"germination_days_min":2,"germination_days_max":7,"fungus_spray_days":[20,38],"pest_spray_days":[14,30],"planting_method":"Direct ground or seed tray","diseases":["Downy mildew","Bottom rot","Lettuce mosaic virus","Bacterial leaf spot","Root rot"],"pests":["Aphids","Slugs and snails","Leaf miners","Whiteflies","Thrips"]},"spinach":{"display_name":"Spinach","varieties":["Smooth Leaf","Savoy","Semi-Savoy"],"plant_type":"Leafy Greens","number_of_weeks_harvest":4,"growing_time_days":45,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[18,36],"pest_spray_days":[14,30],"planting_method":"Direct ground","diseases":["Downy mildew","Fusarium wilt","Leaf spot","Root rot"],"pests":["Aphids","Leaf miners","Slugs","Whiteflies"]},"kale":{"display_name":"Kale","varieties":["Curly","Lacinato","Red Russian"],"plant_type":"Leafy Greens","number_of_weeks_harvest":8,"growing_time_days":55,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":42,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45],"pest_spray_days":[14,35],"planting_method":"Direct ground or seed tray","diseases":["Black rot","Alternaria leaf spot","Root rot"],"pests":["Aphids","Cabbage worms","Whiteflies","Thrips"]},"tomato":{"display_name":"Tomato","varieties":["Cherry","Roma","Beefsteak","Plum","Heirloom"],"plant_type":"Fruiting Vegetable","number_of_weeks_harvest":8,"growing_time_days":90,"transplant_days":35,"growing_from_transplant":55,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,42,63],"pest_spray_days":[14,35,56],"planting_method":"Seed tray then transplant","diseases":["Early blight","Late blight","Fusarium wilt","Bacterial canker"],"pests":["Aphids","Whiteflies","Tomato hornworm","Spider mites"]},"tomatoes":{"alias":"tomato"},"sweet pepper":{"display_name":"Sweet Pepper (Bell Pepper)","varieties":["California Wonder","Yolo Wonder","Purple Bell","Yellow Bell"],"plant_type":"Fruiting Vegetable","number_of_weeks_harvest":10,"growing_time_days":110,"transplant_days":42,"growing_from_transplant":68,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":7,"germination_days_max":14,"fungus_spray_days":[21,42,70],"pest_spray_days":[14,35,60],"planting_method":"Seed tray then transplant","diseases":["Bacterial leaf spot","Phytophthora blight","Anthracnose","Mosaic virus"],"pests":["Aphids","Thrips","Whiteflies","Pepper weevil"]},"bell pepper":{"alias":"sweet pepper"},"pepper":{"alias":"sweet pepper"},"hot pepper":{"display_name":"Hot Pepper (Scotch Bonnet / Chili)","varieties":["Scotch Bonnet","Habanero","Cayenne","Jalapeño","Bird Pepper"],"plant_type":"Fruiting Vegetable","number_of_weeks_harvest":12,"growing_time_days":120,"transplant_days":42,"growing_from_transplant":78,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":7,"germination_days_max":21,"fungus_spray_days":[21,42,70,98],"pest_spray_days":[14,35,60,90],"planting_method":"Seed tray then transplant","diseases":["Bacterial leaf spot","Phytophthora blight","Anthracnose","Mosaic virus"],"pests":["Aphids","Thrips","Whiteflies","Pepper weevil"]},"scotch bonnet":{"alias":"hot pepper"},"chili":{"alias":"hot pepper"},"okra":{"display_name":"Okra","varieties":["Clemson Spineless","Burgundy","Baby Bubba","Star of David"],"plant_type":"Fruiting Vegetable","number_of_weeks_harvest":8,"growing_time_days":70,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":3,"batch_offset_days":28,"germination_days_min":5,"germination_days_max":12,"fungus_spray_days":[21,45],"pest_spray_days":[14,35],"planting_method":"Direct ground","diseases":["Powdery mildew","Fusarium wilt","Root rot"],"pests":["Aphids","Corn earworm","Stink bugs","Whiteflies"]},"cucumber":{"display_name":"Cucumber","varieties":["Straight Eight","Marketmore","English/Telegraph","Pickling","Lemon"],"plant_type":"Vine / Fruiting Vegetable","number_of_weeks_harvest":6,"growing_time_days":60,"transplant_days":14,"growing_from_transplant":46,"harvest_interval":3,"batch_offset_days":28,"germination_days_min":3,"germination_days_max":7,"fungus_spray_days":[18,36,54],"pest_spray_days":[14,30,48],"planting_method":"Seed tray then transplant","diseases":["Powdery mildew","Downy mildew","Cucumber mosaic virus","Angular leaf spot"],"pests":["Cucumber beetles","Aphids","Spider mites","Whiteflies"]},"cucumbers":{"alias":"cucumber"},"pumpkin":{"display_name":"Pumpkin","varieties":["Sugar Pie","Atlantic Giant","Jarrahdale","Cinderella"],"plant_type":"Vine Crop","number_of_weeks_harvest":2,"growing_time_days":100,"transplant_days":21,"growing_from_transplant":79,"harvest_interval":7,"batch_offset_days":35,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45,70],"pest_spray_days":[14,35,60],"planting_method":"Direct ground or seed tray","diseases":["Powdery mildew","Downy mildew","Phytophthora blight"],"pests":["Squash vine borer","Cucumber beetles","Aphids","Spider mites"]},"watermelon":{"display_name":"Watermelon","varieties":["Sugar Baby","Crimson Sweet","Charleston Gray","Yellow Flesh","Seedless"],"plant_type":"Vine Crop","number_of_weeks_harvest":2,"growing_time_days":90,"transplant_days":21,"growing_from_transplant":69,"harvest_interval":7,"batch_offset_days":42,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45,70],"pest_spray_days":[14,35,60],"planting_method":"Seed tray then transplant","diseases":["Powdery mildew","Fusarium wilt","Anthracnose","Phytophthora blight"],"pests":["Aphids","Cucumber beetles","Squash vine borer","Spider mites"]},"carrot":{"display_name":"Carrot","varieties":["Nantes","Chantenay","Imperator","Danvers"],"plant_type":"Root Crop","number_of_weeks_harvest":2,"growing_time_days":80,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":7,"germination_days_max":14,"fungus_spray_days":[28,56],"pest_spray_days":[21,45],"planting_method":"Direct ground","diseases":["Alternaria leaf blight","Cavity spot","Violet root rot"],"pests":["Carrot fly","Aphids","Nematodes","Wireworms"]},"beetroot":{"display_name":"Beetroot","varieties":["Detroit Dark Red","Chioggia","Golden","Cylindra"],"plant_type":"Root Crop","number_of_weeks_harvest":2,"growing_time_days":70,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45],"pest_spray_days":[14,35],"planting_method":"Direct ground","diseases":["Cercospora leaf spot","Root rot","Downy mildew"],"pests":["Aphids","Leaf miners","Slugs","Flea beetles"]},"beet":{"alias":"beetroot"},"corn":{"display_name":"Corn (Maize)","varieties":["Sweet Corn","Popcorn","Blue Hopi","Glass Gem"],"plant_type":"Grain","number_of_weeks_harvest":1,"growing_time_days":90,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":3,"batch_offset_days":14,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45],"pest_spray_days":[14,35],"planting_method":"Direct ground","diseases":["Northern corn leaf blight","Gray leaf spot","Rust"],"pests":["Corn earworm","Aphids","Corn rootworm","Fall armyworm"]},"maize":{"alias":"corn"},"red peas":{"display_name":"Red Peas (Kidney Beans)","varieties":["Dark Red","Light Red","White Kidney"],"plant_type":"Legume","number_of_weeks_harvest":3,"growing_time_days":95,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":28,"germination_days_min":5,"germination_days_max":10,"fungus_spray_days":[21,45],"pest_spray_days":[14,35],"planting_method":"Direct ground","diseases":["Bean mosaic virus","Rust","Anthracnose","Root rot"],"pests":["Bean beetles","Aphids","Thrips","Pod borers"]},"kidney beans":{"alias":"red peas"},"thyme":{"display_name":"Thyme","varieties":["Common","Lemon","Creeping","Silver"],"plant_type":"Herb","number_of_weeks_harvest":12,"growing_time_days":90,"transplant_days":35,"growing_from_transplant":55,"harvest_interval":14,"batch_offset_days":42,"germination_days_min":14,"germination_days_max":21,"fungus_spray_days":[28,56],"pest_spray_days":[21,45],"planting_method":"Seed tray or cuttings","diseases":["Root rot","Botrytis blight","Powdery mildew"],"pests":["Aphids","Spider mites","Whiteflies"]},"scallion":{"display_name":"Scallion","varieties":["Evergreen Hardy","Tokyo Long White","He Shi Ko","Red Beard"],"plant_type":"Bulb","number_of_weeks_harvest":6,"growing_time_days":60,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":21,"germination_days_min":7,"germination_days_max":14,"fungus_spray_days":[21,42],"pest_spray_days":[14,35],"planting_method":"Direct ground or division","diseases":["Downy mildew","Botrytis","Pink root"],"pests":["Onion thrips","Aphids","Root maggots"]},"sweet potato":{"display_name":"Sweet Potato","varieties":["Beauregard","Jewel","Garnet","Japanese","Purple"],"plant_type":"Tuber","number_of_weeks_harvest":1,"growing_time_days":110,"transplant_days":null,"growing_from_transplant":null,"harvest_interval":7,"batch_offset_days":42,"germination_days_min":10,"germination_days_max":21,"fungus_spray_days":[28,56],"pest_spray_days":[21,45],"planting_method":"Slips (vine cuttings)","diseases":["Sweet potato virus disease","Black rot","Fusarium wilt"],"pests":["Sweet potato weevil","Aphids","Wireworms","Whiteflies"]}};
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let cropDB = JSON.parse(JSON.stringify(CROP_DB_INITIAL));
+let fertDB = null; // loaded on demand
+let selectedCropKey = null;
+let selectedFertKey = null;
+let showAliases = false;
+let calDate = new Date(2026,2,1); // March 2026
+
+// ══════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'crops') renderCropList();
+}
+
+function openPanel(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'panel-crop-db') renderCropDbSidebar();
+  if (id === 'panel-fert-db') renderFertList();
+  if (id === 'panel-calendar') renderCalendar();
+}
+
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ══════════════════════════════════════════
+//  CROP LIST (Crops tab)
+// ══════════════════════════════════════════
+const CROP_EMOJIS = {
+  'Leafy Greens':'🥬','Brassica':'🥦','Fruiting Vegetable':'🍅','Vine / Fruiting Vegetable':'🥒',
+  'Vine Crop':'🎃','Root Crop':'🥕','Grain':'🌽','Legume':'🫘','Herb':'🌿','Bulb':'🧅',
+  'Rhizome':'🫚','Tuber':'🍠','default':'🌱'
+};
+
+function cropEmoji(pt) { return CROP_EMOJIS[pt] || CROP_EMOJIS.default; }
+
+function renderCropList() {
+  const q = (document.getElementById('crop-search').value || '').toLowerCase();
+  const list = document.getElementById('crop-list');
+  const entries = Object.entries(cropDB);
+  let html = '';
+  for (const [key, val] of entries) {
+    if (val.alias) {
+      if (!showAliases) continue;
+      if (q && !key.includes(q)) continue;
+      html += `<div class="crop-card" style="opacity:0.6" onclick="openCropEdit('${key}')">
+        <div class="crop-avatar" style="background:var(--blue-pale);font-size:14px">↗</div>
+        <div class="crop-info"><div class="crop-name">${key}</div><div class="crop-meta">Alias → ${val.alias}</div></div>
+        <span class="crop-arrow">›</span></div>`;
+      continue;
+    }
+    if (q && !val.display_name.toLowerCase().includes(q) && !key.includes(q)) continue;
+    html += `<div class="crop-card" onclick="openCropEdit('${key}')">
+      <div class="crop-avatar" style="background:var(--green-pale)">${cropEmoji(val.plant_type)}</div>
+      <div class="crop-info">
+        <div class="crop-name">${val.display_name}</div>
+        <div class="crop-meta">${val.plant_type} · ${val.growing_time_days}d grow</div>
+      </div>
+      <span class="crop-badge">${val.number_of_weeks_harvest}wk harvest</span>
+      <span class="crop-arrow">›</span></div>`;
+  }
+  if (!html) html = '<div class="empty-state"><div class="empty-state-icon">🔍</div><p>No crops found</p></div>';
+  list.innerHTML = html;
+}
+
+function filterCrops() { renderCropList(); }
+function toggleAliasFilter() {
+  showAliases = !showAliases;
+  document.getElementById('filter-alias-btn').classList.toggle('on', showAliases);
+  renderCropList();
+}
+
+function openCropEdit(key) {
+  selectedCropKey = key;
+  openPanel('panel-crop-db');
+  renderCropDbSidebar();
+  renderCropDbDetail(key);
+}
+
+// ══════════════════════════════════════════
+//  CROP DB PANEL — SIDEBAR
+// ══════════════════════════════════════════
+function renderCropDbSidebar() {
+  const q = (document.getElementById('db-sidebar-search').value || '').toLowerCase();
+  const list = document.getElementById('crop-db-sidebar-list');
+  let html = '';
+  for (const [key, val] of Object.entries(cropDB)) {
+    if (q && !key.includes(q) && !(val.display_name||'').toLowerCase().includes(q)) continue;
+    const isAlias = !!val.alias;
+    const isActive = selectedCropKey === key;
+    html += `<div class="crop-sidebar-item ${isAlias?'alias-item':''} ${isActive?'active':''}" onclick="selectCropDb('${key}')">
+      <div class="csi-name">${isAlias ? key : val.display_name}</div>
+      <div class="csi-type">${isAlias ? '→ '+val.alias : val.plant_type}</div>
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+function filterSidebar() { renderCropDbSidebar(); }
+function selectCropDb(key) {
+  selectedCropKey = key;
+  renderCropDbSidebar();
+  renderCropDbDetail(key);
+}
+
+// ══════════════════════════════════════════
+//  CROP DB PANEL — DETAIL EDITOR
+// ══════════════════════════════════════════
+function renderCropDbDetail(key) {
+  const det = document.getElementById('crop-db-detail');
+  const crop = cropDB[key];
+  if (!crop) { det.innerHTML = '<div class="no-select"><div class="no-select-icon">❓</div><p>Crop not found</p></div>'; return; }
+
+  if (crop.alias) {
+    det.innerHTML = `<div class="alias-badge">
+      <div class="alias-badge-icon">↗</div>
+      <div>
+        <div style="font-weight:600;margin-bottom:4px">${key}</div>
+        <div style="color:var(--text-3);font-size:12px">This is an alias for <strong>${crop.alias}</strong>. Edit the main crop entry to change data.</div>
+      </div>
+    </div>
+    <button class="btn-danger" style="width:100%;margin-top:8px" onclick="deleteCrop('${key}')">🗑 Delete alias</button>`;
+    return;
+  }
+
+  const d = (v) => v == null ? '' : v;
+  const arrVal = (arr) => (arr||[]).join(', ');
+
+  det.innerHTML = `
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">${cropEmoji(crop.plant_type)} Basic Info</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="field-row">
+        <div class="field"><label>Display Name</label><input type="text" id="f-display_name" value="${d(crop.display_name)}"></div>
+        <div class="field"><label>Plant Type</label>
+          <select id="f-plant_type">
+            ${['Leafy Greens','Brassica','Fruiting Vegetable','Vine / Fruiting Vegetable','Vine Crop','Root Crop','Grain','Legume','Herb','Bulb','Rhizome','Tuber'].map(t=>`<option ${crop.plant_type===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Planting Method</label><input type="text" id="f-planting_method" value="${d(crop.planting_method)}"></div>
+      <div class="field"><label>Varieties (comma-separated)</label>
+        <input type="text" id="f-varieties" value="${arrVal(crop.varieties)}">
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">⏱ Timing</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="field-row">
+        <div class="field"><label>Growing Time (days)</label><input type="number" id="f-growing_time_days" value="${d(crop.growing_time_days)}"></div>
+        <div class="field"><label>Harvest Weeks</label><input type="number" id="f-number_of_weeks_harvest" value="${d(crop.number_of_weeks_harvest)}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Germination Min (days)</label><input type="number" id="f-germination_days_min" value="${d(crop.germination_days_min)}"></div>
+        <div class="field"><label>Germination Max (days)</label><input type="number" id="f-germination_days_max" value="${d(crop.germination_days_max)}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Transplant Days</label><input type="number" id="f-transplant_days" value="${d(crop.transplant_days)}" placeholder="null"></div>
+        <div class="field"><label>From Transplant (days)</label><input type="number" id="f-growing_from_transplant" value="${d(crop.growing_from_transplant)}" placeholder="null"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Harvest Interval (days)</label><input type="number" id="f-harvest_interval" value="${d(crop.harvest_interval)}"></div>
+        <div class="field"><label>Batch Offset (days)</label><input type="number" id="f-batch_offset_days" value="${d(crop.batch_offset_days)}"></div>
+      </div>
+
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Continuous Harvest</div>
+          <div class="toggle-sub">Plant keeps producing after first pick</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="f-continuous_harvest" ${(crop.number_of_weeks_harvest||1)>1?'checked':''}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">🍄 Fungus Spray Days</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="spray-days-list" id="fungus-days-list"></div>
+      <div class="add-day-row">
+        <input type="number" id="fungus-day-input" placeholder="Day #" class="field" style="width:80px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit">
+        <button class="btn-secondary" onclick="addSprayDay('fungus')">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">🐛 Pest Spray Days</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="spray-days-list" id="pest-days-list"></div>
+      <div class="add-day-row">
+        <input type="number" id="pest-day-input" placeholder="Day #" class="field" style="width:80px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;outline:none;font-family:inherit">
+        <button class="btn-secondary" onclick="addSprayDay('pest')">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">🦠 Diseases</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="tags-wrap" id="diseases-tags" onclick="this.querySelector('input').focus()">
+        <input type="text" placeholder="Add disease…" onkeydown="addTag(event,'diseases')">
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-section">
+    <div class="detail-section-header">
+      <div class="detail-section-title">🦟 Pests</div>
+    </div>
+    <div class="detail-section-body">
+      <div class="tags-wrap" id="pests-tags" onclick="this.querySelector('input').focus()">
+        <input type="text" placeholder="Add pest…" onkeydown="addTag(event,'pests')">
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;padding-bottom:20px">
+    <button class="btn-primary" style="flex:1" onclick="saveCropDb()">💾 Save Changes</button>
+    <button class="btn-danger" onclick="deleteCrop('${key}')">🗑</button>
+  </div>`;
+
+  // Render spray days
+  renderSprayDays('fungus', crop.fungus_spray_days || []);
+  renderSprayDays('pest', crop.pest_spray_days || []);
+  // Render tags
+  renderTags('diseases', crop.diseases || [], 'disease');
+  renderTags('pests', crop.pests || [], 'pest');
+}
+
+// Spray days
+let tmpSprayDays = { fungus: [], pest: [] };
+function renderSprayDays(type, days) {
+  tmpSprayDays[type] = [...days];
+  const el = document.getElementById(type + '-days-list');
+  el.innerHTML = days.map((d,i) =>
+    `<div class="spray-day-chip">Day ${d}<span class="chip-remove" onclick="removeSprayDay('${type}',${i})">×</span></div>`
+  ).join('');
+}
+function addSprayDay(type) {
+  const inp = document.getElementById(type+'-day-input');
+  const v = parseInt(inp.value);
+  if (!v || v < 1) return;
+  tmpSprayDays[type].push(v);
+  tmpSprayDays[type].sort((a,b)=>a-b);
+  renderSprayDays(type, tmpSprayDays[type]);
+  inp.value = '';
+}
+function removeSprayDay(type, idx) {
+  tmpSprayDays[type].splice(idx, 1);
+  renderSprayDays(type, tmpSprayDays[type]);
+}
+
+// Tags
+let tmpTags = { diseases: [], pests: [] };
+function renderTags(field, items, cls) {
+  tmpTags[field] = [...items];
+  const wrap = document.getElementById(field+'-tags');
+  const inp = wrap.querySelector('input');
+  wrap.innerHTML = '';
+  items.forEach((item, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'tag-chip ' + cls;
+    chip.innerHTML = `${item}<span class="chip-remove" onclick="removeTag('${field}',${i})">×</span>`;
+    wrap.appendChild(chip);
+  });
+  wrap.appendChild(inp);
+}
+function addTag(e, field) {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  e.preventDefault();
+  const val = e.target.value.trim().replace(/,$/,'');
+  if (!val) return;
+  tmpTags[field].push(val);
+  e.target.value = '';
+  renderTags(field, tmpTags[field], field === 'diseases' ? 'disease' : 'pest');
+}
+function removeTag(field, idx) {
+  tmpTags[field].splice(idx, 1);
+  renderTags(field, tmpTags[field], field === 'diseases' ? 'disease' : 'pest');
+}
+
+function saveCropDb() {
+  if (!selectedCropKey) return;
+  const crop = cropDB[selectedCropKey];
+  if (crop.alias) return;
+  const g = (id) => document.getElementById(id);
+  const num = (id) => { const v = g(id).value; return v === '' ? null : parseInt(v); };
+  crop.display_name = g('f-display_name').value.trim();
+  crop.plant_type = g('f-plant_type').value;
+  crop.planting_method = g('f-planting_method').value.trim();
+  crop.varieties = g('f-varieties').value.split(',').map(s=>s.trim()).filter(Boolean);
+  crop.growing_time_days = num('f-growing_time_days');
+  crop.number_of_weeks_harvest = num('f-number_of_weeks_harvest');
+  crop.germination_days_min = num('f-germination_days_min');
+  crop.germination_days_max = num('f-germination_days_max');
+  crop.transplant_days = num('f-transplant_days');
+  crop.growing_from_transplant = num('f-growing_from_transplant');
+  crop.harvest_interval = num('f-harvest_interval');
+  crop.batch_offset_days = num('f-batch_offset_days');
+  crop.fungus_spray_days = [...tmpSprayDays.fungus];
+  crop.pest_spray_days = [...tmpSprayDays.pest];
+  crop.diseases = [...tmpTags.diseases];
+  crop.pests = [...tmpTags.pests];
+  renderCropDbSidebar();
+  showToast('✅', 'Saved: ' + crop.display_name);
+}
+
+function deleteCrop(key) {
+  if (!confirm(`Delete "${key}" from database?`)) return;
+  delete cropDB[key];
+  selectedCropKey = null;
+  renderCropDbSidebar();
+  document.getElementById('crop-db-detail').innerHTML = '<div class="no-select"><div class="no-select-icon">👈</div><p>Select a crop to edit</p></div>';
+  showToast('🗑', 'Deleted: ' + key);
+}
+
+// New crop form
+function openNewCropForm() {
+  const det = document.getElementById('crop-db-detail');
+  det.innerHTML = `
+  <div class="new-crop-form">
+    <div style="font-size:15px;font-weight:600;margin-bottom:-4px">New Crop Entry</div>
+    <div class="field-row">
+      <div class="field"><label>Key (lowercase)</label><input type="text" id="new-key" placeholder="e.g. basil"></div>
+      <div class="field"><label>Display Name</label><input type="text" id="new-display" placeholder="e.g. Basil"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Plant Type</label>
+        <select id="new-type">${['Leafy Greens','Brassica','Fruiting Vegetable','Vine Crop','Root Crop','Grain','Legume','Herb','Bulb','Tuber'].map(t=>`<option>${t}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Planting Method</label><input type="text" id="new-method" placeholder="Direct ground"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Growing Time (days)</label><input type="number" id="new-grow" value="60"></div>
+      <div class="field"><label>Harvest Weeks</label><input type="number" id="new-wks" value="1"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Germ Min</label><input type="number" id="new-gmin" value="5"></div>
+      <div class="field"><label>Germ Max</label><input type="number" id="new-gmax" value="10"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Transplant Days</label><input type="number" id="new-trans" placeholder="null"></div>
+      <div class="field"><label>Batch Offset</label><input type="number" id="new-batch" value="14"></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn-primary" style="flex:1" onclick="saveNewCrop()">💾 Add Crop</button>
+      <button class="btn-secondary" onclick="renderCropDbDetail(selectedCropKey)">Cancel</button>
+    </div>
+  </div>`;
+}
+
+function saveNewCrop() {
+  const g = (id) => document.getElementById(id).value.trim();
+  const n = (id) => { const v = g(id); return v===''?null:parseInt(v); };
+  const key = g('new-key').toLowerCase().replace(/\s+/g,' ');
+  if (!key) { showToast('❌','Enter a crop key'); return; }
+  if (cropDB[key]) { showToast('❌','Key already exists'); return; }
+  cropDB[key] = {
+    display_name: g('new-display')||key,
+    varieties: [], plant_type: g('new-type'), number_of_weeks_harvest: n('new-wks')||1,
+    growing_time_days: n('new-grow')||60, transplant_days: n('new-trans'),
+    growing_from_transplant: null, harvest_interval: 7, batch_offset_days: n('new-batch')||14,
+    germination_days_min: n('new-gmin')||5, germination_days_max: n('new-gmax')||10,
+    fungus_spray_days: [], pest_spray_days: [], planting_method: g('new-method')||'Direct ground',
+    diseases: [], pests: []
+  };
+  selectedCropKey = key;
+  renderCropDbSidebar();
+  renderCropDbDetail(key);
+  showToast('✅','Added: '+(cropDB[key].display_name));
+}
+
+// Export JSON
+function exportCropDb() {
+  const json = JSON.stringify(cropDB, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'crop_database.json';
+  a.click();
+}
+
+// ══════════════════════════════════════════
+//  FERTILIZER DB PANEL
+// ══════════════════════════════════════════
+const FERT_DB_STUB = {
+  _meta: { version: "1.0", description: "Alex's 5-tea system" },
+  crops: {}
+};
+
+// Build a stub fert DB from crop_db if no real one loaded
+function ensureFertDb() {
+  if (fertDB) return;
+  fertDB = JSON.parse(JSON.stringify(FERT_DB_STUB));
+  const teas = ['cow_manure_tea','chicken_manure_tea','plant_based_tea','wood_ash_tea'];
+  for (const [key, val] of Object.entries(cropDB)) {
+    if (val.alias) continue;
+    fertDB.crops[key] = {
+      display_name: val.display_name,
+      plant_type: val.plant_type,
+      fert_profile: 'default',
+      stages: {
+        seedling:       { description:'Seedling stage', foliar: makeMix([1,0,1,0],25), drench: makeMix([1,0,1,0],20) },
+        mid_vegetative: { description:'Active growth',  foliar: makeMix([1,1,1,0],20), drench: makeMix([1,1,1,0],15) },
+        flowering:      { description:'Flowering',       foliar: makeMix([1,0,1,1],25), drench: makeMix([1,0,1,1],20) },
+        fruiting:       { description:'Fruiting/harvest',foliar: makeMix([1,0,1,1],30), drench: makeMix([1,0,1,1],20) }
+      }
+    };
+  }
+}
+function makeMix(parts, dil) {
+  const teas = ['cow_manure_tea','chicken_manure_tea','plant_based_tea','wood_ash_tea'];
+  const mp = {}; teas.forEach((t,i)=>mp[t]=parts[i]);
+  return { mix_parts: mp, final_dilution: dil, note: '' };
+}
+
+function renderFertList() {
+  ensureFertDb();
+  const list = document.getElementById('fert-crop-list');
+  const q = (document.getElementById('fert-search').value||'').toLowerCase();
+  let html = '';
+  for (const [key, val] of Object.entries(fertDB.crops)) {
+    if (q && !key.includes(q) && !val.display_name.toLowerCase().includes(q)) continue;
+    html += `<div class="fert-crop-card" onclick="openFertDetail('${key}')">
+      <div class="crop-avatar" style="background:var(--amber-pale)">${cropEmoji(val.plant_type)}</div>
+      <div class="crop-info"><div class="crop-name">${val.display_name}</div>
+      <div class="crop-meta">${val.plant_type} · ${val.fert_profile||'default'} profile</div></div>
+      <span class="crop-arrow">›</span></div>`;
+  }
+  if (!html) html = '<div class="empty-state"><div class="empty-state-icon">🔍</div><p>No entries</p></div>';
+  list.innerHTML = html;
+}
+function filterFertList() { renderFertList(); }
+
+let activeStage = 'seedling';
+function openFertDetail(key) {
+  selectedFertKey = key;
+  document.getElementById('fert-list-view').style.display = 'none';
+  document.getElementById('fert-detail-view').style.display = 'flex';
+  document.getElementById('fert-detail-title').textContent = fertDB.crops[key].display_name;
+  activeStage = 'seedling';
+  renderFertDetail();
+}
+function closeFertDetail() {
+  document.getElementById('fert-list-view').style.display = 'flex';
+  document.getElementById('fert-detail-view').style.display = 'none';
+}
+
+const STAGE_LABELS = { seedling:'🌱 Seedling', mid_vegetative:'🌿 Mid-Veg', flowering:'🌸 Flowering', fruiting:'🍅 Fruiting' };
+const TEA_LABELS = { cow_manure_tea:'Cow manure', chicken_manure_tea:'Chicken manure', plant_based_tea:'Plant-based', wood_ash_tea:'Wood ash' };
+
+function renderFertDetail() {
+  const crop = fertDB.crops[selectedFertKey];
+  const stages = Object.keys(STAGE_LABELS);
+  const body = document.getElementById('fert-detail-body');
+  const stageSt = crop.stages[activeStage];
+
+  let html = `<div class="stage-tabs">` +
+    stages.map(s=>`<button class="stage-tab ${s===activeStage?'active':''}" onclick="setFertStage('${s}')">${STAGE_LABELS[s]}</button>`).join('') +
+    `</div>`;
+
+  html += `<div class="detail-section"><div class="detail-section-header"><div class="detail-section-title">🧪 Foliar Spray</div></div><div class="detail-section-body">`;
+  html += `<div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Mix Parts</div>`;
+  html += `<div class="mix-parts-inputs">`;
+  const teas = Object.keys(TEA_LABELS);
+  teas.forEach(tea => {
+    const v = stageSt.foliar.mix_parts[tea] || 0;
+    html += `<div class="mix-part-row"><span class="mix-part-label">${TEA_LABELS[tea]}</span>
+      <input class="mix-part-input" type="number" min="0" max="5" step="0.5" id="fol-${tea}" value="${v}" oninput="updateMixBar('fol','${tea}',this.value)"></div>`;
+  });
+  html += `</div>`;
+  html += `<div class="field-row" style="margin-top:10px">
+    <div class="field"><label>Final Dilution (1:X)</label><input type="number" id="fol-dilution" value="${stageSt.foliar.final_dilution||25}"></div>
+    <div class="field"><label>Yeast (tsp/L)</label><input type="number" id="fol-yeast" value="${stageSt.foliar.yeast_tsp_per_litre||0}" step="0.5"></div>
+  </div>`;
+  html += `<div class="field"><label>Notes</label><textarea id="fol-note" style="min-height:50px">${stageSt.foliar.note||''}</textarea></div>`;
+  html += `</div></div>`;
+
+  html += `<div class="detail-section"><div class="detail-section-header"><div class="detail-section-title">💧 Soil Drench</div></div><div class="detail-section-body">`;
+  html += `<div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Mix Parts</div>`;
+  html += `<div class="mix-parts-inputs">`;
+  teas.forEach(tea => {
+    const v = stageSt.drench.mix_parts[tea] || 0;
+    html += `<div class="mix-part-row"><span class="mix-part-label">${TEA_LABELS[tea]}</span>
+      <input class="mix-part-input" type="number" min="0" max="5" step="0.5" id="dre-${tea}" value="${v}"></div>`;
+  });
+  html += `</div>`;
+  html += `<div class="field-row" style="margin-top:10px">
+    <div class="field"><label>Final Dilution (1:X)</label><input type="number" id="dre-dilution" value="${stageSt.drench.final_dilution||20}"></div>
+    <div class="field"><label>Yeast (tbsp/5L)</label><input type="number" id="dre-yeast" value="${stageSt.drench.yeast_tbsp_per_5L||0}" step="0.5"></div>
+  </div>`;
+  html += `<div class="field"><label>Notes</label><textarea id="dre-note" style="min-height:50px">${stageSt.drench.note||''}</textarea></div>`;
+  html += `</div></div>`;
+
+  html += `<div style="padding-bottom:20px"><div class="field"><label>Stage Description</label><textarea id="fert-stage-desc" style="min-height:50px">${stageSt.description||''}</textarea></div></div>`;
+
+  body.innerHTML = html;
+}
+
+function setFertStage(s) { activeStage = s; renderFertDetail(); }
+
+function saveFertCrop() {
+  if (!selectedFertKey) return;
+  const crop = fertDB.crops[selectedFertKey];
+  const stageSt = crop.stages[activeStage];
+  const teas = Object.keys(TEA_LABELS);
+  const g = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+  teas.forEach(tea => {
+    stageSt.foliar.mix_parts[tea] = parseFloat(g('fol-'+tea))||0;
+    stageSt.drench.mix_parts[tea] = parseFloat(g('dre-'+tea))||0;
+  });
+  stageSt.foliar.final_dilution = parseInt(g('fol-dilution'))||25;
+  stageSt.foliar.yeast_tsp_per_litre = parseFloat(g('fol-yeast'))||0;
+  stageSt.foliar.note = g('fol-note');
+  stageSt.drench.final_dilution = parseInt(g('dre-dilution'))||20;
+  stageSt.drench.yeast_tbsp_per_5L = parseFloat(g('dre-yeast'))||0;
+  stageSt.drench.note = g('dre-note');
+  stageSt.description = g('fert-stage-desc');
+  showToast('✅','Fert schedule saved — '+crop.display_name);
+}
+
+// ══════════════════════════════════════════
+//  CALENDAR
+// ══════════════════════════════════════════
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function renderCalendar() {
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  document.getElementById('cal-month-label').textContent = MONTHS[m] + ' ' + y;
+  const first = new Date(y,m,1).getDay();
+  const days = new Date(y,m+1,0).getDate();
+  const today = new Date();
+  let html = '';
+  for (let i=0;i<first;i++) {
+    const d = new Date(y,m,0).getDate()-first+i+1;
+    html += `<div class="cal-cell other-month">${d}</div>`;
+  }
+  for (let d=1;d<=days;d++) {
+    const isToday = d===13&&m===2&&y===2026;
+    const hasEv = [13,18,21].includes(d)&&m===2&&y===2026;
+    html += `<div class="cal-cell ${isToday?'today':''} ${hasEv?'has-event':''}" onclick="calSelectDay(${d})">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+function calNav(dir) { calDate.setMonth(calDate.getMonth()+dir); renderCalendar(); }
+function calSelectDay(d) {}
+
+// ══════════════════════════════════════════
+//  TOAST
+// ══════════════════════════════════════════
+let toastTimer;
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-icon').textContent = icon;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+// ══════════════════════════════════════════
+//  REMINDERS — STATE & HELPERS
+// ══════════════════════════════════════════
+let reminders = [
+  // Seed data — unlogged peppers example
+  { id: 'r1', plant: 'Peppers (back bed)', stage: 'Flowering', age: '~8 weeks', location: 'Back bed row 2',
+    type: 'fungicide', product: 'Copper fungicide', dueDate: '2026-03-13', dueTime: '',
+    repeat: '14', repeatEnd: '', notes: 'Already in ground, no log date. Last sprayed ~2 weeks ago.', done: false,
+    createdAt: '2026-03-01', snoozedUntil: null },
+  { id: 'r2', plant: 'Peppers (back bed)', stage: 'Flowering', age: '~8 weeks', location: 'Back bed row 2',
+    type: 'pesticide', product: 'Neem oil', dueDate: '2026-03-17', dueTime: '',
+    repeat: '10', repeatEnd: '', notes: 'Thrips observed. Spray early morning.', done: false,
+    createdAt: '2026-03-01', snoozedUntil: null },
+  { id: 'r3', plant: 'Mystery squash (front)', stage: 'Mid-Vegetative', age: '~4 weeks', location: 'Front fence',
+    type: 'fertilizer', product: 'Organic tea — mid-veg', dueDate: '2026-03-10', dueTime: '',
+    repeat: '10', repeatEnd: '', notes: '', done: false,
+    createdAt: '2026-03-05', snoozedUntil: null },
+  { id: 'r4', plant: 'Tomatoes (side bed)', stage: 'Fruiting', age: '3+ months', location: 'Side bed',
+    type: 'inspect', product: '', dueDate: '2026-03-08', dueTime: '',
+    repeat: 'none', repeatEnd: '', notes: 'Check for blossom end rot', done: true,
+    createdAt: '2026-03-01', snoozedUntil: null },
+];
+let remIdCounter = 10;
+let remFilterMode = 'upcoming';
+let editingRemId = null;
+
+const REM_TYPE_META = {
+  fungicide:  { icon: '🍄', label: 'Fungicide spray',  bg: 'var(--purple-pale)', color: 'var(--purple)' },
+  pesticide:  { icon: '🐛', label: 'Pesticide spray',  bg: 'var(--amber-pale)',  color: 'var(--amber)'  },
+  fertilizer: { icon: '🧪', label: 'Fertilizer',       bg: '#e0f2fe',           color: '#0369a1'       },
+  water:      { icon: '💧', label: 'Watering check',   bg: var_blue_pale(),     color: var_blue()      },
+  inspect:    { icon: '🔍', label: 'Inspect plant',    bg: 'var(--bg)',         color: 'var(--text-2)' },
+  harvest:    { icon: '🥬', label: 'Check harvest',    bg: 'var(--green-pale)', color: 'var(--green)'  },
+  prune:      { icon: '✂️', label: 'Prune / train',    bg: 'var(--surface-2)',  color: 'var(--text-2)' },
+  custom:     { icon: '📝', label: 'Custom task',      bg: 'var(--surface-2)',  color: 'var(--text-2)' },
+};
+function var_blue_pale(){ return 'var(--blue-pale)'; }
+function var_blue(){ return 'var(--blue)'; }
+
+function todayISO() {
+  const d = new Date(); return d.toISOString().split('T')[0];
+}
+function isOverdue(rem) {
+  if (rem.done) return false;
+  return rem.dueDate && rem.dueDate < todayISO();
+}
+function isDueToday(rem) {
+  if (rem.done) return false;
+  return rem.dueDate === todayISO();
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const [y,m,d] = iso.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dt = new Date(Number(y), Number(m)-1, Number(d));
+  return names[dt.getDay()] + ' ' + Number(d) + ' ' + months[Number(m)-1] + ' ' + y;
+}
+
+// ── Filter tab ──
+function remFilter(mode) {
+  remFilterMode = mode;
+  document.querySelectorAll('[id^="rem-tab-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('rem-tab-' + mode).classList.add('active');
+  renderReminderList();
+}
+
+// ── Render list ──
+function renderReminderList() {
+  const list = document.getElementById('rem-list');
+  let items = [...reminders];
+  const today = todayISO();
+
+  if (remFilterMode === 'upcoming') items = items.filter(r => !r.done);
+  else if (remFilterMode === 'done') items = items.filter(r => r.done);
+
+  // sort: overdue first, then by date
+  items.sort((a,b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return (a.dueDate||'') < (b.dueDate||'') ? -1 : 1;
+  });
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔔</div><p>No reminders here.<br>Tap <strong>+ New</strong> to add one.</p></div>`;
+    return;
+  }
+
+  // Group overdue / today / upcoming / done
+  const overdue  = items.filter(r => isOverdue(r));
+  const todayDue = items.filter(r => isDueToday(r));
+  const upcoming = items.filter(r => !r.done && !isOverdue(r) && !isDueToday(r));
+  const doneItems= items.filter(r => r.done);
+
+  let html = '';
+  const renderGroup = (label, arr) => {
+    if (!arr.length) return;
+    html += `<div class="list-group-label">${label}</div>`;
+    arr.forEach(r => { html += buildRemCard(r); });
+  };
+
+  if (remFilterMode !== 'done') {
+    renderGroup('⚠️ Overdue', overdue);
+    renderGroup('📅 Due Today', todayDue);
+    if (remFilterMode === 'upcoming') renderGroup('🗓 Upcoming', upcoming);
+    if (remFilterMode === 'all') {
+      renderGroup('🗓 Upcoming', upcoming);
+      renderGroup('✅ Completed', doneItems);
+    }
+  } else {
+    renderGroup('✅ Completed', doneItems);
+  }
+
+  list.innerHTML = html;
+}
+
+function buildRemCard(r) {
+  const meta = REM_TYPE_META[r.type] || REM_TYPE_META.custom;
+  const overdue  = isOverdue(r);
+  const todayR   = isDueToday(r);
+  let badge = '';
+  if (r.done)        badge = `<span class="badge-done-g">Done</span>`;
+  else if (overdue)  badge = `<span class="badge-overdue">Overdue</span>`;
+  else if (todayR)   badge = `<span class="badge-today-d">Today</span>`;
+  else               badge = `<span class="badge-upcoming">Upcoming</span>`;
+
+  const repeatLabel = r.repeat === 'none' ? 'One-time' : 'Every ' + r.repeat + ' days';
+  const cardClass = r.done ? 'done-card' : overdue ? 'overdue' : todayR ? 'today-due' : '';
+
+  return `<div class="rem-card ${cardClass}">
+    <div class="rem-card-icon" style="background:${meta.bg}">${meta.icon}</div>
+    <div class="rem-card-body">
+      <div class="rem-card-title">${r.plant}</div>
+      <div class="rem-card-sub">${meta.label}${r.product ? ' · ' + r.product : ''}</div>
+      ${r.stage ? `<div class="rem-card-sub">Stage: ${r.stage}${r.age?' · '+r.age:''}</div>` : ''}
+      <div class="rem-card-date">
+        ${badge}
+        <span style="color:var(--text-3)">${fmtDate(r.dueDate)}</span>
+        <span style="color:var(--text-3);font-weight:400">${repeatLabel}</span>
+      </div>
+    </div>
+    <div class="rem-card-actions">
+      ${!r.done ? `<button class="rem-done-btn" onclick="markRemDone('${r.id}',event)">✓ Done</button>` : `<button class="rem-done-btn" style="background:var(--bg);border-color:var(--border);color:var(--text-3)" onclick="undoRemDone('${r.id}',event)">Undo</button>`}
+      ${!r.done ? `<button class="rem-snooze-btn" onclick="openEditReminder('${r.id}',event)">Edit</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function markRemDone(id, e) {
+  e.stopPropagation();
+  const r = reminders.find(x => x.id === id);
+  if (!r) return;
+  r.done = true;
+  // If repeating, create next occurrence
+  if (r.repeat !== 'none' && r.dueDate) {
+    const days = parseInt(r.repeat) || 7;
+    const next = new Date(r.dueDate);
+    next.setDate(next.getDate() + days);
+    const nextISO = next.toISOString().split('T')[0];
+    if (!r.repeatEnd || nextISO <= r.repeatEnd) {
+      reminders.push({ ...r, id: 'r' + (++remIdCounter), done: false, dueDate: nextISO, createdAt: todayISO() });
+    }
+  }
+  renderReminderList();
+  showToast('✅', 'Marked done — ' + r.plant);
+}
+
+function undoRemDone(id, e) {
+  e.stopPropagation();
+  const r = reminders.find(x => x.id === id);
+  if (r) { r.done = false; renderReminderList(); showToast('↩️','Restored'); }
+}
+
+// ── Forms ──
+let selectedRemType = 'fungicide';
+
+function openReminderForm() {
+  editingRemId = null;
+  selectedRemType = 'fungicide';
+  document.getElementById('rem-form-title').textContent = 'New Manual Reminder';
+  document.getElementById('rem-list-view').style.display = 'none';
+  document.getElementById('rem-form-view').style.display = 'flex';
+  // Defaults
+  document.getElementById('rem-due-date').value = todayISO();
+  document.getElementById('rem-plant').value = '';
+  document.getElementById('rem-stage').value = '';
+  document.getElementById('rem-age').value = '';
+  document.getElementById('rem-location').value = '';
+  document.getElementById('rem-product').value = '';
+  document.getElementById('rem-repeat').value = 'none';
+  document.getElementById('rem-notes').value = '';
+  document.getElementById('rem-custom-interval-field').style.display = 'none';
+  document.getElementById('rem-repeat-end-field').style.display = 'none';
+  document.getElementById('rem-custom-field').style.display = 'none';
+  // Reset type buttons
+  document.querySelectorAll('.rem-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-type="fungicide"]').classList.add('active');
+  // Repeat listener
+  document.getElementById('rem-repeat').onchange = function() {
+    const isCustom = this.value === 'custom';
+    const isRepeat = this.value !== 'none';
+    document.getElementById('rem-custom-interval-field').style.display = isCustom ? 'block' : 'none';
+    document.getElementById('rem-repeat-end-field').style.display = isRepeat ? 'block' : 'none';
+  };
+}
+
+function openEditReminder(id, e) {
+  if (e) e.stopPropagation();
+  const r = reminders.find(x => x.id === id);
+  if (!r) return;
+  editingRemId = id;
+  selectedRemType = r.type;
+  document.getElementById('rem-form-title').textContent = 'Edit Reminder';
+  document.getElementById('rem-list-view').style.display = 'none';
+  document.getElementById('rem-form-view').style.display = 'flex';
+  document.getElementById('rem-plant').value = r.plant;
+  document.getElementById('rem-stage').value = r.stage || '';
+  document.getElementById('rem-age').value = r.age || '';
+  document.getElementById('rem-location').value = r.location || '';
+  document.getElementById('rem-product').value = r.product || '';
+  document.getElementById('rem-due-date').value = r.dueDate || '';
+  document.getElementById('rem-due-time').value = r.dueTime || '';
+  document.getElementById('rem-repeat').value = r.repeat || 'none';
+  document.getElementById('rem-repeat-end').value = r.repeatEnd || '';
+  document.getElementById('rem-notes').value = r.notes || '';
+  document.getElementById('rem-custom-text').value = r.customText || '';
+  // type buttons
+  document.querySelectorAll('.rem-type-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === r.type);
+  });
+  document.getElementById('rem-custom-field').style.display = r.type === 'custom' ? 'block' : 'none';
+  const isRepeat = r.repeat !== 'none';
+  document.getElementById('rem-repeat-end-field').style.display = isRepeat ? 'block' : 'none';
+  document.getElementById('rem-repeat').onchange = function() {
+    const isCustom = this.value === 'custom';
+    const isR = this.value !== 'none';
+    document.getElementById('rem-custom-interval-field').style.display = isCustom ? 'block' : 'none';
+    document.getElementById('rem-repeat-end-field').style.display = isR ? 'block' : 'none';
+  };
+}
+
+function closeReminderForm() {
+  document.getElementById('rem-list-view').style.display = 'flex';
+  document.getElementById('rem-form-view').style.display = 'none';
+}
+
+function selectRemType(btn) {
+  document.querySelectorAll('.rem-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedRemType = btn.dataset.type;
+  document.getElementById('rem-custom-field').style.display = selectedRemType === 'custom' ? 'block' : 'none';
+  document.getElementById('rem-product-field').style.display =
+    ['fungicide','pesticide','fertilizer'].includes(selectedRemType) ? 'block' : 'none';
+}
+
+function saveReminder() {
+  const plant = document.getElementById('rem-plant').value.trim();
+  if (!plant) { showToast('❌', 'Enter a plant name'); return; }
+  const dueDate = document.getElementById('rem-due-date').value;
+  if (!dueDate) { showToast('❌', 'Pick a due date'); return; }
+
+  let repeatVal = document.getElementById('rem-repeat').value;
+  if (repeatVal === 'custom') {
+    repeatVal = document.getElementById('rem-interval-days').value || '7';
+  }
+
+  const data = {
+    plant, dueDate,
+    dueTime:   document.getElementById('rem-due-time').value,
+    stage:     document.getElementById('rem-stage').value,
+    age:       document.getElementById('rem-age').value.trim(),
+    location:  document.getElementById('rem-location').value.trim(),
+    type:      selectedRemType,
+    product:   document.getElementById('rem-product').value.trim(),
+    customText:document.getElementById('rem-custom-text').value.trim(),
+    repeat:    repeatVal,
+    repeatEnd: document.getElementById('rem-repeat-end').value,
+    notes:     document.getElementById('rem-notes').value.trim(),
+    done:      false,
+    createdAt: todayISO(),
+  };
+
+  if (editingRemId) {
+    const idx = reminders.findIndex(r => r.id === editingRemId);
+    if (idx !== -1) { reminders[idx] = { ...reminders[idx], ...data }; }
+    showToast('✅', 'Reminder updated');
+  } else {
+    data.id = 'r' + (++remIdCounter);
+    reminders.push(data);
+    showToast('✅', 'Reminder saved — ' + plant);
+  }
+  closeReminderForm();
+  renderReminderList();
+}
+
+// ══════════════════════════════════════════
+//  HERBICIDE — STATE & HELPERS
+// ══════════════════════════════════════════
+let herbLog = [
+  { id: 'h1', product: 'Gramoxone (Paraquat)', ingredient: 'Paraquat dichloride', mode: 'Contact (burns on contact)',
+    rate: 15, volume: 10, area: 'Back field walkways', target: 'Nut grass, general broadleaf',
+    dateApplied: '2026-03-05', timeApplied: '07:30', weather: 'Sunny, dry',
+    reentry: 24, daysExpected: 3, reminderDays: 7,
+    notes: 'Applied along fence line and between beds. Strong knockdown.',
+    outcome: 'effective', outcomeDate: '2026-03-10', outcomeNotes: 'Nut grass browned off within 3 days. 90% kill rate.' },
+  { id: 'h2', product: 'Roundup (Glyphosate 360)', ingredient: 'Glyphosate', mode: 'Systemic (absorbed, translocated)',
+    rate: 20, volume: 5, area: 'Pepper bed perimeter', target: 'Nut grass, Guinea grass',
+    dateApplied: '2026-03-01', timeApplied: '08:00', weather: 'Partly cloudy',
+    reentry: 48, daysExpected: 14, reminderDays: 14,
+    notes: 'Careful around pepper roots. Targeted spray only.',
+    outcome: null, outcomeDate: null, outcomeNotes: '' },
+];
+let herbIdCounter = 10;
+let herbFilterMode = 'all';
+let editingHerbId = null;
+let viewingHerbId = null;
+
+function herbFilter(mode) {
+  herbFilterMode = mode;
+  document.querySelectorAll('[id^="herb-tab-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('herb-tab-' + mode).classList.add('active');
+  renderHerbList();
+}
+
+function herbStatus(h) {
+  if (!h.dateApplied) return 'unknown';
+  if (h.outcome) return 'done';
+  const applied = new Date(h.dateApplied);
+  const today   = new Date();
+  const daysSince = Math.floor((today - applied) / 86400000);
+  if (daysSince >= h.daysExpected) return 'check'; // overdue for outcome check
+  return 'active';
+}
+
+function renderHerbList() {
+  const list = document.getElementById('herb-log-list');
+  let items = [...herbLog];
+  if (herbFilterMode === 'active') items = items.filter(h => herbStatus(h) !== 'done');
+  if (herbFilterMode === 'done')   items = items.filter(h => herbStatus(h) === 'done');
+  items.sort((a,b) => (b.dateApplied||'') > (a.dateApplied||'') ? 1 : -1);
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🌿</div><p>No applications logged.<br>Tap <strong>+ Log</strong> to record one.</p></div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(h => buildHerbCard(h)).join('');
+}
+
+function buildHerbCard(h) {
+  const status = herbStatus(h);
+  const applied = new Date(h.dateApplied);
+  const today   = new Date();
+  const daysSince = Math.floor((today - applied) / 86400000);
+  const pct = h.daysExpected ? Math.min(100, Math.round(daysSince / h.daysExpected * 100)) : 0;
+  const barClass = status === 'done' ? '' : pct >= 100 ? 'warn' : '';
+
+  let statusChip = '';
+  if (status === 'active') statusChip = `<span class="herb-chip herb-status-active">⏳ Working — day ${daysSince}/${h.daysExpected}</span>`;
+  else if (status === 'check') statusChip = `<span class="herb-chip herb-status-check">🔍 Check outcome</span>`;
+  else if (status === 'done')  statusChip = `<span class="herb-chip herb-status-effective">✅ ${h.outcome === 'effective' ? 'Effective' : h.outcome === 'partial' ? 'Partial' : 'Retreated'}</span>`;
+
+  return `<div class="herb-card" onclick="openHerbDetail('${h.id}')">
+    <div class="herb-card-header">
+      <div>
+        <div class="herb-card-title">🌿 ${h.product}</div>
+        <div class="herb-card-sub">${h.area} · ${fmtDate(h.dateApplied)}</div>
+      </div>
+      ${statusChip}
+    </div>
+    <div class="herb-card-body">
+      <div class="herb-meta-row">
+        <span class="herb-chip" style="background:var(--bg);color:var(--text-2)">${h.ingredient}</span>
+        <span class="herb-chip" style="background:var(--bg);color:var(--text-2)">Target: ${h.target}</span>
+      </div>
+      ${status !== 'done' ? `
+      <div style="margin-top:6px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-3);margin-bottom:3px">
+          <span>Effectiveness progress</span><span>${pct}% · Day ${daysSince} of ${h.daysExpected}</span>
+        </div>
+        <div class="herb-progress"><div class="herb-progress-bar ${barClass}" style="width:${pct}%"></div></div>
+      </div>` : `<div style="margin-top:4px;font-size:12px;color:var(--text-3)">${h.outcomeNotes||'Completed'}</div>`}
+    </div>
+  </div>`;
+}
+
+// ── Open detail ──
+function openHerbDetail(id) {
+  viewingHerbId = id;
+  const h = herbLog.find(x => x.id === id);
+  if (!h) return;
+  document.getElementById('herb-list-view').style.display = 'none';
+  document.getElementById('herb-form-view').style.display = 'none';
+  document.getElementById('herb-detail-view').style.display = 'flex';
+  document.getElementById('herb-detail-title').textContent = h.product;
+  renderHerbDetailBody(h);
+}
+
+function renderHerbDetailBody(h) {
+  const status = herbStatus(h);
+  const applied = new Date(h.dateApplied);
+  const today   = new Date();
+  const daysSince = Math.floor((today - applied) / 86400000);
+  const pct = h.daysExpected ? Math.min(100, Math.round(daysSince / h.daysExpected * 100)) : 0;
+
+  const outcomes = ['effective','partial','retreated','no-effect'];
+  const outcomeLabels = { effective:'✅ Effective', partial:'⚡ Partially effective', retreated:'🔁 Needed re-treatment', 'no-effect':'❌ No effect' };
+
+  document.getElementById('herb-detail-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-header"><div class="detail-section-title">🌿 Product</div></div>
+      <div class="detail-section-body">
+        <div style="font-size:16px;font-weight:600;">${h.product}</div>
+        <div style="font-size:13px;color:var(--text-3);margin-top:4px">${h.ingredient} · ${h.mode}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;">
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:600;color:var(--green)">${h.rate||'—'}</div>
+            <div style="font-size:11px;color:var(--text-3)">ml/L mix rate</div>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;text-align:center">
+            <div style="font-size:20px;font-weight:600;color:var(--green)">${h.volume||'—'}</div>
+            <div style="font-size:11px;color:var(--text-3)">litres applied</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header"><div class="detail-section-title">📍 Application</div></div>
+      <div class="detail-section-body">
+        <div style="font-size:13px;color:var(--text-2)"><strong>Area:</strong> ${h.area}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>Target weeds:</strong> ${h.target}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>Applied:</strong> ${fmtDate(h.dateApplied)}${h.timeApplied?' at '+h.timeApplied:''}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>Weather:</strong> ${h.weather||'Not recorded'}</div>
+        <div style="font-size:13px;color:var(--text-2);margin-top:4px"><strong>Re-entry interval:</strong> ${h.reentry||'—'} hours</div>
+        ${h.notes ? `<div style="margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;font-size:13px;color:var(--text-2)">${h.notes}</div>` : ''}
+      </div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-header"><div class="detail-section-title">⏱ Effectiveness</div></div>
+      <div class="detail-section-body">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-3);margin-bottom:6px">
+          <span>Day ${daysSince} of ${h.daysExpected} expected</span><span>${pct}%</span>
+        </div>
+        <div class="herb-progress" style="height:8px;"><div class="herb-progress-bar ${pct>=100&&!h.outcome?'warn':''}" style="width:${pct}%"></div></div>
+        <div style="margin-top:14px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Outcome</div>
+          <div class="outcome-btns">
+            ${outcomes.map(o => `<button class="outcome-btn ${h.outcome===o?'selected':''}" onclick="setHerbOutcome('${h.id}','${o}',this)">${outcomeLabels[o]}</button>`).join('')}
+          </div>
+          <div id="outcome-notes-wrap" style="margin-top:10px;${h.outcome?'':'display:none'}">
+            <div class="field">
+              <label>Outcome Notes</label>
+              <textarea id="outcome-notes-input" style="min-height:60px">${h.outcomeNotes||''}</textarea>
+            </div>
+            <button class="btn-primary" style="margin-top:8px;width:100%" onclick="saveHerbOutcome('${h.id}')">Save Outcome</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;padding-bottom:24px">
+      <button class="btn-secondary" style="flex:1" onclick="editHerbEntry()">✏️ Edit</button>
+      <button class="btn-danger" onclick="deleteHerbEntry('${h.id}')">🗑 Delete</button>
+    </div>`;
+}
+
+function setHerbOutcome(id, outcome, btn) {
+  const h = herbLog.find(x => x.id === id);
+  if (h) { h.outcome = outcome; }
+  btn.closest('.outcome-btns').querySelectorAll('.outcome-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('outcome-notes-wrap').style.display = 'block';
+}
+
+function saveHerbOutcome(id) {
+  const h = herbLog.find(x => x.id === id);
+  if (!h) return;
+  h.outcomeDate  = todayISO();
+  h.outcomeNotes = document.getElementById('outcome-notes-input').value.trim();
+  renderHerbDetailBody(h);
+  renderHerbList();
+  showToast('✅', 'Outcome saved');
+}
+
+function closeHerbDetail() {
+  document.getElementById('herb-detail-view').style.display = 'none';
+  document.getElementById('herb-list-view').style.display = 'flex';
+}
+
+function editHerbEntry() {
+  const id = viewingHerbId;
+  const h = herbLog.find(x => x.id === id);
+  if (!h) return;
+  editingHerbId = id;
+  document.getElementById('herb-detail-view').style.display = 'none';
+  document.getElementById('herb-form-view').style.display = 'flex';
+  document.getElementById('herb-form-title').textContent = 'Edit Application';
+  document.getElementById('herb-product').value    = h.product || '';
+  document.getElementById('herb-ingredient').value = h.ingredient || '';
+  document.getElementById('herb-mode').value        = h.mode || '';
+  document.getElementById('herb-rate').value        = h.rate || '';
+  document.getElementById('herb-volume').value      = h.volume || '';
+  document.getElementById('herb-area').value        = h.area || '';
+  document.getElementById('herb-target').value      = h.target || '';
+  document.getElementById('herb-date-applied').value= h.dateApplied || '';
+  document.getElementById('herb-time-applied').value= h.timeApplied || '';
+  document.getElementById('herb-weather').value     = h.weather || '';
+  document.getElementById('herb-reentry').value     = h.reentry || '';
+  document.getElementById('herb-days-expected').value = h.daysExpected || '';
+  document.getElementById('herb-reminder-days').value = h.reminderDays || '';
+  document.getElementById('herb-notes').value       = h.notes || '';
+}
+
+function deleteHerbEntry(id) {
+  if (!confirm('Delete this herbicide record?')) return;
+  herbLog = herbLog.filter(h => h.id !== id);
+  closeHerbDetail();
+  renderHerbList();
+  showToast('🗑', 'Record deleted');
+}
+
+// ── Add form ──
+function openHerbForm() {
+  editingHerbId = null;
+  document.getElementById('herb-form-title').textContent = 'Log Herbicide Application';
+  document.getElementById('herb-list-view').style.display = 'none';
+  document.getElementById('herb-detail-view').style.display = 'none';
+  document.getElementById('herb-form-view').style.display = 'flex';
+  // defaults
+  document.getElementById('herb-date-applied').value = todayISO();
+  document.getElementById('herb-time-applied').value = '';
+  document.getElementById('herb-product').value = '';
+  document.getElementById('herb-ingredient').value = '';
+  document.getElementById('herb-mode').value = '';
+  document.getElementById('herb-rate').value = '';
+  document.getElementById('herb-volume').value = '';
+  document.getElementById('herb-area').value = '';
+  document.getElementById('herb-target').value = '';
+  document.getElementById('herb-weather').value = '';
+  document.getElementById('herb-reentry').value = '';
+  document.getElementById('herb-days-expected').value = '';
+  document.getElementById('herb-reminder-days').value = '';
+  document.getElementById('herb-notes').value = '';
+}
+
+function closeHerbForm() {
+  document.getElementById('herb-form-view').style.display = 'none';
+  if (editingHerbId && viewingHerbId) {
+    document.getElementById('herb-detail-view').style.display = 'flex';
+    renderHerbDetailBody(herbLog.find(x => x.id === editingHerbId));
+  } else {
+    document.getElementById('herb-list-view').style.display = 'flex';
+  }
+  editingHerbId = null;
+}
+
+function saveHerbEntry() {
+  const product = document.getElementById('herb-product').value.trim();
+  if (!product) { showToast('❌', 'Enter a product name'); return; }
+  const dateApplied = document.getElementById('herb-date-applied').value;
+  if (!dateApplied) { showToast('❌', 'Pick an application date'); return; }
+
+  const data = {
+    product,
+    ingredient:   document.getElementById('herb-ingredient').value.trim(),
+    mode:         document.getElementById('herb-mode').value,
+    rate:         parseFloat(document.getElementById('herb-rate').value) || null,
+    volume:       parseFloat(document.getElementById('herb-volume').value) || null,
+    area:         document.getElementById('herb-area').value.trim(),
+    target:       document.getElementById('herb-target').value.trim(),
+    dateApplied,
+    timeApplied:  document.getElementById('herb-time-applied').value,
+    weather:      document.getElementById('herb-weather').value,
+    reentry:      parseInt(document.getElementById('herb-reentry').value) || null,
+    daysExpected: parseInt(document.getElementById('herb-days-expected').value) || 7,
+    reminderDays: parseInt(document.getElementById('herb-reminder-days').value) || 10,
+    notes:        document.getElementById('herb-notes').value.trim(),
+    outcome: null, outcomeDate: null, outcomeNotes: ''
+  };
+
+  if (editingHerbId) {
+    const idx = herbLog.findIndex(h => h.id === editingHerbId);
+    if (idx !== -1) {
+      herbLog[idx] = { ...herbLog[idx], ...data };
+      showToast('✅', 'Application updated');
+    }
+  } else {
+    data.id = 'h' + (++herbIdCounter);
+    herbLog.push(data);
+    showToast('✅', 'Application logged — ' + product);
+  }
+  closeHerbForm();
+  renderHerbList();
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+renderCropList();
+renderReminderList();
+renderHerbList();</script>
+</body>
+</html>

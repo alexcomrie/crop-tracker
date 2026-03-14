@@ -106,6 +106,44 @@ export function generateCropReminders(
   const fertReminders = generateFertilizerReminders(crop, cropData, adjustments, chatId, threshold);
   reminders.push(...fertReminders);
 
+  // Continuous harvest batch planting reminders
+  if (crop.isContinuous) {
+    const batchReminders = generateContinuousPlantingReminders(crop, cropData, chatId);
+    reminders.push(...batchReminders);
+  }
+
+  return reminders;
+}
+
+export function generateContinuousPlantingReminders(
+  crop: Crop,
+  cropData: CropData,
+  chatId: string
+): Reminder[] {
+  const reminders: Reminder[] = [];
+  const planted = parseDate(crop.plantingDate);
+  if (!planted) return reminders;
+
+  const batchOffset = cropData.batch_offset_days || 14;
+  const monthsAhead = 3;
+  const endDate = addDays(planted, monthsAhead * 30);
+
+  let currentPlantingDate = addDays(planted, batchOffset);
+  let batchNum = 2;
+
+  while (currentPlantingDate <= endDate) {
+    const reminderDate = addDays(currentPlantingDate, -3);
+    reminders.push(makeReminder(
+      'next_batch_planting', crop.cropName, crop.id,
+      reminderDate,
+      `📅 Next Batch Planting: ${crop.cropName} (Batch #${batchNum})`,
+      `Time to plant your next batch of ${crop.cropName} in 3 days (${formatDateShort(currentPlantingDate)}).\n\nReply with 'planted ${crop.id} ${batchNum}' when done to update.`,
+      chatId
+    ));
+    currentPlantingDate = addDays(currentPlantingDate, batchOffset);
+    batchNum++;
+  }
+
   return reminders;
 }
 

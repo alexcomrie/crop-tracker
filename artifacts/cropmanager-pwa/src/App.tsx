@@ -7,6 +7,9 @@ import { DashboardScreen } from './screens/DashboardScreen';
 import { CropsScreen } from './screens/CropsScreen';
 import { PropagationsScreen } from './screens/PropagationsScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
+import { MoreScreen } from './screens/MoreScreen';
+import { HerbicideScheduleScreen } from './screens/HerbicideScheduleScreen';
+import { RemindersScreen } from './screens/RemindersScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { useAppStore } from './store/useAppStore';
 import { useTelegramReminders } from './hooks/useTelegramReminders';
@@ -40,7 +43,10 @@ function AppContent() {
         {activeTab === 'dashboard' && <DashboardScreen />}
         {activeTab === 'crops' && <CropsScreen />}
         {activeTab === 'propagations' && <PropagationsScreen />}
+        {activeTab === 'more' && <MoreScreen />}
         {activeTab === 'calendar' && <CalendarScreen />}
+        {activeTab === 'herb-schedule' && <HerbicideScheduleScreen />}
+        {activeTab === 'reminders' && <RemindersScreen />}
         {activeTab === 'settings' && <SettingsScreen />}
       </main>
       <BottomNav />

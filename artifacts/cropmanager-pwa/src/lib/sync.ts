@@ -31,7 +31,13 @@ export async function buildSyncPayload() {
   ]);
 
   return {
-    crops: crops.map(c => [c.id, c.cropName, c.variety, c.plantingMethod, c.plantStage, c.plantingDate, c.transplantDateScheduled, c.transplantDateActual, c.germinationDate, c.harvestDateEstimated, c.harvestDateActual, c.nextConsistentPlanting, c.batchNumber, c.fungusSprayDates, c.pestSprayDates, c.status, c.notes, c.daysSeedGerm, c.daysGermTransplant, c.daysTransplantHarvest, c.telegramChatId]),
+    crops: crops.map(c => [
+      c.id, c.cropName, c.variety, c.plantingMethod, c.plantStage, c.plantingDate, 
+      c.transplantDateScheduled, c.transplantDateActual, c.germinationDate, 
+      c.harvestDateEstimated, c.harvestDateActual, c.isContinuous, c.nextConsistentPlanting, 
+      c.batchNumber, c.fungusSprayDates, c.pestSprayDates, c.status, c.notes, 
+      c.daysSeedGerm, c.daysGermTransplant, c.daysTransplantHarvest, c.telegramChatId
+    ]),
     propagations: propagations.map(p => [p.id, p.plantName, p.propagationDate, p.propagationMethod, p.notes, p.expectedRootingStart, p.expectedRootingEnd, p.actualRootingDate, p.daysToRootActual, p.status, p.telegramChatId]),
     reminders: reminders.map(r => [r.id, r.type, r.cropPlantName, r.trackingId, r.sendDate, r.subject, r.body, r.sent, r.chatId]),
     stageLogs: stageLogs.map(s => [s.trackingId, s.cropName, s.variety, s.stageFrom, s.stageTo, s.date, s.daysElapsed, s.method, s.notes]),

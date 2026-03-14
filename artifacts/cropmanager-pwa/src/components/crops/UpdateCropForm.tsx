@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import type { Crop } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { VALID_NEXT_STAGES } from '../../lib/stages';
+import { resolveCropData } from '../../lib/cropDb';
 import { processStageChange } from '../../lib/stages';
 import { formatDateShort, today } from '../../lib/dates';
+import { logDeviation } from '../../lib/learning';
+import { sendTelegramMessage } from '../../lib/telegram';
 import db from '../../db/db';
 import { generateId } from '../../lib/ids';
 
@@ -29,17 +32,54 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
-  const cropData = cropDb[crop.cropName.toLowerCase()];
+  const cropData = resolveCropData(cropDb, crop.cropName);
   const validStages = VALID_NEXT_STAGES[crop.plantStage] ?? [];
 
   async function handleStageChange() {
     if (!newStage) return;
     setSaving(true);
     const dateNow = today();
-    const { updatedCrop, stageLog, harvestLog } = processStageChange(crop, newStage, dateNow, cropData ?? {} as any, []);
+    
+    // Fetch adjustments and existing harvest logs
+    const [adjustments, existingHarvestLogs] = await Promise.all([
+      db.cropDbAdjustments.toArray(),
+      db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray()
+    ]);
+
+    const { updatedCrop, stageLog, harvestLog } = processStageChange(
+      crop, newStage, dateNow, cropData ?? {} as any, adjustments, existingHarvestLogs
+    );
+    
     await db.crops.put(updatedCrop);
     await db.stageLogs.add(stageLog);
-    if (harvestLog) await db.harvestLogs.add(harvestLog);
+    if (harvestLog) {
+      await db.harvestLogs.add(harvestLog);
+      
+      // Learning engine: update adjustments if this was a harvest
+      if (newStage === 'Harvested') {
+        const field = crop.transplantDateActual ? 'growing_from_transplant' : 'growing_time_days';
+        const actualValue = harvestLog.daysFromPlanting;
+        const dbDefault = field === 'growing_from_transplant' 
+          ? (cropData?.growing_from_transplant ?? cropData?.growing_time_days ?? 60)
+          : (cropData?.growing_time_days ?? 60);
+
+        const newAdj = logDeviation(
+           crop.cropName, field, dbDefault, actualValue, crop.variety, adjustments, settings.learningThreshold
+         );
+         await db.cropDbAdjustments.put(newAdj);
+
+         // Notify if threshold reached
+         if (newAdj.sampleCount === settings.learningThreshold) {
+           const msg = `📚 <b>Database Learning Update</b>\n` +
+             `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+             `🌱 Crop: <b>${crop.cropName}</b>\n` +
+             `📊 Field: ${field}\n` +
+             `📈 Your average: <b>${newAdj.yourAverage} days</b> (${newAdj.sampleCount} samples)\n\n` +
+             `<i>Your data now overrides the database default for this crop.</i>`;
+           await sendTelegramMessage(settings.telegramToken, settings.telegramChatId, msg);
+         }
+       }
+    }
     setSaving(false);
     setDone(true);
     setTimeout(onClose, 1500);

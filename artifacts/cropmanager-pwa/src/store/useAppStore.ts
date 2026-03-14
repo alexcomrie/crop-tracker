@@ -44,7 +44,19 @@ export const useAppStore = create<AppStore>()(
     (set) => ({
       settings: DEFAULT_SETTINGS,
       cropDb: {},
-      fertDb: {},
+      fertDb: {
+        _meta: {
+          version: '1.0',
+          description: '',
+          teas: {},
+          yeast_preparation: '',
+          yeast_dosing: { foliar_spray: '', soil_drench: '' },
+          thyme_oil_mosquito_control: '',
+          application_tips: [],
+          dilution_note: ''
+        },
+        crops: {}
+      },
       activeTab: 'dashboard',
       lastSyncAt: 0,
       updateSettings: (patch) =>

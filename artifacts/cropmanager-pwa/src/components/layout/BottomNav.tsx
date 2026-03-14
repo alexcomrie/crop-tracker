@@ -6,7 +6,7 @@ const TABS = [
   { id: 'dashboard', emoji: '🏠', label: 'Dashboard' },
   { id: 'crops', emoji: '🌱', label: 'Crops' },
   { id: 'propagations', emoji: '🌿', label: 'Props' },
-  { id: 'calendar', emoji: '📅', label: 'Calendar' },
+  { id: 'more', emoji: '⋯', label: 'More' },
   { id: 'settings', emoji: '⚙️', label: 'Settings' },
 ];
 

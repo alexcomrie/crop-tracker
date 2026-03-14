@@ -6,6 +6,8 @@ import { CropForm } from '../components/crops/CropForm';
 import { UpdateCropForm } from '../components/crops/UpdateCropForm';
 import type { Crop } from '../types';
 import { useAppStore } from '../store/useAppStore';
+import { resolveCropData } from '../lib/cropDb';
+import db from '../db/db';
 
 const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
 
@@ -17,6 +19,25 @@ export function CropsScreen() {
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
   const [updateCrop, setUpdateCrop] = useState<Crop | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  const handleDeleteCrop = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {
+      return;
+    }
+    
+    try {
+      await db.crops.delete(id);
+      await db.stageLogs.where('trackingId').equals(id).delete();
+      await db.harvestLogs.where('cropTrackingId').equals(id).delete();
+      await db.reminders.where('trackingId').equals(id).delete();
+      await db.treatmentLogs.where('cropId').equals(id).delete();
+      
+      setSelectedCrop(null);
+    } catch (err) {
+      console.error('Failed to delete crop:', err);
+      alert('Failed to delete crop. Please try again.');
+    }
+  };
 
   return (
     <div className="pb-24 pt-2">
@@ -43,7 +64,7 @@ export function CropsScreen() {
               <CropCard
                 key={crop.id}
                 crop={crop}
-                cropData={cropDb[crop.cropName.toLowerCase()]}
+                cropData={resolveCropData(cropDb, crop.cropName) || undefined}
                 onClick={() => setSelectedCrop(crop)}
                 onAction={action => {
                   if (action === 'update') setUpdateCrop(crop);
@@ -70,6 +91,7 @@ export function CropsScreen() {
           crop={selectedCrop}
           onClose={() => setSelectedCrop(null)}
           onUpdate={() => { setUpdateCrop(selectedCrop); setSelectedCrop(null); }}
+          onDelete={() => handleDeleteCrop(selectedCrop.id)}
         />
       )}
 

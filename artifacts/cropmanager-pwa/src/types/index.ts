@@ -1,3 +1,97 @@
+// ─── crop_database.json ───────────────────────────────────────────────────────
+
+export interface CropData {
+  display_name: string;
+  varieties: string[];
+  plant_type: string;
+  number_of_weeks_harvest: number;
+  growing_time_days: number;
+  transplant_days: number | null;
+  growing_from_transplant: number | null;
+  harvest_interval: number;
+  batch_offset_days: number;
+  germination_days_min: number;
+  germination_days_max: number;
+  fungus_spray_days: number[];
+  pest_spray_days: number[];
+  planting_method: string;
+  diseases: string[];
+  pests: string[];
+  consistent_harvest: boolean;
+}
+
+export interface CropDbAlias {
+  alias: string;
+}
+
+export type CropDbRecord = CropData | CropDbAlias;
+
+export interface CropDatabase {
+  [key: string]: CropDbRecord;
+}
+
+// ─── fertilizer_schedule.json ─────────────────────────────────────────────────
+
+export interface FertMix {
+  mix_parts?: {
+    cow_manure_tea?: number;
+    chicken_manure_tea?: number;
+    plant_based_tea?: number;
+    wood_ash_tea?: number;
+    [key: string]: number | undefined;
+  };
+  final_dilution: number | string;
+  yeast_tsp_per_litre?: number;
+  yeast_tbsp_per_5L?: number;
+  mixing_example?: string;
+  note?: string;
+  frequency?: string;
+}
+
+export interface FertStage {
+  description?: string;
+  foliar?: FertMix;
+  drench?: FertMix;
+}
+
+export interface FertCropEntry {
+  display_name: string;
+  plant_type: string;
+  fert_profile: string;
+  stages: {
+    seedling: FertStage;
+    mid_vegetative: FertStage;
+    flowering: FertStage;
+    fruiting: FertStage;
+  };
+}
+
+export interface FertMeta {
+  version: string;
+  description: string;
+  teas: Record<string, string>;
+  yeast_preparation: string;
+  yeast_dosing: { foliar_spray: string; soil_drench: string };
+  thyme_oil_mosquito_control: string;
+  application_tips: string[];
+  dilution_note: string;
+}
+
+export interface FertDatabase {
+  _meta: FertMeta;
+  crops: Record<string, FertCropEntry>;
+  [key: string]: any; // To support older lookups
+}
+
+// Support for older code
+export type FertProfile = FertCropEntry | {
+  seedling?: FertStage;
+  mid_vegetative?: FertStage;
+  flowering?: FertStage;
+  fruiting?: FertStage;
+  _meta?: Partial<FertMeta>;
+};
+
 export interface Crop {
   id: string;
   cropName: string;
@@ -10,6 +104,7 @@ export interface Crop {
   germinationDate: string;
   harvestDateEstimated: string;
   harvestDateActual: string;
+  isContinuous: boolean;
   nextConsistentPlanting: string;
   batchNumber: number;
   fungusSprayDates: string;
@@ -182,65 +277,6 @@ export interface DayForecast {
   weatherCode: number;
   label: string;
   emoji: string;
-}
-
-export interface CropData {
-  display_name: string;
-  varieties?: string[];
-  germination_days_min: number;
-  germination_days_max: number;
-  growing_time_days: number;
-  transplant_days?: number;
-  growing_from_transplant?: number;
-  batch_offset_days?: number;
-  fungus_spray_days: number[];
-  pest_spray_days: number[];
-  consistent_harvest: boolean;
-  number_of_weeks_harvest?: number;
-  diseases?: string[];
-  pests?: string[];
-}
-
-export interface CropDatabase {
-  [key: string]: CropData;
-}
-
-export interface FertStage {
-  foliar?: {
-    mix_parts?: Record<string, string | number>;
-    dilution?: string;
-    final_dilution?: string;
-    frequency?: string;
-    notes?: string;
-    mixing_example?: string;
-  };
-  drench?: {
-    mix_parts?: Record<string, string | number>;
-    dilution?: string;
-    final_dilution?: string;
-    frequency?: string;
-    notes?: string;
-    mixing_example?: string;
-  };
-}
-
-export interface FertProfile {
-  seedling?: FertStage;
-  mid_vegetative?: FertStage;
-  flowering?: FertStage;
-  fruiting?: FertStage;
-  _meta?: {
-    teas?: Record<string, string>;
-    yeast_preparation?: string;
-    yeast_dosing?: string;
-    dilution_note?: string;
-    thyme_oil_mosquito_control?: string;
-    application_tips?: string[];
-  };
-}
-
-export interface FertDatabase {
-  [key: string]: FertProfile;
 }
 
 export interface FertScheduleStage {

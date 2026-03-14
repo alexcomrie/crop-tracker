@@ -50,10 +50,12 @@ export function parseDate(str: string): Date | null {
 }
 
 export function formatDateShort(date: Date): string {
+  if (!date || !isValid(date)) return 'N/A';
   return format(date, 'dd-MMM-yyyy');
 }
 
 export function formatDateDisplay(date: Date): string {
+  if (!date || !isValid(date)) return 'N/A';
   return format(date, 'EEE dd MMM yyyy');
 }
 

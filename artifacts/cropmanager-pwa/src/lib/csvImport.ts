@@ -29,7 +29,6 @@ export async function importCSVData(file: File): Promise<ImportResult> {
                 variety: row.variety || '',
                 status: row.status || 'active',
                 plantStage: row.plantStage || 'nursery',
-                syncStatus: 'pending',
                 updatedAt: Date.now(),
                 ...row
               };
@@ -40,7 +39,6 @@ export async function importCSVData(file: File): Promise<ImportResult> {
                 id: row.id || uuidv4(),
                 plantName: row.plantName,
                 status: row.status || 'active',
-                syncStatus: 'pending',
                 updatedAt: Date.now(),
                 ...row
               };

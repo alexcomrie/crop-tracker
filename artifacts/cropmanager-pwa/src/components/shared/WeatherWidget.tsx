@@ -27,34 +27,32 @@ export function WeatherWidget() {
 
   return (
     <div className="space-y-2">
-      <div className="bg-blue-50 rounded-xl p-3">
+      <div className="bg-gradient-to-br from-[#2d6a2d] to-[#3d7a3d] rounded-2xl p-4 text-white shadow-lg">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{settings.weatherLocation}</p>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">{today.emoji}</span>
-              <div>
-                <p className="font-semibold">{today.tempMax}° / {today.tempMin}°C</p>
-                <p className="text-xs text-muted-foreground">{today.label}{today.precipMm > 0 ? ` · ${today.precipMm}mm rain` : ''}</p>
-              </div>
-            </div>
+          <div className="weather-left">
+            <h2 className="text-3xl font-bold leading-none">
+              {today.tempMax}° · {today.precipMm}mm
+            </h2>
+            <p className="text-sm opacity-80 mt-1">{settings.weatherLocation} · Today</p>
           </div>
-          <div className="flex gap-1">
-            {forecasts.slice(1, 5).map(f => (
-              <div key={f.date} className="text-center px-1">
-                <p className="text-xs">{f.emoji}</p>
-                <p className="text-xs font-medium">{f.tempMax}°</p>
-                <p className="text-xs text-muted-foreground">{f.date.slice(5)}</p>
-              </div>
-            ))}
+          <div className="weather-right text-right">
+            <div className="text-3xl mb-1">{today.emoji}</div>
+            <p className="text-xs opacity-75">{today.label}</p>
           </div>
         </div>
-        {cacheAge !== null && cacheAge > 0 && (
-          <p className="text-xs text-muted-foreground mt-1">Updated {cacheAge}m ago</p>
-        )}
+        
+        <div className="flex justify-between mt-4 pt-4 border-t border-white/10">
+          {forecasts.slice(1, 5).map(f => (
+            <div key={f.date} className="text-center">
+              <p className="text-lg mb-1">{f.emoji}</p>
+              <p className="text-xs font-bold">{f.tempMax}°</p>
+              <p className="text-[10px] opacity-60 uppercase">{f.date.split('-').slice(1).join('/')}</p>
+            </div>
+          ))}
+        </div>
       </div>
       {warnings.map((w, i) => (
-        <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-sm text-amber-800">{w}</div>
+        <div key={i} className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 shadow-sm">{w}</div>
       ))}
     </div>
   );

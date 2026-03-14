@@ -1,6 +1,5 @@
 import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { useSyncStore } from '../../store/useSyncStore';
 
 const TABS = [
   { id: 'dashboard', emoji: '🏠', label: 'Dashboard' },
@@ -12,7 +11,6 @@ const TABS = [
 
 export function BottomNav() {
   const { activeTab, setActiveTab } = useAppStore();
-  const { pendingCount } = useSyncStore();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-bottom">
@@ -25,11 +23,6 @@ export function BottomNav() {
           >
             <span className="text-xl leading-none">{tab.emoji}</span>
             <span className={`text-xs leading-none ${activeTab === tab.id ? 'font-semibold' : ''}`}>{tab.label}</span>
-            {tab.id === 'settings' && pendingCount > 0 && (
-              <span className="absolute top-1 right-2 bg-amber-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                {pendingCount > 9 ? '9+' : pendingCount}
-              </span>
-            )}
           </button>
         ))}
       </div>

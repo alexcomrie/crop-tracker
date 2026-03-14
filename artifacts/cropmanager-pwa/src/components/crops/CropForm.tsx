@@ -95,7 +95,7 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
         daysGermTransplant: editCrop?.daysGermTransplant || 0, 
         daysTransplantHarvest: editCrop?.daysTransplantHarvest || 0,
         telegramChatId: settings.telegramChatId,
-        syncStatus: 'pending', updatedAt: now,
+        updatedAt: now,
       };
 
       if (cropData) {

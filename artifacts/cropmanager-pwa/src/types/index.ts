@@ -115,7 +115,6 @@ export interface Crop {
   daysGermTransplant: number;
   daysTransplantHarvest: number;
   telegramChatId: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -131,7 +130,6 @@ export interface Propagation {
   daysToRootActual: number;
   status: string;
   telegramChatId: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -146,7 +144,6 @@ export interface Reminder {
   sent: boolean;
   telegramSent?: boolean;
   chatId: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -161,7 +158,6 @@ export interface StageLog {
   daysElapsed: number;
   method: string;
   notes: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -174,7 +170,6 @@ export interface HarvestLog {
   daysFromPlanting: number;
   deviationFromDb: number;
   notes: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -187,7 +182,6 @@ export interface TreatmentLog {
   type: string;
   product: string;
   notes: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -201,7 +195,6 @@ export interface CropDbAdjustment {
   sampleCount: number;
   useCustom: string;
   lastUpdated: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -214,7 +207,6 @@ export interface PropDbAdjustment {
   sampleCount: number;
   useCustom: string;
   lastUpdated: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -228,7 +220,6 @@ export interface BatchPlantingLog {
   nextBatchDate: string;
   status: string;
   notes: string;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 
@@ -241,7 +232,6 @@ export interface CropSearchLog {
   germinationDaysMax: number;
   sourceSummary: string;
   appliedToTracker: boolean;
-  syncStatus: 'clean' | 'pending';
   updatedAt: number;
 }
 

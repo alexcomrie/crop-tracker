@@ -24,7 +24,6 @@ function makeReminder(
     body,
     sent: false,
     chatId,
-    syncStatus: 'pending',
     updatedAt: Date.now(),
   };
 }

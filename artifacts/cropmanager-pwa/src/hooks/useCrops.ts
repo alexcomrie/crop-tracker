@@ -19,9 +19,9 @@ export function useCrop(id: string) {
 }
 
 export async function saveCrop(crop: Crop) {
-  await db.crops.put({ ...crop, syncStatus: 'pending', updatedAt: Date.now() });
+  await db.crops.put({ ...crop, updatedAt: Date.now() });
 }
 
 export async function deleteCrop(id: string) {
-  await db.crops.where('id').equals(id).modify({ status: 'Deleted', plantStage: 'Deleted', syncStatus: 'pending', updatedAt: Date.now() });
+  await db.crops.where('id').equals(id).modify({ status: 'Deleted', plantStage: 'Deleted', updatedAt: Date.now() });
 }

@@ -44,7 +44,6 @@ export function RemindersScreen() {
       body: `${product ? `Product: ${product}. ` : ''}${notes}`,
       sent: false,
       chatId: '', // Will be filled by system if needed
-      syncStatus: 'pending' as const,
       updatedAt: Date.now(),
     };
     await db.reminders.add(rem);

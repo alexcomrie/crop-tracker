@@ -29,7 +29,6 @@ export function HerbicideScheduleScreen() {
       type: 'herbicide',
       product,
       notes: `Applied to: ${area}`,
-      syncStatus: 'pending' as const,
       updatedAt: Date.now(),
     };
     await db.treatmentLogs.add(log);

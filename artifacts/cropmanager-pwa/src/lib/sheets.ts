@@ -50,7 +50,6 @@ export const mappers = {
     daysGermTransplant: Number(r[19] || 0), 
     daysTransplantHarvest: Number(r[20] || 0), 
     telegramChatId: r[21] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -66,7 +65,6 @@ export const mappers = {
     daysToRootActual: Number(r[8] || 0), 
     status: r[9] ?? 'Propagating', 
     telegramChatId: r[10] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -80,7 +78,6 @@ export const mappers = {
     body: r[6] ?? '', 
     sent: String(r[7]).toLowerCase() === 'true' || r[7] === '1' || r[7] === 1, 
     chatId: r[8] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -95,7 +92,6 @@ export const mappers = {
     daysElapsed: Number(r[6] || 0), 
     method: r[7] ?? '', 
     notes: r[8] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -108,7 +104,6 @@ export const mappers = {
     daysFromPlanting: Number(r[4] || 0), 
     deviationFromDb: Number(r[5] || 0), 
     notes: r[6] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -121,7 +116,6 @@ export const mappers = {
     type: r[4] ?? '', 
     product: r[5] ?? '', 
     notes: r[6] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -135,7 +129,6 @@ export const mappers = {
     sampleCount: Number(r[5] || 0), 
     useCustom: String(r[6] ?? ''), 
     lastUpdated: String(r[7] ?? ''), 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -148,7 +141,6 @@ export const mappers = {
     sampleCount: Number(r[4] || 0), 
     useCustom: String(r[5] ?? ''), 
     lastUpdated: String(r[6] ?? ''), 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -162,7 +154,6 @@ export const mappers = {
     nextBatchDate: r[5] ?? '', 
     status: r[6] ?? '', 
     notes: r[7] ?? '', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   }),
   
@@ -175,7 +166,6 @@ export const mappers = {
     germinationDaysMax: Number(r[4] || 0), 
     sourceSummary: r[5] ?? '', 
     appliedToTracker: String(r[6]).toLowerCase() === 'true' || r[6] === '1' || r[6] === 1 || String(r[6]).toLowerCase() === 'yes', 
-    syncStatus: 'clean', 
     updatedAt: Date.now()
   })
 };

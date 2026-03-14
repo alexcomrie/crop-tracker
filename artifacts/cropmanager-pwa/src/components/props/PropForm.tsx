@@ -11,7 +11,7 @@ import db from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Propagation } from '../../types';
 
-const METHODS = ['Cutting', 'Seed', 'Division', 'Layering', 'Grafting'];
+const METHODS = ['Propagating', 'Callusing', 'Rooted', 'Potted / Transplanted'];
 
 interface PropFormProps {
   open: boolean;
@@ -60,7 +60,6 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
         daysToRootActual: editProp?.daysToRootActual || 0,
         status: editProp?.status || 'Propagating',
         telegramChatId: settings.telegramChatId,
-        syncStatus: 'pending' as const,
         updatedAt: Date.now(),
       };
       

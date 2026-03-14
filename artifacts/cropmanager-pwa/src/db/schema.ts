@@ -21,16 +21,16 @@ export class CropManagerDB extends Dexie {
   constructor() {
     super('CropManagerDB');
     this.version(1).stores({
-      crops: 'id, cropName, status, plantStage, syncStatus, updatedAt',
-      propagations: 'id, plantName, status, syncStatus, updatedAt',
-      reminders: 'id, trackingId, type, sendDate, sent, telegramSent, syncStatus, updatedAt',
-      stageLogs: 'id, trackingId, date, syncStatus, updatedAt',
-      harvestLogs: 'id, cropTrackingId, harvestDate, syncStatus, updatedAt',
-      treatmentLogs: 'id, cropId, date, type, syncStatus, updatedAt',
-      cropDbAdjustments: 'id, cropKey, field, syncStatus, updatedAt',
-      propDbAdjustments: 'id, plantKey, method, syncStatus, updatedAt',
-      batchPlantingLogs: 'id, cropTrackingId, batchPlantingDate, syncStatus, updatedAt',
-      cropSearchLogs: 'id, cropKey, searchDate, syncStatus, updatedAt',
+      crops: 'id, cropName, variety, status, plantStage, updatedAt',
+  propagations: 'id, plantName, status, updatedAt',
+  reminders: 'id, type, trackingId, sendDate, sent, updatedAt',
+  stageLogs: 'id, trackingId, date, updatedAt',
+  harvestLogs: 'id, cropTrackingId, harvestDate, updatedAt',
+  treatmentLogs: 'id, cropId, date, updatedAt',
+  cropDbAdjustments: 'id, cropKey, variety, field, updatedAt',
+  propDbAdjustments: 'id, plantKey, method, updatedAt',
+  batchPlantingLogs: 'id, cropTrackingId, status, updatedAt',
+  cropSearchLogs: 'id, cropKey, updatedAt',
       successionGaps: 'id, updatedAt',
     });
   }

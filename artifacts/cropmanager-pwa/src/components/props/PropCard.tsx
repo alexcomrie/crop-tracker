@@ -10,8 +10,9 @@ interface PropCardProps {
 
 const STATUS_COLORS: Record<string, string> = {
   Propagating: '#2196f3',
+  Callusing: '#7c4dff',
   Rooted: '#43a047',
-  Transplanted: '#26a69a',
+  'Potted / Transplanted': '#26a69a',
   Failed: '#e53935',
 };
 
@@ -19,7 +20,7 @@ export function PropCard({ prop, onClick, onAction }: PropCardProps) {
   const propDate = parseDate(prop.propagationDate);
   const daysOld = propDate ? daysBetween(propDate, today()) : 0;
   const rootingEnd = parseDate(prop.expectedRootingEnd);
-  const isOverdue = rootingEnd && today() > rootingEnd && prop.status === 'Propagating';
+  const isOverdue = rootingEnd && today() > rootingEnd && (prop.status === 'Propagating' || prop.status === 'Callusing');
 
   return (
     <div
@@ -31,7 +32,7 @@ export function PropCard({ prop, onClick, onAction }: PropCardProps) {
           <h3 className="font-semibold text-gray-900">{prop.plantName}</h3>
           <p className="text-sm text-muted-foreground">{prop.propagationMethod}</p>
         </div>
-        <span className="text-xs font-bold uppercase px-2 py-0.5 rounded-full text-white ml-2"
+        <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white ml-2 whitespace-nowrap"
           style={{ backgroundColor: STATUS_COLORS[prop.status] ?? '#9e9e9e' }}>
           {prop.status}
         </span>
@@ -45,14 +46,18 @@ export function PropCard({ prop, onClick, onAction }: PropCardProps) {
         {isOverdue && <span className="ml-2 text-red-600 font-semibold">⚠️ Overdue</span>}
       </div>
 
-      <div className="flex gap-2 mt-3">
+      <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
         {prop.status === 'Propagating' && (
-          <button className="flex-1 text-xs py-1.5 rounded-lg bg-green-50 text-green-700 font-medium"
-            onClick={e => { e.stopPropagation(); onAction('rooted'); }}>Mark Rooted</button>
+          <button className="flex-1 text-xs py-1.5 px-2 rounded-lg bg-indigo-50 text-indigo-700 font-medium whitespace-nowrap"
+            onClick={e => { e.stopPropagation(); onAction('Callusing'); }}>Mark Callusing</button>
+        )}
+        {(prop.status === 'Propagating' || prop.status === 'Callusing') && (
+          <button className="flex-1 text-xs py-1.5 px-2 rounded-lg bg-green-50 text-green-700 font-medium whitespace-nowrap"
+            onClick={e => { e.stopPropagation(); onAction('Rooted'); }}>Mark Rooted</button>
         )}
         {prop.status === 'Rooted' && (
-          <button className="flex-1 text-xs py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium"
-            onClick={e => { e.stopPropagation(); onAction('transplanted'); }}>Mark Transplanted</button>
+          <button className="flex-1 text-xs py-1.5 px-2 rounded-lg bg-blue-50 text-blue-700 font-medium whitespace-nowrap"
+            onClick={e => { e.stopPropagation(); onAction('Potted / Transplanted'); }}>Mark Potted</button>
         )}
       </div>
     </div>

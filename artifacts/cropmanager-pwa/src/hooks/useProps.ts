@@ -15,5 +15,5 @@ export function useProp(id: string) {
 }
 
 export async function saveProp(prop: Propagation) {
-  await db.propagations.put({ ...prop, syncStatus: 'pending', updatedAt: Date.now() });
+  await db.propagations.put({ ...prop, updatedAt: Date.now() });
 }

@@ -9,7 +9,7 @@ import { BottomSheet } from '../components/shared/BottomSheet';
 import db from '../db/db';
 import { generateId } from '../lib/ids';
 
-const FILTERS = ['All', 'Propagating', 'Rooted', 'Transplanted', 'Failed'];
+const FILTERS = ['All', 'Propagating', 'Callusing', 'Rooted', 'Potted / Transplanted', 'Failed'];
 
 export function PropagationsScreen() {
   const [filter, setFilter] = useState('All');
@@ -25,6 +25,18 @@ export function PropagationsScreen() {
       await db.reminders.where('trackingId').equals(id).delete();
       setSelectedProp(null);
     }
+  };
+
+  const handleAction = async (prop: Propagation, newStatus: string) => {
+    const update: Partial<Propagation> = { status: newStatus, updatedAt: Date.now() };
+    if (newStatus === 'Rooted') {
+      update.actualRootingDate = formatDateShort(today());
+      const start = parseDate(prop.propagationDate);
+      if (start) {
+        update.daysToRootActual = daysBetween(start, today());
+      }
+    }
+    await db.propagations.update(prop.id, update);
   };
 
   return (
@@ -52,7 +64,7 @@ export function PropagationsScreen() {
                 key={prop.id}
                 prop={prop}
                 onClick={() => setSelectedProp(prop)}
-                onAction={() => {}} // Not used in this context
+                onAction={(newStatus) => handleAction(prop, newStatus)}
               />
             ))}
           </div>

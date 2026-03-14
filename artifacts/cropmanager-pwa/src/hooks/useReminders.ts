@@ -21,5 +21,5 @@ export function useCropReminders(cropId: string) {
 }
 
 export async function markReminderDone(id: string) {
-  await db.reminders.where('id').equals(id).modify({ sent: true, syncStatus: 'pending', updatedAt: Date.now() });
+  await db.reminders.where('id').equals(id).modify({ sent: true, updatedAt: Date.now() });
 }

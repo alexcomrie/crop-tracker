@@ -100,12 +100,11 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
       type: treatmentType,
       product,
       notes: treatmentNotes,
-      syncStatus: 'pending' as const,
       updatedAt: Date.now(),
     };
     await db.treatmentLogs.add(treatmentLog);
     // Update spray dates on crop
-    const update: Partial<Crop> = { syncStatus: 'pending', updatedAt: Date.now() };
+    const update: Partial<Crop> = { updatedAt: Date.now() };
     if (treatmentType === 'fungus') update.fungusSprayDates = [crop.fungusSprayDates, formatDateShort(now)].filter(Boolean).join(', ');
     if (treatmentType === 'pest') update.pestSprayDates = [crop.pestSprayDates, formatDateShort(now)].filter(Boolean).join(', ');
     await db.crops.where('id').equals(crop.id).modify(update);
@@ -115,7 +114,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   }
 
   async function handleNotes() {
-    await db.crops.where('id').equals(crop.id).modify({ notes, syncStatus: 'pending', updatedAt: Date.now() });
+    await db.crops.where('id').equals(crop.id).modify({ notes, updatedAt: Date.now() });
     setDone(true);
     setTimeout(onClose, 1500);
   }

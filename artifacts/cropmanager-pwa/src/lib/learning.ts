@@ -24,7 +24,6 @@ export function logDeviation(
       sampleCount: newCount,
       useCustom: newCount >= threshold ? 'Yes' : existing.useCustom,
       lastUpdated: now,
-      syncStatus: 'pending',
       updatedAt: Date.now(),
     };
   }
@@ -38,7 +37,6 @@ export function logDeviation(
     sampleCount: 1,
     useCustom: 'No',
     lastUpdated: now,
-    syncStatus: 'pending',
     updatedAt: Date.now(),
   };
 }
@@ -63,7 +61,6 @@ export function updatePropDatabase(
       sampleCount: newCount,
       useCustom: newCount >= threshold ? 'Yes' : existing.useCustom,
       lastUpdated: now,
-      syncStatus: 'pending',
       updatedAt: Date.now(),
     };
   }
@@ -76,7 +73,6 @@ export function updatePropDatabase(
     sampleCount: 1,
     useCustom: 'No',
     lastUpdated: now,
-    syncStatus: 'pending',
     updatedAt: Date.now(),
   };
 }

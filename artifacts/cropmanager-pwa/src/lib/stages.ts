@@ -24,14 +24,12 @@ export function processStageChange(
     daysElapsed: 0,
     method: crop.plantingMethod,
     notes: '',
-    syncStatus: 'pending',
     updatedAt: Date.now(),
   };
 
   const updatedCrop: Crop = {
     ...crop,
     plantStage: newStage,
-    syncStatus: 'pending',
     updatedAt: Date.now(),
   };
 
@@ -91,7 +89,6 @@ export function processStageChange(
       daysFromPlanting: planted ? daysBetween(planted, date) : 0,
       deviationFromDb: deviation,
       notes: '',
-      syncStatus: 'pending',
       updatedAt: Date.now(),
     };
   }
@@ -104,13 +101,12 @@ export function processStageChange(
 }
 
 export const VALID_NEXT_STAGES: Record<string, string[]> = {
-  Seed: ['Germinated', 'Seedling', 'Deleted'],
-  Germinated: ['Seedling', 'Transplanted', 'Deleted'],
-  Seedling: ['Vegetative', 'Transplanted', 'Deleted'],
-  Vegetative: ['Flowering', 'Fruiting', 'Harvested', 'Deleted'],
-  Flowering: ['Fruiting', 'Harvested', 'Deleted'],
-  Fruiting: ['Harvested', 'Deleted'],
-  Transplanted: ['Vegetative', 'Flowering', 'Fruiting', 'Harvested', 'Deleted'],
+  Seed: ['Germinated', 'Deleted'],
+  Germinated: ['Seedling', 'Deleted'],
+  Seedling: ['Transplanted', 'Flowering', 'Deleted'],
+  Transplanted: ['Flowering', 'Deleted'],
+  Flowering: ['Ready to Harvest', 'Deleted'],
+  'Ready to Harvest': ['Harvested', 'Deleted'],
   Harvested: [],
   Deleted: [],
 };
@@ -119,10 +115,9 @@ export const STAGE_COLORS: Record<string, string> = {
   Seed: '#9e9e9e',
   Germinated: '#aed581',
   Seedling: '#8bc34a',
-  Vegetative: '#43a047',
-  Flowering: '#ffb300',
-  Fruiting: '#e65100',
   Transplanted: '#26a69a',
+  Flowering: '#ffb300',
+  'Ready to Harvest': '#e65100',
   Harvested: '#5d4037',
   Deleted: '#e53935',
 };

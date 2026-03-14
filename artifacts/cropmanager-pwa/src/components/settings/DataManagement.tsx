@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
-import { pullFromSheets, exportJsonBackup } from '../../lib/sync';
+import { exportJsonBackup } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
 
@@ -15,15 +15,6 @@ export function DataManagement() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handlePull() {
-    if (!confirm('This will replace ALL local data with data from your published Google Sheets. Continue?')) return;
-    setPulling(true);
-    setPullMsg('Importing...');
-    const result = await pullFromSheets(settings);
-    setPullMsg(result.success ? `✅ Imported ${result.count} records` : `❌ ${result.error}`);
-    setPulling(false);
-  }
-
   async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -32,7 +23,7 @@ export function DataManagement() {
     setPullMsg('Importing CSV...');
     const result = await importCSVData(file);
     if (result.success) {
-      setPullMsg(`✅ Imported ${result.count} CSV records. They will sync with Google Sheets.`);
+      setPullMsg(`✅ Imported ${result.count} CSV records.`);
     } else {
       setPullMsg(`❌ Import failed: ${result.errors.join(', ')}`);
     }
@@ -75,9 +66,6 @@ export function DataManagement() {
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h3 className="font-semibold">Data Management</h3>
 
-        <Button variant="outline" className="w-full" onClick={handlePull} disabled={pulling}>
-          {pulling ? '⏳ Importing...' : '📥 Import from Sheets'}
-        </Button>
         {pullMsg && <p className="text-sm text-center text-muted-foreground">{pullMsg}</p>}
 
         <Button variant="outline" className="w-full" onClick={handleExport}>

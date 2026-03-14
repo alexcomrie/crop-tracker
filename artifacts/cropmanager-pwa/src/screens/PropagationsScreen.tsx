@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useProps } from '../hooks/useProps';
 import { PropCard } from '../components/props/PropCard';
 import { PropForm } from '../components/props/PropForm';
+import { PropDetail } from '../components/props/PropDetail';
 import type { Propagation } from '../types';
 import { formatDateShort, today, parseDate, daysBetween } from '../lib/dates';
 import { BottomSheet } from '../components/shared/BottomSheet';
@@ -13,48 +14,18 @@ const FILTERS = ['All', 'Propagating', 'Rooted', 'Transplanted', 'Failed'];
 export function PropagationsScreen() {
   const [filter, setFilter] = useState('All');
   const props = useProps(filter) ?? [];
-  const [showForm, setShowForm] = useState(false);
-  const [actionProp, setActionProp] = useState<{ prop: Propagation; action: string } | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  async function handleQuickAction(prop: Propagation, action: string) {
-    setSaving(true);
-    const now = today();
-    const nowStr = formatDateShort(now);
-    if (action === 'rooted') {
-      const propDate = parseDate(prop.propagationDate);
-      const daysToRoot = propDate ? daysBetween(propDate, now) : 0;
-      await db.propagations.where('id').equals(prop.id).modify({
-        actualRootingDate: nowStr,
-        daysToRootActual: daysToRoot,
-        status: 'Rooted',
-        syncStatus: 'pending',
-        updatedAt: Date.now(),
-      });
-      await db.stageLogs.add({
-        id: generateId('SL'),
-        trackingId: prop.id,
-        cropName: prop.plantName,
-        variety: '',
-        stageFrom: 'Propagating',
-        stageTo: 'Rooted',
-        date: nowStr,
-        daysElapsed: daysToRoot,
-        method: prop.propagationMethod,
-        notes: '',
-        syncStatus: 'pending',
-        updatedAt: Date.now(),
-      });
-    } else if (action === 'transplanted') {
-      await db.propagations.where('id').equals(prop.id).modify({
-        status: 'Transplanted',
-        syncStatus: 'pending',
-        updatedAt: Date.now(),
-      });
+  const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
+  const [editProp, setEditProp] = useState<Propagation | undefined>(undefined);
+  const [showForm, setShowForm] = useState(false);
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Delete this propagation?')) {
+      await db.propagations.delete(id);
+      await db.reminders.where('trackingId').equals(id).delete();
+      setSelectedProp(null);
     }
-    setSaving(false);
-    setActionProp(null);
-  }
+  };
 
   return (
     <div className="pb-24 pt-2">
@@ -69,7 +40,7 @@ export function PropagationsScreen() {
 
       <div className="px-4 pt-2">
         {props.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
             <p className="text-4xl mb-3">🌿</p>
             <p className="font-semibold text-lg">No propagations yet</p>
             <p className="text-sm text-muted-foreground mb-4">Tap + to log a propagation.</p>
@@ -80,8 +51,8 @@ export function PropagationsScreen() {
               <PropCard
                 key={prop.id}
                 prop={prop}
-                onClick={() => {}}
-                onAction={action => setActionProp({ prop, action })}
+                onClick={() => setSelectedProp(prop)}
+                onAction={() => {}} // Not used in this context
               />
             ))}
           </div>
@@ -90,29 +61,26 @@ export function PropagationsScreen() {
 
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40"
+        className="fixed bottom-20 right-4 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40"
       >
         +
       </button>
 
-      <PropForm open={showForm} onClose={() => setShowForm(false)} />
+      {showForm && (
+        <PropForm 
+          open={showForm} 
+          onClose={() => { setShowForm(false); setEditProp(undefined); }} 
+          editProp={editProp}
+        />
+      )}
 
-      {actionProp && (
-        <BottomSheet open onClose={() => setActionProp(null)} title={`${actionProp.action === 'rooted' ? 'Mark Rooted' : 'Mark Transplanted'}`}>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {actionProp.prop.plantName} · {actionProp.prop.propagationMethod}
-            </p>
-            <p className="text-sm">Date: <strong>{formatDateShort(today())}</strong></p>
-            <button
-              className="w-full bg-green-700 text-white rounded-xl py-3 font-semibold"
-              onClick={() => handleQuickAction(actionProp.prop, actionProp.action)}
-              disabled={saving}
-            >
-              {saving ? 'Saving...' : '✅ Confirm'}
-            </button>
-          </div>
-        </BottomSheet>
+      {selectedProp && (
+        <PropDetail
+          prop={selectedProp}
+          onClose={() => setSelectedProp(null)}
+          onEdit={() => { setEditProp(selectedProp); setShowForm(true); setSelectedProp(null); }}
+          onDelete={() => handleDelete(selectedProp.id)}
+        />
       )}
     </div>
   );

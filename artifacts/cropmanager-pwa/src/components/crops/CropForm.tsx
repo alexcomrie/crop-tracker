@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId } from '../../lib/ids';
-import { formatDateShort, today } from '../../lib/dates';
+import { formatDateShort, today, addDays } from '../../lib/dates';
 import { resolveCropData } from '../../lib/cropDb';
 import { calculateHarvestDate, calculateTransplantDate } from '../../lib/harvest';
-import { generateCropReminders } from '../../lib/reminders';
+import { generateCropReminders, calculateBatchPlantingDates } from '../../lib/reminders';
 import { calcSprayDates, formatSprayDates } from '../../lib/sprays';
 import db from '../../db/db';
 import type { Crop } from '../../types';
@@ -16,23 +16,36 @@ interface CropFormProps {
   open: boolean;
   onClose: () => void;
   date?: Date;
+  editCrop?: Crop;
 }
 
 const PLANTING_METHODS = ['Seed Tray', 'Direct Ground', 'Direct Bed', 'Cutting', 'Division', 'Grafted'];
 const TRAY_COLORS = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'White'];
 
-export function CropForm({ open, onClose, date }: CropFormProps) {
+export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
   const { cropDb, settings } = useAppStore();
   const [step, setStep] = useState(1);
-  const [cropKey, setCropKey] = useState('');
-  const [variety, setVariety] = useState('');
-  const [method, setMethod] = useState('');
+  const [cropKey, setCropKey] = useState(editCrop ? editCrop.cropName.toLowerCase() : '');
+  const [variety, setVariety] = useState(editCrop?.variety || '');
+  const [method, setMethod] = useState(editCrop?.plantingMethod || '');
   const [trayColors, setTrayColors] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
-  const [isContinuous, setIsContinuous] = useState(false);
+  const [notes, setNotes] = useState(editCrop?.notes || '');
+  const [isContinuous, setIsContinuous] = useState(editCrop?.isContinuous || false);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
-  const [plantDate, setPlantDate] = useState<Date>(date ?? today());
+  const [plantDate, setPlantDate] = useState<Date>(editCrop ? new Date(editCrop.plantingDate) : (date ?? today()));
+
+  // Initialize fields if editing
+  useEffect(() => {
+    if (editCrop) {
+      setCropKey(editCrop.cropName.toLowerCase());
+      setVariety(editCrop.variety);
+      setMethod(editCrop.plantingMethod);
+      setNotes(editCrop.notes);
+      setIsContinuous(editCrop.isContinuous);
+      setPlantDate(new Date(editCrop.plantingDate));
+    }
+  }, [editCrop]);
   
   // Ensure date is a valid Date object
   const validPlantDate = plantDate instanceof Date && !isNaN(plantDate.getTime()) ? plantDate : today();
@@ -53,7 +66,7 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
     if (!cropKey || !method) return;
     setSaving(true);
     try {
-      const id = generateId('CT');
+      const id = editCrop?.id || generateId('CT');
       const now = Date.now();
       const cropData = resolveCropData(cropDb, cropKey);
 
@@ -65,16 +78,22 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
         : null;
       const baseCrop: Crop = {
         id, cropName: cropData?.display_name ?? cropKey, variety,
-        plantingMethod: method, plantStage: 'Seed',
+        plantingMethod: method, plantStage: editCrop?.plantStage || 'Seed',
         plantingDate: formatDateShort(validPlantDate),
         transplantDateScheduled: transplantDate ? formatDateShort(transplantDate) : '',
-        transplantDateActual: '', germinationDate: '',
-        harvestDateEstimated: '', harvestDateActual: '',
+        transplantDateActual: editCrop?.transplantDateActual || '',
+        germinationDate: editCrop?.germinationDate || '',
+        harvestDateEstimated: '', 
+        harvestDateActual: editCrop?.harvestDateActual || '',
         isContinuous,
-        nextConsistentPlanting: '', batchNumber: 1,
+        nextConsistentPlanting: editCrop?.nextConsistentPlanting || '',
+        batchNumber: editCrop?.batchNumber || 1,
         fungusSprayDates: '', pestSprayDates: '',
-        status: 'Active', notes: notesStr,
-        daysSeedGerm: 0, daysGermTransplant: 0, daysTransplantHarvest: 0,
+        status: editCrop?.status || 'Active', 
+        notes: notesStr,
+        daysSeedGerm: editCrop?.daysSeedGerm || 0, 
+        daysGermTransplant: editCrop?.daysGermTransplant || 0, 
+        daysTransplantHarvest: editCrop?.daysTransplantHarvest || 0,
         telegramChatId: settings.telegramChatId,
         syncStatus: 'pending', updatedAt: now,
       };
@@ -88,7 +107,13 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
         baseCrop.pestSprayDates = formatSprayDates(pestDates);
       }
 
-      await db.crops.add(baseCrop);
+      if (editCrop) {
+        await db.crops.put(baseCrop);
+        // Clear existing reminders if re-calculating
+        await db.reminders.where('trackingId').equals(id).delete();
+      } else {
+        await db.crops.add(baseCrop);
+      }
 
       // Generate reminders
       if (cropData) {
@@ -203,12 +228,12 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
         )}
 
         {step === 5 && (
-          <div>
-            <p className="text-sm font-medium text-gray-700 mb-2">Step 5: Constant Harvest</p>
+          <div className="space-y-4">
+            <p className="text-sm font-medium text-gray-700">Step 5: Constant Harvest</p>
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
               <div>
                 <p className="text-sm font-medium text-gray-900">Continuous Production?</p>
-                <p className="text-[10px] text-gray-500">Enable if crop yields multiple harvests over time</p>
+                <p className="text-[10px] text-gray-500">Enable to generate batch planting schedule</p>
               </div>
               <input
                 type="checkbox"
@@ -217,6 +242,22 @@ export function CropForm({ open, onClose, date }: CropFormProps) {
                 className="w-5 h-5 accent-green-600 cursor-pointer"
               />
             </div>
+
+            {isContinuous && selectedCropData && (
+              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 space-y-2">
+                <p className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Upcoming Batch Planting Dates</p>
+                <div className="space-y-1.5">
+                  {calculateBatchPlantingDates({ ...editCrop, plantingDate: formatDateShort(validPlantDate) } as any, selectedCropData, 2).map(b => (
+                    <div key={b.batchNumber} className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-amber-900">Batch #{b.batchNumber}</span>
+                      <span className="text-amber-700">{formatDateShort(b.date)}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[9px] text-amber-600 italic">Dates calculated to ensure harvest overlap</p>
+              </div>
+            )}
+
             <Button className="w-full mt-3" onClick={() => setStep(6)}>Next</Button>
           </div>
         )}

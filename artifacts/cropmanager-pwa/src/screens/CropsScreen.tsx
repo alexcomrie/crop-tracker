@@ -18,6 +18,7 @@ export function CropsScreen() {
 
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
   const [updateCrop, setUpdateCrop] = useState<Crop | null>(null);
+  const [editCrop, setEditCrop] = useState<Crop | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
 
   const handleDeleteCrop = async (id: string) => {
@@ -84,13 +85,20 @@ export function CropsScreen() {
         +
       </button>
 
-      <CropForm open={showForm} onClose={() => setShowForm(false)} />
+      {showForm && (
+        <CropForm 
+          open={showForm} 
+          onClose={() => { setShowForm(false); setEditCrop(undefined); }} 
+          editCrop={editCrop}
+        />
+      )}
 
       {selectedCrop && (
         <CropDetail
           crop={selectedCrop}
           onClose={() => setSelectedCrop(null)}
           onUpdate={() => { setUpdateCrop(selectedCrop); setSelectedCrop(null); }}
+          onEdit={() => { setEditCrop(selectedCrop); setShowForm(true); setSelectedCrop(null); }}
           onDelete={() => handleDeleteCrop(selectedCrop.id)}
         />
       )}

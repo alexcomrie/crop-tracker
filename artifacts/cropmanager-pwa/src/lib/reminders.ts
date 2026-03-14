@@ -124,27 +124,68 @@ export function generateContinuousPlantingReminders(
   const planted = parseDate(crop.plantingDate);
   if (!planted) return reminders;
 
-  const batchOffset = cropData.batch_offset_days || 14;
-  const monthsAhead = 3;
-  const endDate = addDays(planted, monthsAhead * 30);
-
-  let currentPlantingDate = addDays(planted, batchOffset);
-  let batchNum = 2;
-
-  while (currentPlantingDate <= endDate) {
-    const reminderDate = addDays(currentPlantingDate, -3);
+  const batchDates = calculateBatchPlantingDates(crop, cropData);
+  
+  batchDates.forEach(batch => {
+    const reminderDate = addDays(batch.date, -3);
     reminders.push(makeReminder(
       'next_batch_planting', crop.cropName, crop.id,
       reminderDate,
-      `📅 Next Batch Planting: ${crop.cropName} (Batch #${batchNum})`,
-      `Time to plant your next batch of ${crop.cropName} in 3 days (${formatDateShort(currentPlantingDate)}).\n\nReply with 'planted ${crop.id} ${batchNum}' when done to update.`,
+      `📅 Next Batch Planting: ${crop.cropName} (Batch #${batch.batchNumber})`,
+      `Time to plant your next batch of ${crop.cropName} in 3 days (${formatDateShort(batch.date)}).\n\nReply with 'planted ${crop.id} ${batch.batchNumber}' when done to update.`,
       chatId
     ));
-    currentPlantingDate = addDays(currentPlantingDate, batchOffset);
+  });
+
+  return reminders;
+}
+
+export function calculateBatchPlantingDates(
+  crop: Crop,
+  cropData: CropData,
+  monthsAhead = 3
+): Array<{ batchNumber: number; date: Date }> {
+  const planted = parseDate(crop.plantingDate);
+  if (!planted) return [];
+
+  // Logic: 
+  // number_of_weeks_harvest is the harvest window.
+  // 1 week: Every week.
+  // 2 weeks: Ready in second week (offset = growing_time + 1 week).
+  // > 2 weeks: Ready when first is in second to last week.
+  
+  const numWeeks = cropData.number_of_weeks_harvest || 1;
+  const growingTime = cropData.growing_time_days || 60;
+  
+  let batchOffsetDays = 7; // Default 1 week for numWeeks = 1
+  
+  if (numWeeks === 2) {
+    batchOffsetDays = 7; // New batch every week? No, "second batch must be ready in the second week"
+    // Wait, if harvest is 2 weeks, and batch 2 is ready in week 2 of batch 1...
+    // that means batch 2 starts harvest 7 days after batch 1 starts harvest.
+    batchOffsetDays = 7;
+  } else if (numWeeks > 2) {
+    // "second planted batch of crop should be ready when the first is in its second to last week of harvest"
+    // Example: numWeeks = 4. Weeks: 1, 2, 3, 4. Second to last is week 3.
+    // So batch 2 starts harvest when batch 1 is in week 3.
+    // Offset = (numWeeks - 1) * 7 days.
+    // No, if it's week 3, that's 14 days after harvest start.
+    batchOffsetDays = (numWeeks - 2) * 7;
+  }
+
+  const batchDates: Array<{ batchNumber: number; date: Date }> = [];
+  const endDate = addDays(planted, monthsAhead * 30);
+  
+  let currentPlantingDate = addDays(planted, batchOffsetDays);
+  let batchNum = 2;
+
+  while (currentPlantingDate <= endDate) {
+    batchDates.push({ batchNumber: batchNum, date: currentPlantingDate });
+    currentPlantingDate = addDays(currentPlantingDate, batchOffsetDays);
     batchNum++;
   }
 
-  return reminders;
+  return batchDates;
 }
 
 export function generateFertilizerReminders(

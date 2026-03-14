@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { getRootingDays } from '../../lib/propagation';
 import { generatePropReminders } from '../../lib/reminders';
 import db from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
+import type { Propagation } from '../../types';
 
 const METHODS = ['Cutting', 'Seed', 'Division', 'Layering', 'Grafting'];
 
@@ -16,18 +17,27 @@ interface PropFormProps {
   open: boolean;
   onClose: () => void;
   date?: Date;
+  editProp?: Propagation;
 }
 
-export function PropForm({ open, onClose, date }: PropFormProps) {
+export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
   const { settings } = useAppStore();
   const [step, setStep] = useState(1);
-  const [plantName, setPlantName] = useState('');
-  const [method, setMethod] = useState('');
-  const [notes, setNotes] = useState('');
+  const [plantName, setPlantName] = useState(editProp?.plantName || '');
+  const [method, setMethod] = useState(editProp?.propagationMethod || '');
+  const [notes, setNotes] = useState(editProp?.notes || '');
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    if (editProp) {
+      setPlantName(editProp.plantName);
+      setMethod(editProp.propagationMethod);
+      setNotes(editProp.notes);
+    }
+  }, [editProp]);
+
   const propAdjustments = useLiveQuery(() => db.propDbAdjustments.toArray(), []) ?? [];
-  const plantDate = date ?? today();
+  const plantDate = editProp ? new Date(editProp.propagationDate) : (date ?? today());
 
   function reset() { setStep(1); setPlantName(''); setMethod(''); setNotes(''); }
 
@@ -37,8 +47,8 @@ export function PropForm({ open, onClose, date }: PropFormProps) {
       const rootingDays = getRootingDays(plantName, method, propAdjustments);
       const rootStart = addDays(plantDate, rootingDays.min);
       const rootEnd = addDays(plantDate, rootingDays.max);
-      const id = generateId('PROP');
-      const prop = {
+      const id = editProp?.id || generateId('PROP');
+      const prop: Propagation = {
         id,
         plantName,
         propagationDate: formatDateShort(plantDate),
@@ -46,14 +56,21 @@ export function PropForm({ open, onClose, date }: PropFormProps) {
         notes,
         expectedRootingStart: formatDateShort(rootStart),
         expectedRootingEnd: formatDateShort(rootEnd),
-        actualRootingDate: '',
-        daysToRootActual: 0,
-        status: 'Propagating',
+        actualRootingDate: editProp?.actualRootingDate || '',
+        daysToRootActual: editProp?.daysToRootActual || 0,
+        status: editProp?.status || 'Propagating',
         telegramChatId: settings.telegramChatId,
         syncStatus: 'pending' as const,
         updatedAt: Date.now(),
       };
-      await db.propagations.add(prop);
+      
+      if (editProp) {
+        await db.propagations.put(prop);
+        await db.reminders.where('trackingId').equals(id).delete();
+      } else {
+        await db.propagations.add(prop);
+      }
+
       const reminders = generatePropReminders(prop, propAdjustments, settings.telegramChatId);
       if (reminders.length) await db.reminders.bulkAdd(reminders);
       reset();

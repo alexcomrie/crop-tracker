@@ -9,18 +9,19 @@ import { parseDate, formatDateDisplay, daysBetween, today } from '../../lib/date
 import { STAGE_COLORS } from '../../lib/stages';
 import { FertScheduleView } from './FertScheduleView';
 
-import { Trash2 } from 'lucide-react';
+import { Trash2, Edit3 } from 'lucide-react';
 
 interface CropDetailProps {
   crop: Crop;
   onClose: () => void;
   onUpdate: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }
 
 const STAGE_ORDER = ['Seed', 'Germinated', 'Seedling', 'Transplanted', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
 
-export function CropDetail({ crop, onClose, onUpdate, onDelete }: CropDetailProps) {
+export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDetailProps) {
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('cropId').equals(crop.id).sortBy('date'), [crop.id]);
   const stageLogs = useLiveQuery(() => db.stageLogs.where('trackingId').equals(crop.id).sortBy('date'), [crop.id]);
   const planted = parseDate(crop.plantingDate);
@@ -107,9 +108,12 @@ export function CropDetail({ crop, onClose, onUpdate, onDelete }: CropDetailProp
         )}
 
         <div className="flex gap-2">
-          <Button className="flex-1" onClick={onUpdate}>Update This Crop</Button>
+          <Button className="flex-1" onClick={onUpdate}>Update Status</Button>
+          <Button variant="outline" className="border-gray-200" onClick={onEdit}>
+            <Edit3 className="w-4 h-4 mr-2" /> Edit
+          </Button>
           <Button className="flex-1 bg-amber-500 hover:bg-amber-600" onClick={() => setShowFert(true)}>
-            Fertilizer Schedule
+            Fertilizer
           </Button>
           <Button variant="ghost" size="icon" className="text-gray-300 hover:text-red-500 border border-gray-100 h-10 w-10 shrink-0" onClick={onDelete}>
             <Trash2 className="w-5 h-5" />

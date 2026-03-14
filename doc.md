@@ -57,3 +57,29 @@ The Crop Manager application is a well-architected, modern web application. The 
 -   **Advanced Propagation Tracking**: Implemented a dedicated four-step lifecycle for cuttings and seeds being propagated: `Propagating → Callusing → Rooted → Potted / Transplanted`.
 -   **Dashboard Redesign**: Overhauled the `DashboardScreen.tsx` and `WeatherWidget.tsx` to match the high-fidelity layout and color scheme of the `cropmanager (1).html` prototype, featuring sectioned task lists, overview stats, and a gradient-based weather card.
 -   **Backup & Export**: Extracted and moved the JSON backup functionality to a new dedicated utility [backup.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/backup.ts) to ensure local data persistence remains available after removing the sync layer.
+
+## New Updates (Local DB overrides, scheduling, history)
+
+-   Local DB Persistence: Implemented local overrides for the reference databases. The loaders now read device-local overrides if present and fall back to bundled JSON:
+    - Loader updates: [cropDb.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/cropDb.ts), [fertDb.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/fertDb.ts)
+    - Save locally from UI: [CropDatabaseScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/CropDatabaseScreen.tsx#L92-L110), [FertilizerDatabaseScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/FertilizerDatabaseScreen.tsx#L103-L150)
+    - App initialization uses loaders with overrides: [App.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/App.tsx#L26-L37)
+
+-   Transplant Readjustment: Added automatic readjustment when a scheduled transplant date has passed and no transplant occurred:
+    - Helper: [stages.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/stages.ts#L109-L123)
+    - Hook usage: [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx#L24-L40)
+
+-   Manual Progression Controls: Added tick/untick progression for Germinated / Transplanted / Harvested linked to the update form:
+    - UI and logic: [UpdateCropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/UpdateCropForm.tsx#L1-L196)
+
+-   History & Averages: New panel aggregates average days between stages per crop and shows average deviation versus database defaults (using stage logs):
+    - Screen: [CropHistory.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/reports/CropHistory.tsx)
+    - Navigation: [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx#L33-L101)
+    - Calculation: Seed→Germ, Germ→Transplant, Transplant→Harvest from StageLog daysElapsed; deviations vs Crop DB defaults
+
+-   Propagation Learns from Crop: Seed propagation windows now inherit germination min/max from the Crop DB when no custom adjustments exist:
+    - Logic: [propagation.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/propagation.ts)
+    - Form usage: [PropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/props/PropForm.tsx#L44-L74)
+
+-   Overdue Transplant Badge: Added a visible badge on crop cards when a scheduled transplant date is past and not yet done:
+    - UI: [CropCard.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropCard.tsx)

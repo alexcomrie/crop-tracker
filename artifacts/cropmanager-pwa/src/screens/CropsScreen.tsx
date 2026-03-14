@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCrops } from '../hooks/useCrops';
 import { CropCard } from '../components/crops/CropCard';
 import { CropDetail } from '../components/crops/CropDetail';
@@ -7,6 +7,7 @@ import { UpdateCropForm } from '../components/crops/UpdateCropForm';
 import type { Crop } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
+import { autoAdjustTransplantSchedule } from '../lib/stages';
 import db from '../db/db';
 
 const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
@@ -20,6 +21,19 @@ export function CropsScreen() {
   const [updateCrop, setUpdateCrop] = useState<Crop | null>(null);
   const [editCrop, setEditCrop] = useState<Crop | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
+
+  // Auto-adjust transplant schedule if overdue
+  useEffect(() => {
+    (async () => {
+      for (const c of crops) {
+        const cd = resolveCropData(cropDb, c.cropName);
+        const updated = autoAdjustTransplantSchedule(c, cd);
+        if (updated) {
+          await db.crops.put(updated);
+        }
+      }
+    })();
+  }, [crops, cropDb]);
 
   const handleDeleteCrop = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {

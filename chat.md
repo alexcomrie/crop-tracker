@@ -397,3 +397,32 @@ I have resolved the TypeScript error in the CSV synchronization logic by correct
 - **Mapper Synchronization**: Updated the `Crop` data mapper in [sheets.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sheets.ts) to handle the new `isContinuous` column (index 11) from your spreadsheet CSV.
 - **Sync Payload Update**: Updated the `buildSyncPayload` function in [sync.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/sync.ts) to include the `isContinuous` flag when pushing local data back to Google Sheets.
 - **Zero-Error Build**: Confirmed that the application now builds without any TypeScript errors, ensuring the entire data flow from CSV → Local DB → GAS Sync is fully operational.
+
+**You:**
+
+`c:\Users\ALEX\Desktop\Crop-Manager\file\newprompt.md#L1-6`
+
+**Me:**
+
+Implemented full support for the new prompt:
+- Saved Crop/Fertilizer DB edits locally on-device using override loaders and persisted UI actions ([cropDb.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/cropDb.ts), [fertDb.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/fertDb.ts), [CropDatabaseScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/CropDatabaseScreen.tsx), [FertilizerDatabaseScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/FertilizerDatabaseScreen.tsx)).
+- Auto-readjust transplant schedule if the scheduled date has passed and no transplant occurred ([stages.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/stages.ts), [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx)).
+- Ensured all dates/reminders/cards are computed from JSON DBs; app now loads DB via loaders with overrides ([App.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/App.tsx)).
+- Added manual tick/untick progression controls in the crop update flow to set Germinated/Transplanted/Harvested directly ([UpdateCropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/UpdateCropForm.tsx)).
+- Added a History & Averages panel that aggregates average days between key stages and made it available from the More menu ([CropHistory.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/reports/CropHistory.tsx), [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx)).
+- Propagations now inherit seed germination windows from the Crop DB when no custom propagation adjustment exists ([propagation.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/propagation.ts), [PropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/props/PropForm.tsx)).
+
+Verified with typecheck and production build.
+
+**You:**
+
+- Extend history calculations to include deviation from database defaults using stage logs. 
+ - Add a quick “overdue transplant” badge on crop cards for visibility before auto-adjust kicks in
+
+**Me:**
+
+I've implemented both enhancements:
+- History now computes stage durations from StageLog entries and shows average deviation vs the Crop DB defaults for Seed→Germ, Germ→Transplant, and Transplant→Harvest. See [CropHistory.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/reports/CropHistory.tsx).
+- Crop cards show a red “Transplant overdue” badge if there is a scheduled transplant date in the past and no actual transplant recorded yet. See [CropCard.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropCard.tsx).
+
+Typecheck and production build have been run and are passing.

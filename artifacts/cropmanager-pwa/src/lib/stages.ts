@@ -121,3 +121,16 @@ export const STAGE_COLORS: Record<string, string> = {
   Harvested: '#5d4037',
   Deleted: '#e53935',
 };
+
+/** If transplant is scheduled, not yet done, and overdue, move schedule to today */
+export function autoAdjustTransplantSchedule(crop: Crop, cropData: CropData | null): Crop | null {
+  if (!crop.transplantDateScheduled || crop.transplantDateActual) return null;
+  const sched = parseDate(crop.transplantDateScheduled);
+  const now = today();
+  if (!sched) return null;
+  if (sched < now) {
+    const updated: Crop = { ...crop, transplantDateScheduled: formatDateShort(now), updatedAt: Date.now() };
+    return updated;
+  }
+  return null;
+}

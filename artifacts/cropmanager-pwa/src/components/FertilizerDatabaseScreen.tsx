@@ -3,8 +3,9 @@ import { Search, ChevronLeft, Download, Info, ArrowLeft, Leaf, Droplets, Flower2
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { loadFertDatabase, getFertCrops } from '../lib/fertDb';
+import { loadFertDatabase, getFertCrops, saveFertDatabaseOverride } from '../lib/fertDb';
 import type { FertDatabase, FertCropEntry, FertStage, FertMix } from '../types';
+import { useAppStore } from '../store/useAppStore';
 
 const TEA_COLORS: Record<string, string> = {
   cow_manure_tea: '#92400e',
@@ -34,6 +35,7 @@ export function FertilizerDatabaseScreen({ onClose }: { onClose: () => void }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showMeta, setShowMeta] = useState(false);
+  const { setFertDb } = useAppStore();
 
   useEffect(() => {
     loadFertDatabase().then(data => {
@@ -100,23 +102,11 @@ export function FertilizerDatabaseScreen({ onClose }: { onClose: () => void }) {
     setDb(nextDb);
   };
 
-  const handleSaveDb = async () => {
-    try {
-      const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-      const response = await fetch(`${baseUrl}/api/data/fert-db`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(db),
-      });
-      if (response.ok) {
-        alert('Fertilizer Database saved successfully to JSON file!');
-      } else {
-        alert('Failed to save to server. Local changes kept.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error saving to server. Local changes kept.');
-    }
+  const handleSaveDb = () => {
+    if (!db) return;
+    saveFertDatabaseOverride(db);
+    setFertDb(db);
+    alert('Fertilizer Database saved locally on this device.');
   };
 
   const exportJson = () => {

@@ -1,12 +1,22 @@
 import type { CropDatabase, CropData } from '../types';
 
 let _cache: CropDatabase | null = null;
+const LS_CROP_DB_KEY = 'crop_db_override_v1';
 
 export async function loadCropDatabase(): Promise<CropDatabase> {
   if (_cache) return _cache;
   const res = await fetch('/data/crop_database.json');
   if (!res.ok) throw new Error('Failed to load crop_database.json');
-  _cache = await res.json();
+  const base = await res.json();
+  try {
+    const raw = localStorage.getItem(LS_CROP_DB_KEY);
+    if (raw) {
+      const override = JSON.parse(raw);
+      _cache = override;
+      return _cache!;
+    }
+  } catch {}
+  _cache = base;
   return _cache!;
 }
 
@@ -37,4 +47,14 @@ export function resolveCropData(db: CropDatabase, key: string): CropData | null 
     return resolveCropData(db, record.alias);
   }
   return record as CropData;
+}
+
+export function saveCropDatabaseOverride(db: CropDatabase) {
+  localStorage.setItem(LS_CROP_DB_KEY, JSON.stringify(db));
+  _cache = db;
+}
+
+export function clearCropDatabaseOverride() {
+  localStorage.removeItem(LS_CROP_DB_KEY);
+  _cache = null;
 }

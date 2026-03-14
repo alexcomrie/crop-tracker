@@ -14,6 +14,8 @@ import { SettingsScreen } from './screens/SettingsScreen';
 import { useAppStore } from './store/useAppStore';
 import { useTelegramReminders } from './hooks/useTelegramReminders';
 import type { CropDatabase, FertDatabase } from './types';
+import { loadCropDatabase } from './lib/cropDb';
+import { loadFertDatabase } from './lib/fertDb';
 
 const queryClient = new QueryClient();
 
@@ -23,15 +25,12 @@ function AppContent() {
   // Initialize Telegram notification service
   useTelegramReminders();
 
-  // Load JSON databases on startup
+  // Load JSON databases on startup (with local overrides)
   useEffect(() => {
-    fetch('/data/crop_database.json')
-      .then(r => r.json())
+    loadCropDatabase()
       .then((data: CropDatabase) => setCropDb(data))
       .catch(console.error);
-
-    fetch('/data/fertilizer_schedule.json')
-      .then(r => r.json())
+    loadFertDatabase()
       .then((data: FertDatabase) => setFertDb(data))
       .catch(console.error);
   }, [setCropDb, setFertDb]);

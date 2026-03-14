@@ -3,8 +3,9 @@ import { Search, Plus, Trash2, Download, ChevronLeft, X, ArrowRight, Tag } from 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { loadCropDatabase, getNonAliasCrops, getAliases, isAlias } from '../lib/cropDb';
+import { loadCropDatabase, getNonAliasCrops, getAliases, isAlias, saveCropDatabaseOverride } from '../lib/cropDb';
 import type { CropDatabase, CropData, CropDbRecord } from '../types';
+import { useAppStore } from '../store/useAppStore';
 
 const PLANT_TYPES = [
   'Leafy Greens', 'Brassica', 'Fruiting Vegetable', 'Vine / Fruiting Vegetable', 
@@ -13,6 +14,7 @@ const PLANT_TYPES = [
 
 export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
   const [db, setDb] = useState<CropDatabase | null>(null);
+  const { setCropDb } = useAppStore();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAliases, setShowAliases] = useState(false);
@@ -89,23 +91,11 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
     setNewKey('');
   };
 
-  const handleSaveDb = async () => {
-    try {
-      const baseUrl = window.location.hostname === 'localhost' ? 'http://localhost:5000' : '';
-      const response = await fetch(`${baseUrl}/api/data/crop-db`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(db),
-      });
-      if (response.ok) {
-        alert('Crop Database saved successfully to JSON file!');
-      } else {
-        alert('Failed to save to server. Local changes kept.');
-      }
-    } catch (err) {
-      console.error(err);
-      alert('Error saving to server. Local changes kept.');
-    }
+  const handleSaveDb = () => {
+    if (!db) return;
+    saveCropDatabaseOverride(db);
+    setCropDb(db);
+    alert('Crop Database saved locally on this device.');
   };
 
   const exportJson = () => {

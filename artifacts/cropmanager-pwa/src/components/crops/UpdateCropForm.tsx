@@ -35,6 +35,10 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const cropData = resolveCropData(cropDb, crop.cropName);
   const validStages = VALID_NEXT_STAGES[crop.plantStage] ?? [];
 
+  const [tickGerminated, setTickGerminated] = useState(!!crop.germinationDate);
+  const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
+  const [tickHarvested, setTickHarvested] = useState(!!crop.harvestDateActual);
+
   async function handleStageChange() {
     if (!newStage) return;
     setSaving(true);
@@ -83,6 +87,45 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     setSaving(false);
     setDone(true);
     setTimeout(onClose, 1500);
+  }
+
+  async function handleManualProgress() {
+    setSaving(true);
+    const dateNowStr = formatDateShort(today());
+    const update: Partial<Crop> = { updatedAt: Date.now() };
+
+    if (tickGerminated) {
+      update.germinationDate = dateNowStr;
+      if (crop.plantingDate) {
+        // days since planting is not critical here; keep existing if any
+      }
+    } else {
+      update.germinationDate = '';
+      update.daysSeedGerm = 0;
+    }
+
+    if (tickTransplanted) {
+      update.transplantDateActual = dateNowStr;
+    } else {
+      update.transplantDateActual = '';
+      update.daysGermTransplant = 0;
+    }
+
+    if (tickHarvested) {
+      update.harvestDateActual = dateNowStr;
+      update.status = crop.isContinuous ? 'Active' : 'Harvested';
+      update.plantStage = 'Harvested';
+    } else {
+      update.harvestDateActual = '';
+      update.daysTransplantHarvest = 0;
+      // derive stage from toggles
+      update.plantStage = tickTransplanted ? 'Transplanted' : (tickGerminated ? 'Germinated' : 'Seed');
+    }
+
+    await db.crops.update(crop.id, update);
+    setSaving(false);
+    setDone(true);
+    setTimeout(onClose, 1200);
   }
 
   async function handleTreatment() {
@@ -157,6 +200,25 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
             <Button className="w-full mt-3" onClick={handleStageChange} disabled={!newStage || saving}>
               {saving ? 'Saving...' : 'Confirm Stage Change'}
             </Button>
+
+            <div className="mt-5 border-t pt-4">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Manual Progression</p>
+              <div className="flex items-center justify-between py-1.5">
+                <label className="text-sm">Germinated</label>
+                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickGerminated} onChange={e => setTickGerminated(e.target.checked)} />
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <label className="text-sm">Transplanted</label>
+                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => setTickTransplanted(e.target.checked)} />
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <label className="text-sm">Harvested</label>
+                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickHarvested} onChange={e => setTickHarvested(e.target.checked)} />
+              </div>
+              <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
+                {saving ? 'Saving...' : 'Apply Manual Progress'}
+              </Button>
+            </div>
           </div>
         )}
 

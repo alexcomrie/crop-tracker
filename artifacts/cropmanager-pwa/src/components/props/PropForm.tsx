@@ -21,7 +21,7 @@ interface PropFormProps {
 }
 
 export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
-  const { settings } = useAppStore();
+  const { settings, cropDb } = useAppStore();
   const [step, setStep] = useState(1);
   const [plantName, setPlantName] = useState(editProp?.plantName || '');
   const [method, setMethod] = useState(editProp?.propagationMethod || '');
@@ -44,7 +44,7 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
   async function handleSave() {
     setSaving(true);
     try {
-      const rootingDays = getRootingDays(plantName, method, propAdjustments);
+      const rootingDays = getRootingDays(plantName, method, propAdjustments, cropDb);
       const rootStart = addDays(plantDate, rootingDays.min);
       const rootEnd = addDays(plantDate, rootingDays.max);
       const id = editProp?.id || generateId('PROP');

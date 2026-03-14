@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Calendar, Database, Beaker, ShieldAlert, Bell, ChevronRight } from 'lucide-react';
+import { Calendar, Database, Beaker, ShieldAlert, Bell, ChevronRight, BarChart2 } from 'lucide-react';
 import { CropDatabaseScreen } from '../components/CropDatabaseScreen';
 import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen';
+import { CropHistoryScreen } from '../components/reports/CropHistory';
 
 interface MoreItemProps {
   title: string;
@@ -32,7 +33,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -53,6 +54,13 @@ export function MoreScreen() {
               icon={<Beaker className="w-6 h-6 text-amber-600" />}
               iconColor="bg-amber-50"
               onClick={() => setActivePanel('fert-db')}
+            />
+            <MoreItem
+              title="History & Averages"
+              subtitle="Stage timing averages by crop"
+              icon={<BarChart2 className="w-6 h-6 text-blue-600" />}
+              iconColor="bg-blue-50"
+              onClick={() => setActivePanel('history')}
             />
             <MoreItem
               title="Herbicide Schedule"
@@ -94,6 +102,11 @@ export function MoreScreen() {
       {activePanel === 'fert-db' && (
         <div className="fixed inset-0 z-[60] bg-white">
           <FertilizerDatabaseScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'history' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <CropHistoryScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
     </div>

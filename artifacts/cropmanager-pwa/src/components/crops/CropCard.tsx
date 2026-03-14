@@ -17,6 +17,8 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
   const totalDays = cropData?.growing_time_days ?? 90;
   const progress = Math.min(100, Math.round((daysOld / totalDays) * 100));
   const daysToHarvest = harvestEst ? daysBetween(today(), harvestEst) : null;
+  const transSched = crop.transplantDateScheduled ? parseDate(crop.transplantDateScheduled) : null;
+  const overdueTransplant = transSched && !crop.transplantDateActual && transSched < today();
 
   const stageColor = STAGE_COLORS[crop.plantStage] ?? '#9e9e9e';
 
@@ -37,6 +39,14 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
           {crop.plantStage}
         </span>
       </div>
+
+      {overdueTransplant && (
+        <div className="mb-2">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-100">
+            ⚠ Transplant overdue
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
         <span>Planted {daysOld}d ago</span>

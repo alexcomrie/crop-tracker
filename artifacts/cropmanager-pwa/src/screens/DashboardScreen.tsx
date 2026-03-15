@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
-import { useDueReminders } from '../hooks/useReminders';
+import { useTodayReminders } from '../hooks/useReminders';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { formatDateShort, today, parseDate, formatDateDisplay } from '../lib/dates';
@@ -11,7 +11,6 @@ import { BottomSheet } from '../components/shared/BottomSheet';
 import { SuccessionGapReport } from '../components/reports/SuccessionGapReport';
 import { Bell, Calendar, Database, CheckCircle2, ChevronRight, LayoutDashboard, Sprout } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
-import { useTodayReminders } from '../hooks/useReminders';
 
 const TYPE_EMOJI: Record<string, string> = {
   harvest: 'Ready',
@@ -47,7 +46,6 @@ const TYPE_TAG: Record<string, string> = {
 };
 
 export function DashboardScreen() {
-  const dueReminders = useDueReminders() ?? [];
   const todayReminders = useTodayReminders() ?? [];
   const todayStr = formatDateShort(today());
 
@@ -96,14 +94,14 @@ export function DashboardScreen() {
           </div>
           
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {dueReminders.length === 0 ? (
+            {todayReminders.length === 0 ? (
               <div className="p-8 text-center">
                 <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2 opacity-20" />
                 <p className="text-sm font-medium text-gray-400">All tasks completed for today</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {dueReminders.map(r => (
+                {todayReminders.map(r => (
                   <div 
                     key={r.id} 
                     className="p-4 flex items-center gap-3 active:bg-gray-50 transition-colors"

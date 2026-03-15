@@ -416,6 +416,18 @@ Verified with typecheck and production build.
 
 **You:**
 
+1. the app need a notification badge, for all clendar task and schedule task, so when the app is closes the app will get a notification badge on task schedule to that current day, also lets add in app notification sounds, so the app alert when a task schedule to that current day, 
+ 2. the today task card in the dash board should be wired to todays calendar to view task schedule for today without opening the calendar, and the same thing apply to the "upcoming" card in the dashboard 
+ 3. after implimenting run type check for errors and test the app for build errors then push to github main
+
+**Me:**
+
+- Added app icon badge for today's task count and an in-app alert tone that plays once per day when tasks are due. Integrated at dashboard load using the Badging API when available. See [notifications.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/notifications.ts) and [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx).
+- Wired Dashboard “Today” and “Upcoming” cards to open inline bottom-sheet views of today’s schedule and upcoming tasks without switching tabs. See [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx).
+- Verified typecheck and production build, then pushed changes to GitHub main.
+
+**You:**
+
 - Extend history calculations to include deviation from database defaults using stage logs. 
  - Add a quick “overdue transplant” badge on crop cards for visibility before auto-adjust kicks in
 

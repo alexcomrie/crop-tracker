@@ -83,3 +83,10 @@ The Crop Manager application is a well-architected, modern web application. The 
 
 -   Overdue Transplant Badge: Added a visible badge on crop cards when a scheduled transplant date is past and not yet done:
     - UI: [CropCard.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropCard.tsx)
+
+-   Notification Badge & Sound: Shows an app icon badge with today's task count and plays a short alert tone once per day when tasks are due:
+    - Logic: [notifications.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/notifications.ts)
+    - Integration: [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx)
+
+-   Dashboard Inline Views: Added bottom-sheet views to inspect today's schedule and upcoming tasks without leaving the dashboard:
+    - Integration: [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx)

@@ -423,7 +423,7 @@ Verified with typecheck and production build.
 **Me:**
 
 - Added app icon badge for today's task count and an in-app alert tone that plays once per day when tasks are due. Integrated at dashboard load using the Badging API when available. See [notifications.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/notifications.ts) and [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx).
-- Wired Dashboard “Today” and “Upcoming” cards to open inline bottom-sheet views of today’s schedule and upcoming tasks without switching tabs. See [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx).
+- Kept the existing “Today” and “Upcoming” cards per the provided layout and removed newly-added inline bottom-sheet view buttons, utilizing the original cards only. See [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx).
 - Verified typecheck and production build, then pushed changes to GitHub main.
 
 **You:**

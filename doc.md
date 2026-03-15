@@ -88,5 +88,5 @@ The Crop Manager application is a well-architected, modern web application. The 
     - Logic: [notifications.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/notifications.ts)
     - Integration: [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx)
 
--   Dashboard Inline Views: Added bottom-sheet views to inspect today's schedule and upcoming tasks without leaving the dashboard:
+-   Dashboard: Kept the original Today and Upcoming cards per the provided layout and removed the newly-added inline sheet views, aligning strictly with the prototype:
     - Integration: [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx)

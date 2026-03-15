@@ -67,8 +67,6 @@ export function DashboardScreen() {
   const [showCropForm, setShowCropForm] = useState(false);
   const [showPropForm, setShowPropForm] = useState(false);
   const [showSuccession, setShowSuccession] = useState(false);
-  const [showTodaySheet, setShowTodaySheet] = useState(false);
-  const [showUpcomingSheet, setShowUpcomingSheet] = useState(false);
 
   useEffect(() => {
     const count = todayReminders.length;
@@ -95,7 +93,6 @@ export function DashboardScreen() {
             <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
               Today — {formatDateDisplay(today())}
             </h2>
-            <button onClick={() => setShowTodaySheet(true)} className="text-xs px-2 py-1 rounded border bg-white hover:bg-gray-50">View Day</button>
           </div>
           
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -160,7 +157,6 @@ export function DashboardScreen() {
             <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
               Upcoming
             </h2>
-            <button onClick={() => setShowUpcomingSheet(true)} className="text-xs px-2 py-1 rounded border bg-white hover:bg-gray-50">View Upcoming</button>
           </div>
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
             {upcomingReminders.length === 0 ? (
@@ -228,58 +224,6 @@ export function DashboardScreen() {
 
       <BottomSheet open={showSuccession} onClose={() => setShowSuccession(false)} title="Succession Gap Analysis" position="center">
         <SuccessionGapReport />
-      </BottomSheet>
-
-      <BottomSheet open={showTodaySheet} onClose={() => setShowTodaySheet(false)} title="Today's Schedule" position="center">
-        <div className="pt-2">
-          {todayReminders.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400 italic">Nothing due today</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {todayReminders.map(r => (
-                <div key={r.id} className="p-3 flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[r.type] || 'bg-gray-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {r.subject.split(':').pop()?.trim()} — {r.cropPlantName}
-                    </p>
-                  </div>
-                  <button
-                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${TYPE_TAG[r.type] || 'bg-gray-100 text-gray-500'}`}
-                    onClick={() => markReminderDone(r.id)}
-                  >
-                    Done
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </BottomSheet>
-
-      <BottomSheet open={showUpcomingSheet} onClose={() => setShowUpcomingSheet(false)} title="Upcoming Tasks" position="center">
-        <div className="pt-2">
-          {upcomingReminders.length === 0 ? (
-            <div className="p-6 text-center text-sm text-gray-400 italic">No upcoming tasks scheduled</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {upcomingReminders.map(r => (
-                <div key={r.id} className="p-3 flex items-center gap-3">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[r.type] || 'bg-gray-400'}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      <span className="text-[#2d6a2d] font-bold mr-2 text-[11px]">{formatDateDisplay(parseDate(r.sendDate)!).split(',')[0]}</span>
-                      {r.subject.split(':').pop()?.trim()} — {r.cropPlantName}
-                    </p>
-                  </div>
-                  <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${TYPE_TAG[r.type] || 'bg-gray-100 text-gray-500'}`}>
-                    {TYPE_EMOJI[r.type] || 'Task'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </BottomSheet>
     </div>
   );

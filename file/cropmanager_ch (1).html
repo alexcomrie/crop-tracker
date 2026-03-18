@@ -130,6 +130,72 @@ html, body { height: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif;
 .icon-blue { background: var(--blue-pale); }
 .icon-purple { background: var(--purple-pale); }
 .icon-red { background: var(--red-pale); }
+.icon-teal { background: #e0fdf4; }
+
+/* ══════════════════════════════════════════
+   C-H CALCULATOR STYLES
+══════════════════════════════════════════ */
+.ch-select-list { flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px; }
+.ch-crop-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 15px; cursor:pointer; display:flex; align-items:center; gap:12px; transition:all 0.15s; }
+.ch-crop-card:active { transform:scale(0.985); }
+.ch-crop-card.selected { border-color:var(--green); background:var(--green-pale); }
+.ch-crop-avatar { width:38px; height:38px; border-radius:9px; background:var(--green-pale); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.ch-crop-info { flex:1; min-width:0; }
+.ch-crop-name { font-size:13px; font-weight:600; }
+.ch-crop-type { font-size:11px; color:var(--text-3); margin-top:1px; }
+.ch-crop-badge { font-size:11px; font-weight:600; padding:2px 7px; border-radius:6px; flex-shrink:0; white-space:nowrap; }
+.ch-badge-single { background:var(--amber-pale); color:var(--amber); }
+.ch-badge-multi { background:var(--green-pale); color:var(--green); }
+.ch-result-scroll { flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+.ch-summary-cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ch-summary-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 12px; text-align:center; }
+.ch-summary-num { font-size:28px; font-weight:600; color:var(--green); line-height:1; }
+.ch-summary-unit { font-size:11px; color:var(--text-3); margin-top:2px; }
+.ch-summary-lbl { font-size:12px; font-weight:500; color:var(--text-2); margin-top:4px; }
+.ch-info-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.ch-info-header { padding:11px 14px; border-bottom:1px solid var(--border); font-size:13px; font-weight:600; display:flex; align-items:center; gap:8px; }
+.ch-info-body { padding:13px 14px; display:flex; flex-direction:column; gap:8px; }
+.ch-info-row { display:flex; justify-content:space-between; align-items:center; }
+.ch-info-label { font-size:12px; color:var(--text-3); }
+.ch-info-value { font-size:13px; font-weight:600; color:var(--text); font-family:'DM Mono',monospace; }
+.ch-tl-item { display:flex; gap:12px; align-items:flex-start; padding:8px 0; border-bottom:1px solid var(--border); }
+.ch-tl-item:last-child { border-bottom:none; }
+.ch-tl-dot-wrap { display:flex; flex-direction:column; align-items:center; padding-top:3px; flex-shrink:0; width:16px; }
+.ch-tl-dot { width:10px; height:10px; border-radius:50%; }
+.ch-tl-content { flex:1; }
+.ch-tl-week { font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.4px; text-transform:uppercase; }
+.ch-tl-action { font-size:13px; font-weight:500; color:var(--text); margin-top:1px; }
+.ch-tl-note { font-size:11px; color:var(--text-3); margin-top:2px; line-height:1.4; }
+.ch-dot-plant { background:#2d6a2d; }
+.ch-dot-harvest { background:#d97706; }
+.ch-dot-replant { background:#7c3aed; }
+.ch-dot-start { background:#e0e0e0; }
+.ch-inputs { background:var(--surface); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; flex-direction:column; gap:10px; flex-shrink:0; }
+.ch-input-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ch-freq-row { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; padding-bottom:2px; }
+.ch-freq-btn { flex:0 0 auto; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit; color:var(--text-2); text-align:center; transition:all 0.15s; }
+.ch-freq-btn.active { background:var(--green-pale); border-color:var(--green); color:var(--green); font-weight:600; }
+.ch-field label { font-size:11px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px; }
+.ch-field input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:'DM Mono',monospace; outline:none; color:var(--text); }
+.ch-field input:focus { border-color:var(--green); }
+.ch-calc-btn { width:100%; background:var(--green); color:#fff; border:none; border-radius:9px; padding:11px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+.ch-calc-btn:hover { background:var(--green-light); }
+.ch-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:10px; color:var(--text-3); padding:30px 20px; text-align:center; }
+.ch-empty-icon { font-size:36px; }
+.ch-empty p { font-size:13px; line-height:1.6; }
+.ch-vis-wrap { overflow-x:auto; }
+.ch-vis-grid { display:table; border-collapse:collapse; font-size:10px; min-width:100%; }
+.ch-vis-row { display:table-row; }
+.ch-vis-lbl { display:table-cell; padding:2px 6px 2px 0; color:var(--text-3); font-weight:500; white-space:nowrap; width:60px; vertical-align:middle; }
+.ch-vis-cell { display:table-cell; width:20px; height:20px; border-radius:3px; margin:1px; }
+.ch-cell-plant { background:#2d6a2d; }
+.ch-cell-grow { background:#c2e0c2; }
+.ch-cell-harvest { background:#d97706; }
+.ch-cell-empty { background:var(--border); }
+.ch-cell-replant { background:#7c3aed; }
+.ch-legend-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+.ch-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-3); }
+.ch-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
 .more-btn-text { flex: 1; }
 .more-btn-title { font-size: 15px; font-weight: 600; color: var(--text); }
 .more-btn-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
@@ -448,6 +514,15 @@ html, body { height: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif;
           <div class="more-btn-text">
             <div class="more-btn-title">Reminders</div>
             <div class="more-btn-sub">View and manage queued Telegram reminders</div>
+          </div>
+          <span class="more-btn-arrow">›</span>
+        </button>
+        <div class="more-section-title">Planning</div>
+        <button class="more-btn" onclick="openPanel('panel-ch-calc')">
+          <div class="more-btn-icon icon-teal">♻️</div>
+          <div class="more-btn-text">
+            <div class="more-btn-title">C-H Calculator</div>
+            <div class="more-btn-sub">Plan plots for continuous weekly harvests</div>
           </div>
           <span class="more-btn-arrow">›</span>
         </button>
@@ -836,6 +911,69 @@ html, body { height: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif;
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════
+       PANEL: C-H CALCULATOR
+  ═══════════════════════════════════ -->
+  <div class="panel" id="panel-ch-calc">
+    <div class="panel-header">
+      <button class="panel-back" onclick="closePanel('panel-ch-calc')">‹</button>
+      <span class="panel-title">♻️ C-H Calculator</span>
+      <div class="panel-actions" id="ch-header-actions"></div>
+    </div>
+
+    <!-- STEP 1: Crop selection list -->
+    <div id="ch-step-select" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+      <div style="padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;gap:8px;">
+        <div class="search-wrap" style="flex:1;position:relative;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="ch-search" placeholder="Search crops…" oninput="chFilterCrops()" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 12px 9px 34px;font-size:14px;font-family:inherit;outline:none;">
+        </div>
+        <select id="ch-type-filter" onchange="chFilterCrops()" style="background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:9px 10px;font-size:13px;font-family:inherit;outline:none;cursor:pointer;">
+          <option value="">All crops</option>
+          <option value="single">Single harvest</option>
+          <option value="multi">Multi harvest</option>
+        </select>
+      </div>
+      <div class="ch-select-list" id="ch-crop-list"></div>
+    </div>
+
+    <!-- STEP 2: Configuration + Results -->
+    <div id="ch-step-result" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+      <!-- Sub-header with crop name + back-to-list -->
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <button class="panel-back" style="width:28px;height:28px;font-size:16px;" onclick="chBackToList()">‹</button>
+        <span style="font-size:14px;font-weight:600;flex:1;" id="ch-result-crop-name">Tomato</span>
+        <span id="ch-result-crop-badge" class="ch-crop-badge ch-badge-multi"></span>
+      </div>
+
+      <!-- Inputs bar -->
+      <div class="ch-inputs">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Desired harvest frequency</div>
+          <div class="ch-freq-row" id="ch-freq-row">
+            <button class="ch-freq-btn active" data-days="7"  onclick="chSetFreq(this)">Every week</button>
+            <button class="ch-freq-btn"        data-days="14" onclick="chSetFreq(this)">Every 2 wks</button>
+            <button class="ch-freq-btn"        data-days="21" onclick="chSetFreq(this)">Every 3 wks</button>
+            <button class="ch-freq-btn"        data-days="28" onclick="chSetFreq(this)">Monthly</button>
+          </div>
+        </div>
+        <div class="ch-input-row">
+          <div class="ch-field"><label>Plot area (sq ft)</label><input type="number" id="ch-plot-area" value="400" min="1"></div>
+          <div class="ch-field"><label>Start date</label><input type="date" id="ch-start-date"></div>
+        </div>
+        <button class="ch-calc-btn" onclick="chCalculate()">📐 Calculate my planting plan</button>
+      </div>
+
+      <!-- Results area -->
+      <div class="ch-result-scroll" id="ch-result-body">
+        <div class="ch-empty">
+          <div class="ch-empty-icon">📐</div>
+          <p>Set your harvest frequency and plot size above, then tap Calculate.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="toast" id="toast"><span class="toast-icon" id="toast-icon">✅</span><span id="toast-msg">Saved</span></div>
 
@@ -873,6 +1011,7 @@ function openPanel(id) {
   if (id === 'panel-crop-db') renderCropDbSidebar();
   if (id === 'panel-fert-db') renderFertList();
   if (id === 'panel-calendar') renderCalendar();
+  if (id === 'panel-ch-calc') chOpen();
 }
 
 function closePanel(id) {
@@ -2019,6 +2158,359 @@ function saveHerbEntry() {
   }
   closeHerbForm();
   renderHerbList();
+}
+
+// ══════════════════════════════════════════
+//  C-H CALCULATOR
+// ══════════════════════════════════════════
+
+const CROP_EMOJIS_CH = {
+  'Leafy Greens':'🥬','Brassica':'🥦','Fruiting Vegetable':'🍅',
+  'Vine / Fruiting Vegetable':'🥒','Vine Crop':'🎃','Root Crop':'🥕',
+  'Grain':'🌽','Legume':'🫘','Herb':'🌿','Bulb':'🧅',
+  'Rhizome':'🫚','Tuber':'🍠','default':'🌱'
+};
+function chEmoji(pt) { return CROP_EMOJIS_CH[pt] || CROP_EMOJIS_CH.default; }
+
+let chSelectedKey = null;
+let chFreqDays    = 7;
+
+// ── Open panel init ─────────────────────────────────────────────────────────
+function chOpen() {
+  chSelectedKey = null;
+  document.getElementById('ch-step-select').style.display = 'flex';
+  document.getElementById('ch-step-result').style.display = 'none';
+  document.getElementById('ch-search').value = '';
+  document.getElementById('ch-type-filter').value = '';
+  chRenderCropList();
+  // set today as default start
+  document.getElementById('ch-start-date').value = new Date().toISOString().split('T')[0];
+}
+
+// ── Crop list ────────────────────────────────────────────────────────────────
+function chRenderCropList() {
+  const q    = (document.getElementById('ch-search').value||'').toLowerCase();
+  const type = document.getElementById('ch-type-filter').value;
+  const list = document.getElementById('ch-crop-list');
+  let html   = '';
+
+  const entries = Object.entries(cropDB)
+    .filter(([,v]) => !v.alias)
+    .sort(([,a],[,b]) => a.display_name.localeCompare(b.display_name));
+
+  for (const [key, val] of entries) {
+    if (q && !val.display_name.toLowerCase().includes(q) && !key.includes(q)) continue;
+    const isMulti = (val.number_of_weeks_harvest || 1) > 1;
+    if (type === 'single' && isMulti) continue;
+    if (type === 'multi'  && !isMulti) continue;
+
+    const growDays   = val.growing_time_days || 60;
+    const harvestWks = val.number_of_weeks_harvest || 1;
+    const selected   = chSelectedKey === key ? 'selected' : '';
+
+    html += `<div class="ch-crop-card ${selected}" onclick="chSelectCrop('${key}')">
+      <div class="ch-crop-avatar">${chEmoji(val.plant_type)}</div>
+      <div class="ch-crop-info">
+        <div class="ch-crop-name">${val.display_name}</div>
+        <div class="ch-crop-type">${val.plant_type} · ${growDays}d grow · ${harvestWks}wk harvest</div>
+      </div>
+      <span class="ch-crop-badge ${isMulti ? 'ch-badge-multi':'ch-badge-single'}">${isMulti ? 'Multi':'Single'}</span>
+    </div>`;
+  }
+  if (!html) html = '<div class="ch-empty"><div class="ch-empty-icon">🔍</div><p>No crops found</p></div>';
+  list.innerHTML = html;
+}
+
+function chFilterCrops() { chRenderCropList(); }
+
+function chSelectCrop(key) {
+  chSelectedKey = key;
+  const val   = cropDB[key];
+  const isMulti = (val.number_of_weeks_harvest||1) > 1;
+  // switch to result panel
+  document.getElementById('ch-step-select').style.display = 'none';
+  document.getElementById('ch-step-result').style.display = 'flex';
+  document.getElementById('ch-result-crop-name').textContent = val.display_name;
+  const badge = document.getElementById('ch-result-crop-badge');
+  badge.textContent = isMulti ? 'Multi harvest' : 'Single harvest';
+  badge.className   = 'ch-crop-badge ' + (isMulti ? 'ch-badge-multi' : 'ch-badge-single');
+  // reset result area
+  document.getElementById('ch-result-body').innerHTML =
+    '<div class="ch-empty"><div class="ch-empty-icon">📐</div><p>Set your harvest frequency and plot size above, then tap Calculate.</p></div>';
+}
+
+function chBackToList() {
+  document.getElementById('ch-step-select').style.display = 'flex';
+  document.getElementById('ch-step-result').style.display = 'none';
+  chRenderCropList();
+}
+
+function chSetFreq(btn) {
+  document.querySelectorAll('.ch-freq-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  chFreqDays = parseInt(btn.dataset.days);
+}
+
+// ── Core calculation engine ──────────────────────────────────────────────────
+function chCalculate() {
+  if (!chSelectedKey) return;
+  const val = cropDB[chSelectedKey];
+  if (!val) return;
+
+  const plotArea    = parseFloat(document.getElementById('ch-plot-area').value) || 400;
+  const startDateV  = document.getElementById('ch-start-date').value;
+  const startDate   = startDateV ? new Date(startDateV + 'T00:00:00') : new Date();
+
+  const growDays      = val.growing_time_days   || 60;
+  const harvestWks    = val.number_of_weeks_harvest || 1;
+  const harvestDays   = harvestWks * 7;
+  const harvestIntv   = val.harvest_interval    || 7;
+  const isMulti       = harvestWks > 1;
+
+  // ── Determine effective batch offset ──────────────────────────────────────
+  // For single harvest: offset = desired frequency (user-chosen chFreqDays)
+  // For multi harvest:  offset = harvestDays - harvestIntv  (so Batch2 starts at 2nd-to-last harvest of Batch1)
+  //   BUT we also respect user's desired frequency: if chFreqDays > offset, use chFreqDays
+  let batchOffset;
+  if (!isMulti) {
+    batchOffset = chFreqDays;                         // plant a new batch every N days
+  } else {
+    const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
+    batchOffset = Math.max(naturalOffset, chFreqDays); // can't harvest more often than crop allows
+  }
+
+  // ── Number of batches in rotation ─────────────────────────────────────────
+  // Single: how many batches are "in flight" at any one time = growDays / batchOffset
+  // Multi:  how many plots needed so harvest never stops = ceil(harvestDays / batchOffset)
+  let numBatches;
+  if (!isMulti) {
+    numBatches = Math.ceil(growDays / batchOffset);
+  } else {
+    numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
+  }
+
+  // ── Plot sizes ────────────────────────────────────────────────────────────
+  const subplotArea = Math.round((plotArea / numBatches) * 10) / 10;
+
+  // ── Total cycle length ────────────────────────────────────────────────────
+  // Single: grows for growDays, then gets replanted immediately → cycle = growDays
+  // Multi:  grows for growDays, then produces for harvestDays, then replant
+  const cycleDays = isMulti ? growDays + harvestDays : growDays;
+
+  // ── First harvest date (from start) ──────────────────────────────────────
+  const firstHarvestDate = new Date(startDate.getTime() + growDays * 86400000);
+
+  // ── Wait weeks before first harvest ─────────────────────────────────────
+  const waitWeeks = Math.ceil(growDays / 7);
+
+  // ── Build timeline entries ────────────────────────────────────────────────
+  // Show the first numBatches planting dates + first harvest event
+  const timeline = [];
+
+  // Planting events for each batch
+  for (let b = 0; b < numBatches; b++) {
+    const plantDay  = b * batchOffset;
+    const plantDate = new Date(startDate.getTime() + plantDay * 86400000);
+    const harvestStart = new Date(plantDate.getTime() + growDays * 86400000);
+    const harvestEnd   = isMulti ? new Date(harvestStart.getTime() + harvestDays * 86400000) : null;
+    timeline.push({
+      type:        'plant',
+      batchNum:    b + 1,
+      day:         plantDay,
+      date:        plantDate,
+      harvestStart,
+      harvestEnd,
+    });
+  }
+
+  // Add first harvest event (Batch 1)
+  timeline.push({ type:'harvest', batchNum:1, day:growDays, date:firstHarvestDate });
+
+  // Sort by day
+  timeline.sort((a,b) => a.day - b.day);
+
+  // ── Build weekly calendar grid (first 20 weeks) ───────────────────────────
+  const GRID_WEEKS = Math.min(40, Math.ceil((growDays + harvestDays + batchOffset * numBatches) / 7) + 2);
+  // For each batch and each week, determine state: empty | plant | grow | harvest | replant
+  const gridData = []; // gridData[batch][week] = state
+  for (let b = 0; b < numBatches; b++) {
+    const plantWeek   = Math.floor((b * batchOffset) / 7);
+    const harvestWeek = Math.floor((b * batchOffset + growDays) / 7);
+    const endWeek     = isMulti ? Math.floor((b * batchOffset + cycleDays) / 7) : harvestWeek + 1;
+    const row = [];
+    for (let w = 0; w < GRID_WEEKS; w++) {
+      if (w < plantWeek)          row.push('empty');
+      else if (w === plantWeek)   row.push('plant');
+      else if (w < harvestWeek)   row.push('grow');
+      else if (w < endWeek)       row.push('harvest');
+      else                         row.push('empty'); // replanted — would wrap
+    }
+    gridData.push(row);
+  }
+
+  // ── Format dates ─────────────────────────────────────────────────────────
+  function fmt(d) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+  function fmtShort(d) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return d.getDate() + ' ' + months[d.getMonth()];
+  }
+
+  // ── Render result HTML ────────────────────────────────────────────────────
+  const body = document.getElementById('ch-result-body');
+  let html = '';
+
+  // ─ Summary cards ──
+  html += `<div class="ch-summary-cards">
+    <div class="ch-summary-card">
+      <div class="ch-summary-num">${numBatches}</div>
+      <div class="ch-summary-unit">plots / batches</div>
+      <div class="ch-summary-lbl">to maintain the cycle</div>
+    </div>
+    <div class="ch-summary-card">
+      <div class="ch-summary-num">${Math.round(subplotArea)}</div>
+      <div class="ch-summary-unit">sq ft per plot</div>
+      <div class="ch-summary-lbl">from ${plotArea} sq ft total</div>
+    </div>
+    <div class="ch-summary-card">
+      <div class="ch-summary-num">${batchOffset}</div>
+      <div class="ch-summary-unit">days between plantings</div>
+      <div class="ch-summary-lbl">planting interval</div>
+    </div>
+    <div class="ch-summary-card">
+      <div class="ch-summary-num">${waitWeeks}</div>
+      <div class="ch-summary-unit">weeks wait</div>
+      <div class="ch-summary-lbl">until first harvest</div>
+    </div>
+  </div>`;
+
+  // ─ Crop data card ──
+  html += `<div class="ch-info-card">
+    <div class="ch-info-header">🌱 Crop data used</div>
+    <div class="ch-info-body">
+      <div class="ch-info-row"><span class="ch-info-label">Growing time</span><span class="ch-info-value">${growDays} days</span></div>
+      <div class="ch-info-row"><span class="ch-info-label">Harvest duration</span><span class="ch-info-value">${harvestWks} week${harvestWks!==1?'s':''} (${harvestDays}d)</span></div>
+      <div class="ch-info-row"><span class="ch-info-label">Harvest interval</span><span class="ch-info-value">every ${harvestIntv} days</span></div>
+      <div class="ch-info-row"><span class="ch-info-label">Planting method</span><span class="ch-info-value" style="font-family:inherit;font-size:12px;text-align:right;max-width:55%">${val.planting_method||'—'}</span></div>
+      ${val.transplant_days ? `<div class="ch-info-row"><span class="ch-info-label">Transplant at</span><span class="ch-info-value">${val.transplant_days} days</span></div>` : ''}
+      <div class="ch-info-row"><span class="ch-info-label">Batch offset (DB)</span><span class="ch-info-value">${val.batch_offset_days} days</span></div>
+      <div class="ch-info-row"><span class="ch-info-label">Batch offset (used)</span><span class="ch-info-value" style="color:var(--green)">${batchOffset} days</span></div>
+    </div>
+  </div>`;
+
+  // ─ How it works explanation ──
+  const formula = isMulti
+    ? `Offset = harvest duration (${harvestDays}d) − harvest interval (${harvestIntv}d) = ${harvestDays - harvestIntv}d. Adjusted to match your ${chFreqDays}-day frequency → ${batchOffset}d.`
+    : `You chose to harvest every ${chFreqDays} days. Each new batch is planted every ${batchOffset} days. With ${growDays} days to grow, you need ${numBatches} batches always in rotation.`;
+
+  html += `<div class="ch-info-card">
+    <div class="ch-info-header">🧮 How the numbers work</div>
+    <div class="ch-info-body" style="gap:6px">
+      <div style="font-size:13px;color:var(--text-2);line-height:1.6">${formula}</div>
+      <div style="font-size:13px;color:var(--text-2);line-height:1.6">
+        Divide your <strong>${plotArea} sq ft</strong> into <strong>${numBatches} plots of ~${Math.round(subplotArea)} sq ft each</strong>.
+        Plant one plot every <strong>${batchOffset} days</strong>.
+        After <strong>${waitWeeks} weeks</strong>, Plot 1 is ready and you harvest it, then replant it immediately — the cycle repeats indefinitely.
+      </div>
+      ${isMulti ? `<div style="font-size:12px;color:var(--text-3);line-height:1.5;">For multi-harvest crops, each plot keeps producing for ${harvestWks} weeks. When Plot 1 starts slowing down, Plot 2 is already in peak harvest — no gap in supply.</div>` : ''}
+    </div>
+  </div>`;
+
+  // ─ Planting schedule timeline ──
+  html += `<div class="ch-info-card">
+    <div class="ch-info-header">📅 Planting schedule</div>
+    <div class="ch-info-body" style="padding:0">`;
+
+  for (let b = 0; b < numBatches; b++) {
+    const plantDay   = b * batchOffset;
+    const plantDate  = new Date(startDate.getTime() + plantDay * 86400000);
+    const harvDate   = new Date(plantDate.getTime() + growDays * 86400000);
+    const dotClass   = b === 0 ? 'ch-dot-plant' : 'ch-dot-plant';
+    const isFirst    = b === 0;
+    html += `<div class="ch-tl-item" style="${b===0?'padding-top:13px;':''}${b===numBatches-1?'padding-bottom:13px;':''}margin:0 14px">
+      <div class="ch-tl-dot-wrap"><div class="ch-tl-dot ${dotClass}"></div></div>
+      <div class="ch-tl-content">
+        <div class="ch-tl-week">Plot ${b+1} · Day ${plantDay} · ${fmtShort(plantDate)}</div>
+        <div class="ch-tl-action">Plant batch ${b+1}${isFirst?' — starting today':''}</div>
+        <div class="ch-tl-note">Ready to harvest: <strong>${fmtShort(harvDate)}</strong> (day ${plantDay + growDays})${isMulti ? ` · harvesting for ${harvestWks} weeks`:''}</div>
+      </div>
+    </div>`;
+  }
+
+  // First harvest entry
+  html += `<div class="ch-tl-item" style="padding:10px 14px;background:var(--amber-pale);border-radius:0 0 12px 12px;border-top:1px solid var(--border);">
+    <div class="ch-tl-dot-wrap"><div class="ch-tl-dot ch-dot-harvest"></div></div>
+    <div class="ch-tl-content">
+      <div class="ch-tl-week" style="color:var(--amber)">First harvest · Day ${growDays} · ${fmt(firstHarvestDate)}</div>
+      <div class="ch-tl-action">🥬 Harvest Plot 1 — then replant immediately</div>
+      <div class="ch-tl-note">From here on, harvest every ${batchOffset} days continuously.</div>
+    </div>
+  </div>`;
+
+  html += `</div></div>`;
+
+  // ─ Visual calendar grid ──
+  const cellColors = { plant:'#2d6a2d', grow:'#c2e0c2', harvest:'#d97706', empty:'#e8e8e4', replant:'#7c3aed' };
+  const showWeeks = Math.min(GRID_WEEKS, 28); // cap display at 28 weeks for space
+
+  html += `<div class="ch-info-card">
+    <div class="ch-info-header">📊 Visual planting calendar <span style="font-size:11px;font-weight:400;color:var(--text-3);margin-left:6px;">first ${showWeeks} weeks</span></div>
+    <div class="ch-info-body">
+      <div style="overflow-x:auto;">
+        <table style="border-collapse:separate;border-spacing:2px;font-size:10px;">
+          <tr>
+            <td style="width:46px;color:var(--text-3);font-size:10px;font-weight:600;padding-right:4px;vertical-align:middle;">Plot</td>`;
+
+  // Week headers
+  for (let w = 0; w < showWeeks; w++) {
+    const wDate = new Date(startDate.getTime() + w * 7 * 86400000);
+    const label = (w % 4 === 0) ? (wDate.getMonth()+1)+'/'+wDate.getDate() : (w+1);
+    html += `<td style="width:18px;text-align:center;color:var(--text-3);font-size:9px;padding-bottom:3px;">${label}</td>`;
+  }
+  html += `</tr>`;
+
+  for (let b = 0; b < numBatches; b++) {
+    html += `<tr><td style="color:var(--text-2);font-size:11px;font-weight:600;padding-right:4px;vertical-align:middle;white-space:nowrap;">P${b+1}</td>`;
+    for (let w = 0; w < showWeeks; w++) {
+      const state = gridData[b] ? (gridData[b][w] || 'empty') : 'empty';
+      const bg    = cellColors[state] || cellColors.empty;
+      const title = state.charAt(0).toUpperCase() + state.slice(1);
+      html += `<td style="width:18px;height:16px;background:${bg};border-radius:2px;" title="${title}"></td>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</table></div>
+
+      <div class="ch-legend-row">
+        <div class="ch-legend-item"><div class="ch-legend-dot" style="background:#2d6a2d"></div>Plant</div>
+        <div class="ch-legend-item"><div class="ch-legend-dot" style="background:#c2e0c2"></div>Growing</div>
+        <div class="ch-legend-item"><div class="ch-legend-dot" style="background:#d97706"></div>Harvest</div>
+        <div class="ch-legend-item"><div class="ch-legend-dot" style="background:#e8e8e4"></div>Empty/replanted</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ─ Practical tips ──
+  html += `<div class="ch-info-card" style="margin-bottom:4px">
+    <div class="ch-info-header">💡 Practical tips for ${val.display_name}</div>
+    <div class="ch-info-body" style="gap:8px">
+      <div style="font-size:13px;color:var(--text-2);line-height:1.6;">
+        🔄 <strong>Label each plot</strong> — mark them P1 to P${numBatches} so you always know which is next to plant and which is next to harvest.
+      </div>
+      <div style="font-size:13px;color:var(--text-2);line-height:1.6;">
+        🌱 <strong>Replant immediately</strong> after harvesting each plot. The replanted plot joins the back of the rotation — your cycle stays tight.
+      </div>
+      ${val.transplant_days ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;">🪴 <strong>Transplant at day ${val.transplant_days}</strong> — start seeds in a tray first to save plot space during germination.</div>` : ''}
+      <div style="font-size:13px;color:var(--text-2);line-height:1.6;">
+        📦 <strong>At full rotation</strong> you'll harvest approximately <strong>${plotArea / numBatches | 0} sq ft of ${val.display_name}</strong> every ${batchOffset} days.
+      </div>
+      ${!isMulti ? `<div style="font-size:13px;color:var(--text-2);line-height:1.6;">⚡ <strong>${val.display_name} is a single-harvest crop</strong> — once you cut it, that plot needs to be replanted. Keep all ${numBatches} plots staggered and you'll never miss a week.</div>` : `<div style="font-size:13px;color:var(--text-2);line-height:1.6;">♻️ <strong>${val.display_name} keeps producing</strong> for ${harvestWks} weeks per batch — you only need ${numBatches} large plots, not ${numBatches*4}+ tiny ones.</div>`}
+    </div>
+  </div>`;
+
+  body.innerHTML = html;
 }
 
 // ══════════════════════════════════════════

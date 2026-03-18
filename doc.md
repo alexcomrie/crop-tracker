@@ -91,3 +91,12 @@ The Crop Manager application is a well-architected, modern web application. The 
 -   Dashboard: Kept the original Today and Upcoming cards per the provided layout and removed the newly-added inline sheet views, aligning strictly with the prototype:
     - Integration: [DashboardScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/DashboardScreen.tsx)
     - Today card shows only today's tasks (not past-due backlog), Upcoming card shows future tasks inline
+
+## New Panels (Herbicide & C‑H Calculator)
+
+-   Herbicide Schedule (slide-in panel): Three-view experience (list, form, detail) matching the standalone prototype. Local component state with seed data for quick logging and outcome tracking.
+    - Screen: [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx)
+    - Navigation: [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx)
+-   C‑H (Continuous Harvest) Calculator (slide-in panel): Two-step calculator reading directly from the in-memory Crop DB to produce batch offsets, plots, schedules, visual grid, and tips.
+    - Screen: [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)
+    - Navigation: [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx)

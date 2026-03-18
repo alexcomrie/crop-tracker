@@ -4,6 +4,8 @@ import { Calendar, Database, Beaker, ShieldAlert, Bell, ChevronRight, BarChart2 
 import { CropDatabaseScreen } from '../components/CropDatabaseScreen';
 import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen';
 import { CropHistoryScreen } from '../components/reports/CropHistory';
+import { HerbicideScreen } from '../components/herb/HerbicideScreen';
+import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
 
 interface MoreItemProps {
   title: string;
@@ -33,7 +35,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -65,9 +67,9 @@ export function MoreScreen() {
             <MoreItem
               title="Herbicide Schedule"
               subtitle="Manage herbicide application timing"
-              icon={<ShieldAlert className="w-6 h-6 text-red-600" />}
-              iconColor="bg-red-50"
-              onClick={() => setActiveTab('herb-schedule')}
+              icon={<span className="text-lg">🌿</span>}
+              iconColor="bg-red-100"
+              onClick={() => setActivePanel('herb')}
             />
             <MoreItem
               title="Reminders"
@@ -79,6 +81,18 @@ export function MoreScreen() {
           </div>
         </section>
 
+        <section>
+          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Planning</h2>
+          <div className="space-y-3">
+            <MoreItem
+              title="C-H Calculator"
+              subtitle="Plan plots for continuous weekly harvests"
+              icon={<span className="text-lg">♻️</span>}
+              iconColor="bg-[#e0fdf4]"
+              onClick={() => setActivePanel('ch-calc')}
+            />
+          </div>
+        </section>
         <section>
           <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Schedule</h2>
           <div className="space-y-3">
@@ -107,6 +121,16 @@ export function MoreScreen() {
       {activePanel === 'history' && (
         <div className="fixed inset-0 z-[60] bg-white">
           <CropHistoryScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'herb' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <HerbicideScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'ch-calc' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <CHCalculatorScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
     </div>

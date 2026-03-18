@@ -438,3 +438,18 @@ I've implemented both enhancements:
 - Crop cards show a red “Transplant overdue” badge if there is a scheduled transplant date in the past and no actual transplant recorded yet. See [CropCard.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropCard.tsx).
 
 Typecheck and production build have been run and are passing.
+
+**You:**
+
+1. analyze `c:\Users\ALEX\Desktop\Crop-Manager\file\cropmanager_ch (1).html` and `c:\Users\ALEX\Desktop\Crop-Manager\file\trae_prompt_ch_herb.md`  and impliment `c:\Users\ALEX\Desktop\Crop-Manager\file\trae_prompt_ch_herb.md` 
+ 2. after implimenting run type check for errors and test the app for build errors then push to github main
+
+**Me:**
+
+- Added slide-in Herbicide Schedule panel with list, form, and detail views; seeded with two example entries and full outcome tracking. See [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx).
+- Added slide-in C‑H Calculator panel that reads from the Crop DB and renders summaries, schedule, visual grid, and tips. See [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx).
+- Wired buttons in More menu:
+  - Herbicide Schedule opens slide‑in panel with a 🌿 icon on red background.
+  - New “Planning” section with C‑H Calculator button (♻️ on teal background).
+  - See [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx).
+- Ran typecheck and production build; both passed. Changes pushed to GitHub main.

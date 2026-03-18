@@ -100,3 +100,7 @@ The Crop Manager application is a well-architected, modern web application. The 
 -   C‑H (Continuous Harvest) Calculator (slide-in panel): Two-step calculator reading directly from the in-memory Crop DB to produce batch offsets, plots, schedules, visual grid, and tips.
     - Screen: [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)
     - Navigation: [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx)
+
+### Fixes
+-   Made Herbicide and C‑H panels vertically scrollable at the panel container level to prevent overflow on small screens:
+    - Updates: [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx), [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)

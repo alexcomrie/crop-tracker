@@ -96,7 +96,7 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
   }, [selectedKey, cropDb, freqDays, plotArea, startDate]);
 
   return (
-    <div className="absolute inset-0 bg-[#f5f5f0] flex flex-col z-[60] animate-in slide-in-from-right duration-300">
+    <div className="absolute inset-0 bg-[#f5f5f0] flex flex-col z-[60] animate-in slide-in-from-right duration-300 overflow-y-auto min-h-0">
       <div className="bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4">
         <button onClick={onClose} className="w-8 h-8 rounded-lg border bg-[#f9f9f6] text-gray-600 flex items-center justify-center">‹</button>
         <h2 className="font-semibold text-[16px] flex-1">♻️ C-H Calculator</h2>
@@ -301,4 +301,3 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
     </div>
   );
 }
-

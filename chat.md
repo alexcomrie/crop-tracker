@@ -453,3 +453,15 @@ Typecheck and production build have been run and are passing.
   - New “Planning” section with C‑H Calculator button (♻️ on teal background).
   - See [MoreScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/MoreScreen.tsx).
 - Ran typecheck and production build; both passed. Changes pushed to GitHub main.
+
+**You:**
+
+1. CHCalculatorScreen.tsx and HerbicideScreen.tsx need to be scrollable vertically to compensate for over flow 
+ 2. after implimenting run type check for errors and test the app for build errors then push to github main
+
+**Me:**
+
+- Added overflow handling on the slide-in panel containers to ensure vertical scrolling on smaller screens:
+  - [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx)
+  - [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)
+- Verified with typecheck and production build, then pushed to GitHub main.

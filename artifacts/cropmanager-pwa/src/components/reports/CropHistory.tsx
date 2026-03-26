@@ -194,24 +194,61 @@ export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
 function TrackerStages() {
   const crops = useLiveQuery(() => db.crops.toArray(), []) ?? [];
   const logs = useLiveQuery(() => db.stageLogs.toArray(), []) ?? [];
-  const byId = new Map<string, { name: string; entries: { to: string; date: string }[] }>();
+  
+  const byId = new Map<string, { name: string; entries: { to: string; date: string; days: number }[] }>();
+  
   crops.forEach((c: any) => {
-    byId.set(c.id, { name: `${c.cropName}${c.variety ? ' ('+c.variety+')' : ''}`, entries: [] });
+    // Only include active crops
+    if (c.status === 'Active' || c.status === 'Propagating') {
+      byId.set(c.id, { 
+        name: `${c.cropName}${c.variety ? ' (' + c.variety + ')' : ''}`, 
+        entries: [] 
+      });
+    }
   });
+
   logs.forEach((l: any) => {
     const e = byId.get(l.trackingId);
-    if (e) e.entries.push({ to: l.stageTo, date: l.date });
+    if (e) {
+      e.entries.push({ to: l.stageTo, date: l.date, days: l.daysElapsed });
+    }
   });
-  const items = Array.from(byId.entries()).map(([id, v]) => ({ id, ...v, entries: v.entries.sort((a,b) => a.date.localeCompare(b.date)) })).filter(x => x.entries.length > 0);
-  if (items.length === 0) return <div className="text-xs text-gray-400 italic p-3">No stage updates recorded yet.</div>;
+
+  const items = Array.from(byId.entries())
+    .map(([id, v]) => ({ 
+      id, 
+      ...v, 
+      entries: v.entries.sort((a, b) => a.date.localeCompare(b.date)) 
+    }))
+    .filter(x => x.entries.length > 0);
+
+  if (items.length === 0) return <div className="text-xs text-gray-400 italic p-3">No active crops with stage updates recorded yet.</div>;
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {items.map(item => (
-        <div key={item.id} className="bg-white border border-gray-100 rounded-lg p-3">
-          <div className="text-sm font-semibold mb-1">{item.name}</div>
-          <div className="flex flex-wrap gap-2">
-            {item.entries.map((e,i) => (
-              <span key={i} className="text-[11px] px-2 py-1 rounded bg-gray-50 border border-gray-100">{e.to} · {e.date}</span>
+        <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-gray-800 capitalize">{item.name.replace(/_/g, ' ')}</h3>
+            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-tight">{item.id}</span>
+          </div>
+          <div className="flex flex-col gap-2 relative">
+            {/* Vertical line connector */}
+            <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-100" />
+            
+            {item.entries.map((e, i) => (
+              <div key={i} className="flex items-start gap-3 relative z-10">
+                <div className="w-3.5 h-3.5 rounded-full bg-white border-2 border-green-500 mt-0.5 shrink-0" />
+                <div className="flex-1 bg-gray-50/50 rounded-lg px-3 py-2 border border-gray-100/50">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-green-800 uppercase tracking-wider">{e.to}</span>
+                    <span className="text-[10px] font-medium text-gray-500">{e.date}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-600 font-medium">
+                    Reached in <span className="text-green-700 font-bold">{e.days}</span> days
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
         </div>

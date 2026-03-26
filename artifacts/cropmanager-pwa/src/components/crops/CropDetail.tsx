@@ -28,10 +28,16 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
   const { cropDb } = useAppStore();
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('cropId').equals(crop.id).sortBy('date'), [crop.id]);
   const stageLogs = useLiveQuery(() => db.stageLogs.where('trackingId').equals(crop.id).sortBy('date'), [crop.id]);
+  const batchLogs = useLiveQuery(() => db.batchPlantingLogs.where('cropTrackingId').equals(crop.id).toArray(), [crop.id]);
   const [showFert, setShowFert] = useState(false);
 
   const cropData = resolveCropData(cropDb, crop.cropName);
-  const batchDates = crop.isContinuous && cropData ? calculateBatchPlantingDates(crop, cropData, 2) : [];
+  const batchDates = crop.isContinuous && cropData ? calculateBatchPlantingDates(crop, cropData, 3) : [];
+  
+  const confirmedBatchNumbers = new Set(batchLogs?.map(l => l.batchNumber) || []);
+  
+  // Find the next batch to confirm: the first one that isn't confirmed yet
+  const nextBatchToConfirm = batchDates.find(b => !confirmedBatchNumbers.has(b.batchNumber));
   
   const planted = parseDate(crop.plantingDate);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
@@ -75,34 +81,49 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
               <p className="text-[10px] font-bold uppercase tracking-widest">Continuous Batch Schedule</p>
             </div>
             <div className="space-y-2">
-              {batchDates.map(b => (
-                <div key={b.batchNumber} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 border border-amber-100/50">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-amber-900">Batch #{b.batchNumber}</span>
-                    <span className="text-[10px] text-amber-700 uppercase font-medium">Planting Date</span>
+              {batchDates.map(b => {
+                const isConfirmed = confirmedBatchNumbers.has(b.batchNumber);
+                const isNext = nextBatchToConfirm?.batchNumber === b.batchNumber;
+                const dateArrived = b.date <= today();
+
+                return (
+                  <div key={b.batchNumber} className={`flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 border ${isConfirmed ? 'border-green-100' : 'border-amber-100/50'}`}>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-xs font-bold ${isConfirmed ? 'text-green-900' : 'text-amber-900'}`}>Batch #{b.batchNumber}</span>
+                        {isConfirmed && <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">Confirmed</span>}
+                      </div>
+                      <span className="text-[10px] text-amber-700 uppercase font-medium">Planting Date</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-amber-900">{formatDateShort(b.date)}</span>
+                      {isNext && dateArrived && !isConfirmed && (
+                        <button
+                          className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-bold uppercase hover:bg-amber-700 transition-colors"
+                          onClick={async () => {
+                            try {
+                              await db.batchPlantingLogs.add({
+                                id: `${crop.id}_B${b.batchNumber}`,
+                                cropTrackingId: crop.id,
+                                cropName: crop.cropName,
+                                batchNumber: b.batchNumber,
+                                batchPlantingDate: formatDateShort(b.date),
+                                confirmedPlantedDate: formatDateShort(today()),
+                                nextBatchDate: '',
+                                status: 'active',
+                                notes: '',
+                                updatedAt: Date.now(),
+                              });
+                            } catch (err) {
+                              console.error('Failed to confirm batch:', err);
+                            }
+                          }}
+                        >Confirm</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-amber-900">{formatDateShort(b.date)}</span>
-                    <button
-                      className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-bold uppercase"
-                      onClick={async () => {
-                        await db.batchPlantingLogs.add({
-                          id: `${crop.id}_B${b.batchNumber}`,
-                          cropTrackingId: crop.id,
-                          cropName: crop.cropName,
-                          batchNumber: b.batchNumber,
-                          batchPlantingDate: formatDateShort(b.date),
-                          confirmedPlantedDate: formatDateShort(today()),
-                          nextBatchDate: '',
-                          status: 'active',
-                          notes: '',
-                          updatedAt: Date.now(),
-                        });
-                      }}
-                    >Confirm</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="flex items-start gap-2 bg-amber-100/50 rounded-lg p-2">
               <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />

@@ -104,3 +104,11 @@ The Crop Manager application is a well-architected, modern web application. The 
 ### Fixes
 -   Made Herbicide and C‑H panels vertically scrollable at the panel container level to prevent overflow on small screens:
     - Updates: [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx), [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)
+
+### Enhancements
+-   Herbicide persistence: Herbicide entries now save to local IndexedDB and reload reliably. Storage uses the existing treatmentLogs table with structured metadata embedded in the notes field.
+-   Stage updates with date: Stage changes support a user-selected date, not just “today”.
+-   History tracker stages: Added a “Tracker Stages” section that lists stage updates for crops currently in the tracker.
+-   Continuous harvest confirmation: Added “Confirm” action per upcoming batch in a crop’s detail to track planted batches using batchPlantingLogs without creating new crop records.
+-   Refresh timings: Added a “Refresh Timings” action in the Crop Tracker to recompute transplant and harvest estimates for active crops from the current Crop DB.
+-   Fail workflow: Added a “Mark as Failed” option in stage updates; failed crops are auto-removed after a few days by a background cleanup.

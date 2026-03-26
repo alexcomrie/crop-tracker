@@ -1,6 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useLiveQuery } from 'dexie-react-hooks';
+import db from '../../db/db';
 
 type Outcome = 'effective' | 'partial' | 'retreated' | 'no-effect';
 
@@ -86,7 +88,36 @@ function statusOf(h: HerbEntry): 'active' | 'check' | 'done' | 'unknown' {
 }
 
 export function HerbicideScreen({ onClose }: { onClose: () => void }) {
-  const [herbLog, setHerbLog] = useState<HerbEntry[]>(HERB_SEED);
+  const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('type').equals('herbicide').toArray(), []) ?? [];
+  const herbLog: HerbEntry[] = useMemo(() => {
+    if (!treatmentLogs || treatmentLogs.length === 0) return HERB_SEED;
+    return treatmentLogs.map(t => {
+      let meta: Partial<HerbEntry> = {};
+      if (t.notes && t.notes.startsWith('HERBJSON:')) {
+        try { meta = JSON.parse(t.notes.slice(9)); } catch {}
+      }
+      return {
+        id: t.id,
+        product: t.product,
+        ingredient: (meta.ingredient as any) || '',
+        mode: (meta.mode as any) || '',
+        rate: (meta.rate as any) ?? null,
+        volume: (meta.volume as any) ?? null,
+        area: t.cropName,
+        target: (meta.target as any) || '',
+        dateApplied: t.date,
+        timeApplied: (meta.timeApplied as any) || '',
+        weather: (meta.weather as any) || '',
+        reentry: (meta.reentry as any) ?? null,
+        daysExpected: (meta.daysExpected as any) ?? 7,
+        reminderDays: (meta.reminderDays as any) ?? 10,
+        notes: (meta.notes as any) || '',
+        outcome: (meta.outcome as any) ?? null,
+        outcomeDate: (meta.outcomeDate as any) ?? null,
+        outcomeNotes: (meta.outcomeNotes as any) || '',
+      };
+    });
+  }, [treatmentLogs]);
   const [filterMode, setFilterMode] = useState<'all'|'active'|'done'>('all');
   const [view, setView] = useState<'list'|'form'|'detail'>('list');
   const [editingId, setEditingId] = useState<string|null>(null);
@@ -173,18 +204,15 @@ export function HerbicideScreen({ onClose }: { onClose: () => void }) {
     setView('list');
   }
 
-  function saveHerbEntry() {
+  async function saveHerbEntry() {
     if (!form.product || !form.dateApplied) return;
-    const data: HerbEntry = {
-      id: editingId ?? 'h' + (++herbIdCounter.current),
-      product: form.product,
+    const id = editingId ?? 'h' + (++herbIdCounter.current);
+    const meta = {
       ingredient: form.ingredient,
       mode: form.mode,
       rate: parseFloat(form.rate) || null,
       volume: parseFloat(form.volume) || null,
-      area: form.area,
       target: form.target,
-      dateApplied: form.dateApplied,
       timeApplied: form.timeApplied,
       weather: form.weather,
       reentry: parseInt(form.reentry) || null,
@@ -193,27 +221,45 @@ export function HerbicideScreen({ onClose }: { onClose: () => void }) {
       notes: form.notes,
       outcome: editing?.outcome ?? null,
       outcomeDate: editing?.outcomeDate ?? null,
-      outcomeNotes: editing?.outcomeNotes ?? ''
+      outcomeNotes: editing?.outcomeNotes ?? '',
     };
-    if (editingId) {
-      setHerbLog(prev => prev.map(h => h.id === editingId ? data : h));
-    } else {
-      setHerbLog(prev => [...prev, data]);
-    }
+    const t = {
+      id,
+      cropId: 'HERB',
+      cropName: form.area,
+      date: form.dateApplied,
+      daysFromPlanting: 0,
+      type: 'herbicide',
+      product: form.product,
+      notes: 'HERBJSON:' + JSON.stringify(meta),
+      updatedAt: Date.now(),
+    };
+    await db.treatmentLogs.put(t);
     closeHerbForm();
   }
 
-  function setHerbOutcome(id: string, outcome: Outcome) {
-    setHerbLog(prev => prev.map(h => h.id === id ? { ...h, outcome } : h));
+  async function setHerbOutcome(id: string, outcome: Outcome) {
+    const t = await db.treatmentLogs.get(id);
+    if (!t) return;
+    let meta: any = {};
+    if (t.notes && t.notes.startsWith('HERBJSON:')) { try { meta = JSON.parse(t.notes.slice(9)); } catch {} }
+    meta.outcome = outcome;
+    await db.treatmentLogs.update(id, { notes: 'HERBJSON:' + JSON.stringify(meta), updatedAt: Date.now() });
   }
 
-  function saveHerbOutcome(id: string) {
-    setHerbLog(prev => prev.map(h => h.id === id ? { ...h, outcomeDate: todayISO(), outcomeNotes: outcomeNotesDraft } : h));
+  async function saveHerbOutcome(id: string) {
+    const t = await db.treatmentLogs.get(id);
+    if (!t) return;
+    let meta: any = {};
+    if (t.notes && t.notes.startsWith('HERBJSON:')) { try { meta = JSON.parse(t.notes.slice(9)); } catch {} }
+    meta.outcomeDate = todayISO();
+    meta.outcomeNotes = outcomeNotesDraft;
+    await db.treatmentLogs.update(id, { notes: 'HERBJSON:' + JSON.stringify(meta), updatedAt: Date.now() });
   }
 
-  function deleteHerbEntry(id: string) {
+  async function deleteHerbEntry(id: string) {
     if (!confirm('Delete this herbicide record?')) return;
-    setHerbLog(prev => prev.filter(h => h.id !== id));
+    await db.treatmentLogs.delete(id);
     closeHerbDetail();
   }
 

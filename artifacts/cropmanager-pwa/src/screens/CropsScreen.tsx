@@ -9,6 +9,8 @@ import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
 import { autoAdjustTransplantSchedule } from '../lib/stages';
 import db from '../db/db';
+import { formatDateShort } from '../lib/dates';
+import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
 
 const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
 
@@ -35,6 +37,37 @@ export function CropsScreen() {
     })();
   }, [crops, cropDb]);
 
+  useEffect(() => {
+    (async () => {
+      const threshold = Date.now() - 3 * 86400000;
+      const toDelete = await db.crops.where('status').equals('Deleted').toArray();
+      for (const c of toDelete) {
+        if (c.updatedAt < threshold) {
+          await db.crops.delete(c.id);
+          await db.stageLogs.where('trackingId').equals(c.id).delete();
+          await db.harvestLogs.where('cropTrackingId').equals(c.id).delete();
+          await db.reminders.where('trackingId').equals(c.id).delete();
+          await db.treatmentLogs.where('cropId').equals(c.id).delete();
+        }
+      }
+    })();
+  }, []);
+
+  async function refreshTimings() {
+    const adjustments = await db.cropDbAdjustments.toArray();
+    for (const c of crops.filter(x => x.status === 'Active')) {
+      const cd = resolveCropData(cropDb, c.cropName);
+      if (!cd) continue;
+      const planted = new Date(c.plantingDate);
+      const tDate = calculateTransplantDate(planted, null, cd, adjustments, c.cropName.toLowerCase(), c.variety);
+      const hDate = calculateHarvestDate(c, cd, adjustments);
+      const patch: Partial<Crop> = { updatedAt: Date.now() };
+      if (tDate) patch.transplantDateScheduled = formatDateShort(tDate);
+      if (hDate) patch.harvestDateEstimated = formatDateShort(hDate);
+      await db.crops.update(c.id, patch);
+    }
+    alert('Timings refreshed from current Crop DB.');
+  }
   const handleDeleteCrop = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {
       return;
@@ -64,6 +97,9 @@ export function CropsScreen() {
             {f}
           </button>
         ))}
+      </div>
+      <div className="px-4">
+        <button onClick={refreshTimings} className="text-xs px-2 py-1 rounded border bg-white hover:bg-gray-50">Refresh Timings</button>
       </div>
 
       <div className="px-4 pt-2">

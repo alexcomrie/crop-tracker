@@ -38,11 +38,13 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [tickGerminated, setTickGerminated] = useState(!!crop.germinationDate);
   const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
   const [tickHarvested, setTickHarvested] = useState(!!crop.harvestDateActual);
+  const [stageDate, setStageDate] = useState(formatDateShort(today()));
 
   async function handleStageChange() {
     if (!newStage) return;
     setSaving(true);
-    const dateNow = today();
+    const parts = stageDate.split('-').map(s => parseInt(s, 10));
+    const dateNow = (parts.length === 3) ? new Date(parts[0], parts[1]-1, parts[2]) : today();
     
     // Fetch adjustments and existing harvest logs
     const [adjustments, existingHarvestLogs] = await Promise.all([
@@ -197,6 +199,10 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
               ))}
             </div>
             {validStages.length === 0 && <p className="text-sm text-muted-foreground">No valid next stages.</p>}
+            <div className="mt-3 flex items-center gap-2">
+              <Input type="date" className="w-48" value={stageDate} onChange={e => setStageDate(e.target.value)} />
+              <span className="text-xs text-muted-foreground">Stage date</span>
+            </div>
             <Button className="w-full mt-3" onClick={handleStageChange} disabled={!newStage || saving}>
               {saving ? 'Saving...' : 'Confirm Stage Change'}
             </Button>
@@ -218,6 +224,16 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
               <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
                 {saving ? 'Saving...' : 'Apply Manual Progress'}
               </Button>
+              <button
+                className="w-full mt-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm font-semibold"
+                onClick={async () => {
+                  if (!window.confirm('Mark this crop as failed? It will be auto-removed after a few days.')) return;
+                  await db.crops.update(crop.id, { status: 'Deleted', plantStage: 'Deleted', updatedAt: Date.now() });
+                  onClose();
+                }}
+              >
+                Mark as Failed
+              </button>
             </div>
           </div>
         )}

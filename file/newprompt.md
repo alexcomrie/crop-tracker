@@ -4,3 +4,7 @@
 4. add a history button and history window, this will store time frame for crops and show the average timeframe between stage, log will have the date from planting to germination, then from germination to transplant, and from transplant to harvest, so the necessary data will be collected for each crop, to determine the time frame between each stage, also propagation and corp will share this area.
 5. propagation will learn from crop, since crop is already being planted fron seeds propagation will in heretrit these data
 6. after implimenting run type check for errors and test the app for build errors then push to github main
+
+
+
+git commit -m "fix(ui): NEW Enhancements ; typecheck+build pass"

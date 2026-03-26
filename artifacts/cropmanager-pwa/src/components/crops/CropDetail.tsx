@@ -81,8 +81,25 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
                     <span className="text-xs font-bold text-amber-900">Batch #{b.batchNumber}</span>
                     <span className="text-[10px] text-amber-700 uppercase font-medium">Planting Date</span>
                   </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-amber-900">{formatDateShort(b.date)}</span>
+                    <button
+                      className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-bold uppercase"
+                      onClick={async () => {
+                        await db.batchPlantingLogs.add({
+                          id: `${crop.id}_B${b.batchNumber}`,
+                          cropTrackingId: crop.id,
+                          cropName: crop.cropName,
+                          batchNumber: b.batchNumber,
+                          batchPlantingDate: formatDateShort(b.date),
+                          confirmedPlantedDate: formatDateShort(today()),
+                          nextBatchDate: '',
+                          status: 'active',
+                          notes: '',
+                          updatedAt: Date.now(),
+                        });
+                      }}
+                    >Confirm</button>
                   </div>
                 </div>
               ))}

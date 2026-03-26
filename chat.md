@@ -465,3 +465,23 @@ Typecheck and production build have been run and are passing.
   - [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx)
   - [CHCalculatorScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/ch/CHCalculatorScreen.tsx)
 - Verified with typecheck and production build, then pushed to GitHub main.
+
+**You:**
+
+1. the herbicide schedule is not being saved it keep deleting after it was created and edited, 
+ 2. when updating stage changes in a crop lets add a date selection for crops that change stage at a different date, 
+ 3. history should also display crops that are in the tracker and the stages that pass and when thos stages were updated' 
+ 4. also want to make and adjustment to the continous harvest, instead of creating a new crop for a new batch the current crop also track the new batch, so when the crop is open in the tracker the will also be a conformation to indicate if the next batch is planted, and once the new batch is confirm then its tracking process will start, and once the old batch has confirmed the harvest, then it will be removed from the trackin and update history, and will continue will all up coming batches. 
+ 5. also add a refresh feature to the crop tracker, so just incase the the crop database has been adjusted all the timing in all active crops in the tracker will be auto uppdated, 
+ 6. add a fail conformation to the staging selection, this will auto remove the crop from the tracker after a certain time 
+ 7. after implimenting run type check for errors and test the app for build errors
+
+**Me:**
+
+- Herbicide schedule now persists to IndexedDB using the existing treatmentLogs table; structured herbicide metadata is embedded in the notes field and reloaded into the UI. See [HerbicideScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/herb/HerbicideScreen.tsx).
+- Added a date input for stage changes and pipe this date into the stage-change workflow. See [UpdateCropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/UpdateCropForm.tsx).
+- History screen now includes a “Tracker Stages” section listing stage updates for crops in the tracker. See [CropHistory.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/reports/CropHistory.tsx).
+- Continuous harvest: added “Confirm” per batch in crop detail to track new batches using batchPlantingLogs without creating new crop records. See [CropDetail.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropDetail.tsx).
+- Crop tracker “Refresh Timings” action recomputes transplant and harvest estimates for active crops from the current Crop DB. See [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx).
+- Fail confirmation: added “Mark as Failed” button in stage update; failed crops are set to Deleted and auto-removed after a few days by a cleanup pass. See [UpdateCropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/UpdateCropForm.tsx) and cleanup in [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx).
+- Verified with typecheck and production build; pushed to GitHub main.

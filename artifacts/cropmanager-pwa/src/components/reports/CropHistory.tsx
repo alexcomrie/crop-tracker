@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, BarChart2 } from 'lucide-react';
 import db from '../../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Crop, StageLog } from '../../types';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -179,9 +180,42 @@ export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
             ))}
+            <div className="mt-4">
+              <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 px-1">Tracker Stages</div>
+              <TrackerStages />
+            </div>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function TrackerStages() {
+  const crops = useLiveQuery(() => db.crops.toArray(), []) ?? [];
+  const logs = useLiveQuery(() => db.stageLogs.toArray(), []) ?? [];
+  const byId = new Map<string, { name: string; entries: { to: string; date: string }[] }>();
+  crops.forEach((c: any) => {
+    byId.set(c.id, { name: `${c.cropName}${c.variety ? ' ('+c.variety+')' : ''}`, entries: [] });
+  });
+  logs.forEach((l: any) => {
+    const e = byId.get(l.trackingId);
+    if (e) e.entries.push({ to: l.stageTo, date: l.date });
+  });
+  const items = Array.from(byId.entries()).map(([id, v]) => ({ id, ...v, entries: v.entries.sort((a,b) => a.date.localeCompare(b.date)) })).filter(x => x.entries.length > 0);
+  if (items.length === 0) return <div className="text-xs text-gray-400 italic p-3">No stage updates recorded yet.</div>;
+  return (
+    <div className="space-y-2">
+      {items.map(item => (
+        <div key={item.id} className="bg-white border border-gray-100 rounded-lg p-3">
+          <div className="text-sm font-semibold mb-1">{item.name}</div>
+          <div className="flex flex-wrap gap-2">
+            {item.entries.map((e,i) => (
+              <span key={i} className="text-[11px] px-2 py-1 rounded bg-gray-50 border border-gray-100">{e.to} · {e.date}</span>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

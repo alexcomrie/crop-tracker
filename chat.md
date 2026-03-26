@@ -485,3 +485,18 @@ Typecheck and production build have been run and are passing.
 - Crop tracker “Refresh Timings” action recomputes transplant and harvest estimates for active crops from the current Crop DB. See [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx).
 - Fail confirmation: added “Mark as Failed” button in stage update; failed crops are set to Deleted and auto-removed after a few days by a cleanup pass. See [UpdateCropForm.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/UpdateCropForm.tsx) and cleanup in [CropsScreen.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/screens/CropsScreen.tsx).
 - Verified with typecheck and production build; pushed to GitHub main.
+
+**You:**
+
+1. the confirm batch button dose not work when press, the next batch will not confirm when i press the button, also i want the batch confirm button to only appear on the next upcoming batch, example if the date for batch #2 has arrived only batch #2 must have a confirm button, this will be use to confirm if that batch has been planted, 
+ 2. when i said i wanted `c:\Users\ALEX\Desktop\Crop-Manager\chat.md#L473-473` , what i wanted is for the history to state how long the active crop in the tracker take to reach each stage, 
+ 3. after implimenting run type check for errors and test the app for build errors then push to github main
+
+**Me:**
+
+- Fixed the "Confirm" button in the continuous harvest batch schedule. It now correctly persists to the `batchPlantingLogs` table and provides visual feedback with a "Confirmed" badge.
+- Restricted the "Confirm" button visibility: it now only appears for the *next* unconfirmed batch, and only if its scheduled planting date has arrived or passed.
+- Enhanced the "Tracker Stages" section in the **History & Averages** panel. It now shows a detailed timeline of stage transitions for all active crops in the tracker, including the specific number of days taken to reach each stage.
+- Verified all changes with `pnpm run typecheck` and `pnpm run build`.
+- Pushed the latest updates to the GitHub `main` branch.
+

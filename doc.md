@@ -112,3 +112,7 @@ The Crop Manager application is a well-architected, modern web application. The 
 -   Continuous harvest confirmation: Added “Confirm” action per upcoming batch in a crop’s detail to track planted batches using batchPlantingLogs without creating new crop records.
 -   Refresh timings: Added a “Refresh Timings” action in the Crop Tracker to recompute transplant and harvest estimates for active crops from the current Crop DB.
 -   Fail workflow: Added a “Mark as Failed” option in stage updates; failed crops are auto-removed after a few days by a background cleanup.
+
+### Recent Fixes & Enhancements (Batch Confirmation & History)
+-   **Refined Batch Confirmation**: The "Confirm" button for continuous harvest batches now only appears for the *next* upcoming batch once its scheduled planting date has arrived. Confirmed batches are clearly marked with a "Confirmed" badge.
+-   **Active Tracker History**: The "Tracker Stages" section in the History & Averages panel now displays the specific number of days taken to reach each stage for all active crops in the tracker, presented in a clean vertical timeline.

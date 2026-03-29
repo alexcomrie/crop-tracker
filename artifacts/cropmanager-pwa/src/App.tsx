@@ -35,6 +35,13 @@ function AppContent() {
       .catch(console.error);
   }, [setCropDb, setFertDb]);
 
+  // Request persistent storage to reduce risk of data eviction
+  useEffect(() => {
+    if (navigator.storage && 'persist' in navigator.storage) {
+      navigator.storage.persist?.().catch(() => {});
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative">
       <TopBar />

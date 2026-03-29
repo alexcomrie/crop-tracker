@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
-import { exportJsonBackup } from '../../lib/backup';
+import { exportJsonBackup, importJsonBackupFromFile } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
 
@@ -14,6 +14,7 @@ export function DataManagement() {
   const [showClear, setShowClear] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jsonInputRef = useRef<HTMLInputElement>(null);
 
   async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -40,6 +41,22 @@ export function DataManagement() {
     a.download = `cropmanager-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function handleJsonImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setPullMsg('Importing JSON backup...');
+    try {
+      const res = await importJsonBackupFromFile(file);
+      setPullMsg(`✅ Restored: ${Object.entries(res.counts).map(([k,v]) => `${k}=${v}`).join(', ')}`);
+    } catch (err: any) {
+      setPullMsg(`❌ Import failed: ${String(err?.message || err)}`);
+    } finally {
+      setImporting(false);
+      if (jsonInputRef.current) jsonInputRef.current.value = '';
+    }
   }
 
   async function handleClear() {
@@ -71,6 +88,25 @@ export function DataManagement() {
         <Button variant="outline" className="w-full" onClick={handleExport}>
           📦 Export JSON Backup
         </Button>
+
+        <div className="relative">
+          <input
+            type="file"
+            accept=".json,application/json"
+            onChange={handleJsonImport}
+            className="hidden"
+            id="json-upload"
+            ref={jsonInputRef}
+          />
+          <Button 
+            variant="outline" 
+            className="w-full" 
+            onClick={() => jsonInputRef.current?.click()}
+            disabled={importing}
+          >
+            {importing ? '⏳ Importing...' : '📥 Import JSON Backup'}
+          </Button>
+        </div>
 
         <div className="relative">
           <input

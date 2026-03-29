@@ -115,4 +115,16 @@ The Crop Manager application is a well-architected, modern web application. The 
 
 ### Recent Fixes & Enhancements (Batch Confirmation & History)
 -   **Refined Batch Confirmation**: The "Confirm" button for continuous harvest batches now only appears for the *next* upcoming batch once its scheduled planting date has arrived. Confirmed batches are clearly marked with a "Confirmed" badge.
--   **Active Tracker History**: The "Tracker Stages" section in the History & Averages panel now displays the specific number of days taken to reach each stage for all active crops in the tracker, presented in a clean vertical timeline.
+-   Active Tracker History: The "Tracker Stages" section in the History & Averages panel now displays the specific number of days taken to reach each stage for all active crops in the tracker, presented in a clean vertical timeline.
+
+### Recent UI/UX Enhancements (Responsive Layouts)
+-   **Mobile-Optimized Crop Database**: The Crop Database screen now features a fully responsive design. On mobile portrait mode, the interface intelligently switches between the crop list and the details editor, ensuring a comfortable editing experience on small screens without requiring landscape rotation. Added dedicated "Save" and "Export" actions to the mobile sidebar for easier data management.
+-   **Consistent Navigation**: Standardized the header and back-button behavior across all management screens, ensuring a predictable user journey when navigating between lists and detailed views.
+
+### Install & Persistence Enhancements
+-   **Single App Across URLs**: Added a stable PWA identity by setting `manifest.id` to a constant value in the Vite PWA config ([vite.config.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/vite.config.ts#L20-L35)). This ensures installs from different web addresses consolidate into one app instance on supported platforms.
+-   **Storage Persistence**: The app now requests persistent storage on startup to reduce the risk of the browser evicting local data ([App.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/App.tsx#L30-L44)).
+-   **JSON Restore Path**: Added a JSON backup importer in Data Management to restore local data on any installation, even from a different URL origin:
+    - Importer: [backup.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/lib/backup.ts)
+    - UI: [DataManagement.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/settings/DataManagement.tsx)
+    - Export remains available to create portable backups

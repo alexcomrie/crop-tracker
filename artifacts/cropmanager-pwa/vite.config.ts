@@ -21,12 +21,14 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
+        id: "/cropmanager",
         name: "CropManager",
         short_name: "CropMgr",
         description: "Farm crop and propagation tracking PWA",
         theme_color: "#2d6a2d",
         background_color: "#f0f7f0",
         display: "standalone",
+        scope: "/",
         start_url: "/",
         icons: [
           { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },

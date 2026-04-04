@@ -122,7 +122,7 @@ export const VALID_NEXT_STAGES: Record<string, string[]> = {
   Germinated: ['Seedling', 'Grafting', 'Deleted'],
   Grafting: ['Healing', 'Deleted'],
   Healing: ['Seedling', 'Transplanted', 'Deleted'],
-  Seedling: ['Transplanted', 'Flowering', 'Deleted'],
+  Seedling: ['Transplanted', 'Grafting', 'Flowering', 'Deleted'],
   Transplanted: ['Flowering', 'Deleted'],
   Flowering: ['Ready to Harvest', 'Deleted'],
   'Ready to Harvest': ['Harvested', 'Deleted'],
@@ -143,11 +143,14 @@ export const STAGE_COLORS: Record<string, string> = {
   Deleted: '#e53935',
 };
 
-const VINE_FAMILY = ['watermelon', 'melon', 'pumpkin', 'cucumber', 'squash', 'zucchini', 'gourd'];
+const VINE_FAMILY = ['watermelon', 'melon', 'pumpkin', 'cucumber', 'squash', 'zucchini', 'gourd', 'cantaloupe'];
 
-export function isVineFamily(cropName: string): boolean {
+export function isVineFamily(cropName: string, plantType?: string): boolean {
   const name = cropName.toLowerCase();
-  return VINE_FAMILY.some(v => name.includes(v));
+  const type = (plantType || '').toLowerCase();
+  const isVineName = VINE_FAMILY.some(v => name.includes(v));
+  const isVineType = type.includes('vine');
+  return isVineName || isVineType;
 }
 
 /** 

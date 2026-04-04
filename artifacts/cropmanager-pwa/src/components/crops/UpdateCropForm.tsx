@@ -33,7 +33,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [done, setDone] = useState(false);
 
   const cropData = resolveCropData(cropDb, crop.cropName);
-  const isVine = isVineFamily(crop.cropName);
+  const isVine = isVineFamily(crop.cropName, cropData?.plant_type);
   const validStages = (VALID_NEXT_STAGES[crop.plantStage] ?? []).filter(s => {
     if ((s === 'Grafting' || s === 'Healing') && !isVine) return false;
     return true;

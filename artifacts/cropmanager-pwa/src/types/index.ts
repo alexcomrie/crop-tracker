@@ -105,6 +105,10 @@ export interface Crop {
   harvestDateEstimated: string;
   harvestDateActual: string;
   isContinuous: boolean;
+  harvestFrequency?: number; // Days between harvests
+  numPlots?: number;         // Calculated number of plots
+  batchOffset?: number;      // Days between plantings
+  parentCropId?: string;     // Link to the original crop for C-H promotion
   nextConsistentPlanting: string;
   batchNumber: number;
   fungusSprayDates: string;

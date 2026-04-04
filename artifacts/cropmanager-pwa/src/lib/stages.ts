@@ -70,7 +70,14 @@ export function processStageChange(
   let harvestLog: HarvestLog | undefined;
   if (newStage === 'Harvested') {
     updatedCrop.harvestDateActual = dateStr;
-    if (!crop.isContinuous) {
+    
+    // Continuous Harvest Promotion Logic
+    if (crop.isContinuous) {
+      // The original crop is removed, and batches are promoted.
+      // This logic will be handled in the component calling processStageChange 
+      // or we can add a flag here.
+      updatedCrop.status = 'Harvested'; // It will be removed from tracker by the caller
+    } else {
       updatedCrop.status = 'Harvested';
     }
     const transplanted = parseDate(crop.transplantDateActual || crop.transplantDateScheduled);
@@ -97,12 +104,24 @@ export function processStageChange(
     updatedCrop.status = 'Deleted';
   }
 
+  if (newStage === 'Grafting') {
+    updatedCrop.status = 'Healing';
+  }
+
+  if (newStage === 'Healing') {
+    updatedCrop.status = 'Healing';
+  } else if (newStage !== 'Harvested' && newStage !== 'Deleted' && newStage !== 'Grafting') {
+    updatedCrop.status = 'Active';
+  }
+
   return { updatedCrop, stageLog, harvestLog };
 }
 
 export const VALID_NEXT_STAGES: Record<string, string[]> = {
-  Seed: ['Germinated', 'Deleted'],
-  Germinated: ['Seedling', 'Deleted'],
+  Seed: ['Germinated', 'Grafting', 'Deleted'],
+  Germinated: ['Seedling', 'Grafting', 'Deleted'],
+  Grafting: ['Healing', 'Deleted'],
+  Healing: ['Seedling', 'Transplanted', 'Deleted'],
   Seedling: ['Transplanted', 'Flowering', 'Deleted'],
   Transplanted: ['Flowering', 'Deleted'],
   Flowering: ['Ready to Harvest', 'Deleted'],
@@ -114,6 +133,8 @@ export const VALID_NEXT_STAGES: Record<string, string[]> = {
 export const STAGE_COLORS: Record<string, string> = {
   Seed: '#9e9e9e',
   Germinated: '#aed581',
+  Grafting: '#7e57c2',
+  Healing: '#ba68c8',
   Seedling: '#8bc34a',
   Transplanted: '#26a69a',
   Flowering: '#ffb300',
@@ -121,6 +142,53 @@ export const STAGE_COLORS: Record<string, string> = {
   Harvested: '#5d4037',
   Deleted: '#e53935',
 };
+
+const VINE_FAMILY = ['watermelon', 'melon', 'pumpkin', 'cucumber', 'squash', 'zucchini', 'gourd'];
+
+export function isVineFamily(cropName: string): boolean {
+  const name = cropName.toLowerCase();
+  return VINE_FAMILY.some(v => name.includes(v));
+}
+
+/** 
+ * Promotes the next batch to be the "original" and shifts others.
+ */
+export async function promoteNextBatch(harvestedCrop: Crop, db: any) {
+  // 1. Get all batches associated with this parent (or if this is a parent itself)
+  const parentId = harvestedCrop.parentCropId || harvestedCrop.id;
+  const batches = await db.crops
+    .where('parentCropId')
+    .equals(parentId)
+    .and((c: Crop) => c.status === 'Active')
+    .toArray();
+    
+  if (batches.length === 0) return;
+
+  // 2. Sort batches by batch number
+  batches.sort((a: Crop, b: Crop) => a.batchNumber - b.batchNumber);
+
+  // 3. Promote the first batch in the list
+  const nextParent = batches[0];
+  const originalName = harvestedCrop.cropName.split(' [Batch')[0];
+  
+  await db.crops.update(nextParent.id, {
+    cropName: originalName,
+    parentCropId: undefined, // Now it's the new original
+    batchNumber: 1, // Becomes the first
+    updatedAt: Date.now()
+  });
+
+  // 4. Update the subsequent batches to point to the new parent and shift their numbers
+  for (let i = 1; i < batches.length; i++) {
+    const batch = batches[i];
+    await db.crops.update(batch.id, {
+      parentCropId: nextParent.id,
+      batchNumber: i + 1,
+      cropName: `${originalName} [Batch ${i + 1}]`,
+      updatedAt: Date.now()
+    });
+  }
+}
 
 /** If transplant is scheduled, not yet done, and overdue, move schedule to today */
 export function autoAdjustTransplantSchedule(crop: Crop, cropData: CropData | null): Crop | null {

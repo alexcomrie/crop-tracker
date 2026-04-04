@@ -8,6 +8,8 @@ import type { Crop } from '../../types';
 import { parseDate, formatDateDisplay, daysBetween, today, formatDateShort } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
 import { FertScheduleView } from './FertScheduleView';
+import { calculateTransplantDate, calculateHarvestDate } from '../../lib/harvest';
+import { generateId } from '../../lib/ids';
 
 import { Trash2, Edit3, Info, Calendar as CalendarIcon, Repeat } from 'lucide-react';
 import { useAppStore } from '../../store/useAppStore';
@@ -102,12 +104,42 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
                           className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-bold uppercase hover:bg-amber-700 transition-colors"
                           onClick={async () => {
                             try {
+                              const batchId = generateId('CT');
+                              const batchDateStr = formatDateShort(b.date);
+                              
+                              // 1. Create the new crop record
+                              const newCrop: Crop = {
+                                ...crop,
+                                id: batchId,
+                                cropName: `${crop.cropName} [Batch ${b.batchNumber}]`,
+                                plantingDate: batchDateStr,
+                                batchNumber: b.batchNumber,
+                                parentCropId: crop.id,
+                                plantStage: 'Seed',
+                                germinationDate: '',
+                                transplantDateActual: '',
+                                harvestDateActual: '',
+                                updatedAt: Date.now(),
+                              };
+                              
+                              // Recalculate transplant and harvest dates for the new crop
+                              if (cropData) {
+                                const newTransplant = calculateTransplantDate(b.date, null, cropData, [], crop.cropName, crop.variety);
+                                if (newTransplant) newCrop.transplantDateScheduled = formatDateShort(newTransplant);
+                                
+                                const newHarvest = calculateHarvestDate(newCrop, cropData, []);
+                                if (newHarvest) newCrop.harvestDateEstimated = formatDateShort(newHarvest);
+                              }
+
+                              await db.crops.add(newCrop);
+
+                              // 2. Add the log entry to the original crop
                               await db.batchPlantingLogs.add({
                                 id: `${crop.id}_B${b.batchNumber}`,
                                 cropTrackingId: crop.id,
                                 cropName: crop.cropName,
                                 batchNumber: b.batchNumber,
-                                batchPlantingDate: formatDateShort(b.date),
+                                batchPlantingDate: batchDateStr,
                                 confirmedPlantedDate: formatDateShort(today()),
                                 nextBatchDate: '',
                                 status: 'active',

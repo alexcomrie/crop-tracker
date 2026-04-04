@@ -16,6 +16,8 @@ import { useTelegramReminders } from './hooks/useTelegramReminders';
 import type { CropDatabase, FertDatabase } from './types';
 import { loadCropDatabase } from './lib/cropDb';
 import { loadFertDatabase } from './lib/fertDb';
+import db from './db/db';
+import type { Crop } from './types';
 
 const queryClient = new QueryClient();
 
@@ -34,6 +36,25 @@ function AppContent() {
       .then((data: FertDatabase) => setFertDb(data))
       .catch(console.error);
   }, [setCropDb, setFertDb]);
+
+  // Migration for existing continuous crops
+  useEffect(() => {
+    async function migrateCrops() {
+      const crops = await db.crops.where('isContinuous').equals(1).toArray();
+      for (const crop of crops) {
+        if (!crop.harvestFrequency || !crop.batchOffset) {
+          const numWeeks = 1; // Default
+          const batchOffset = 7; // Default
+          await db.crops.update(crop.id, {
+            harvestFrequency: crop.harvestFrequency || 7,
+            batchOffset: crop.batchOffset || batchOffset,
+            updatedAt: Date.now(),
+          });
+        }
+      }
+    }
+    migrateCrops().catch(console.error);
+  }, []);
 
   // Request persistent storage to reduce risk of data eviction
   useEffect(() => {

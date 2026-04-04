@@ -31,6 +31,8 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
   const [trayColors, setTrayColors] = useState<string[]>([]);
   const [notes, setNotes] = useState(editCrop?.notes || '');
   const [isContinuous, setIsContinuous] = useState(editCrop?.isContinuous || false);
+  const [freqDays, setFreqDays] = useState(editCrop?.harvestFrequency || 7);
+  const [plotArea, setPlotArea] = useState(400); // Default to 400
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [plantDate, setPlantDate] = useState<Date>(editCrop ? new Date(editCrop.plantingDate) : (date ?? today()));
@@ -57,6 +59,39 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
   });
 
   const selectedCropData = cropKey ? resolveCropData(cropDb, cropKey) : null;
+
+  const chResult = React.useMemo(() => {
+    if (!selectedCropData || !isContinuous) return null;
+    const growDays    = selectedCropData.growing_time_days || 60;
+    const harvestWks  = selectedCropData.number_of_weeks_harvest || 1;
+    const harvestDays = harvestWks * 7;
+    const harvestIntv = selectedCropData.harvest_interval || 7;
+    const isMulti     = harvestWks > 1;
+    let batchOffset: number;
+    if (!isMulti) {
+      batchOffset = freqDays;
+    } else {
+      const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
+      batchOffset = Math.max(naturalOffset, freqDays);
+    }
+    let numBatches: number;
+    if (!isMulti) numBatches = Math.ceil(growDays / batchOffset);
+    else numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
+    const subplotArea  = Math.round((plotArea / numBatches) * 10) / 10;
+    const cycleDays    = isMulti ? growDays + harvestDays : growDays;
+    const startDateObj = validPlantDate;
+    const firstHarvestDate = new Date(startDateObj.getTime() + growDays * 86400000);
+    const waitWeeks    = Math.ceil(growDays / 7);
+
+    const upcomingBatches = Array.from({ length: numBatches }).map((_, b) => {
+      const plantDay = b * batchOffset;
+      const plantDate = new Date(startDateObj.getTime() + plantDay * 86400000);
+      const harvDate = new Date(plantDate.getTime() + growDays * 86400000);
+      return { batchNumber: b + 1, plantDate, harvDate, plantDay };
+    });
+
+    return { isMulti, growDays, harvestWks, harvestDays, harvestIntv, batchOffset, numBatches, subplotArea, waitWeeks, startDateObj, firstHarvestDate, upcomingBatches };
+  }, [selectedCropData, isContinuous, freqDays, plotArea, validPlantDate]);
 
   function reset() {
     setStep(1); setCropKey(''); setVariety(''); setMethod(''); setTrayColors([]); setNotes(''); setIsContinuous(false); setSearch(''); setPlantDate(date ?? today());
@@ -86,6 +121,9 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
         harvestDateEstimated: '', 
         harvestDateActual: editCrop?.harvestDateActual || '',
         isContinuous,
+        harvestFrequency: isContinuous ? freqDays : undefined,
+        numPlots: chResult?.numBatches,
+        batchOffset: chResult?.batchOffset,
         nextConsistentPlanting: editCrop?.nextConsistentPlanting || '',
         batchNumber: editCrop?.batchNumber || 1,
         fungusSprayDates: '', pestSprayDates: '',
@@ -244,17 +282,43 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
             </div>
 
             {isContinuous && selectedCropData && (
-              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 space-y-2">
-                <p className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Upcoming Batch Planting Dates</p>
-                <div className="space-y-1.5">
-                  {calculateBatchPlantingDates({ ...editCrop, plantingDate: formatDateShort(validPlantDate) } as any, selectedCropData, 2).map(b => (
-                    <div key={b.batchNumber} className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-amber-900">Batch #{b.batchNumber}</span>
-                      <span className="text-amber-700">{formatDateShort(b.date)}</span>
-                    </div>
-                  ))}
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-[#888] uppercase tracking-wide">Desired harvest frequency</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {[7,14,21,28].map(d => (
+                      <button key={d} onClick={() => setFreqDays(d)} className={`px-3 py-2 rounded-lg border text-[12px] font-medium whitespace-nowrap ${freqDays===d ? 'bg-[#e8f5e8] border-[#2d6a2d] text-[#2d6a2d]' : 'bg-[#f5f5f0] border-[#e0e0e0] text-[#555]'}`}>
+                        {d===7?'Weekly':d===14?'2 wks':d===21?'3 wks':'Monthly'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-[9px] text-amber-600 italic">Dates calculated to ensure harvest overlap</p>
+
+                {chResult && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white border rounded-[12px] p-2 text-center">
+                      <div className="text-[20px] font-semibold text-[#2d6a2d] leading-none">{chResult.numBatches}</div>
+                      <div className="text-[10px] text-[#888] mt-0.5">Plots Needed</div>
+                    </div>
+                    <div className="bg-white border rounded-[12px] p-2 text-center">
+                      <div className="text-[20px] font-semibold text-[#2d6a2d] leading-none">{chResult.batchOffset}</div>
+                      <div className="text-[10px] text-[#888] mt-0.5">Days Between</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 space-y-2">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-widest">Upcoming Batch Planting Dates</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {chResult?.upcomingBatches.map(b => (
+                      <div key={b.batchNumber} className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-amber-900">Batch #{b.batchNumber} {b.batchNumber === 1 ? '(Today)' : ''}</span>
+                        <span className="text-amber-700">{formatDateShort(b.plantDate)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-amber-600 italic">Dates calculated using C-H Calculator logic</p>
+                </div>
               </div>
             )}
 

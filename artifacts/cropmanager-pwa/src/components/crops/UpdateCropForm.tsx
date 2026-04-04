@@ -6,7 +6,7 @@ import type { Crop } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { VALID_NEXT_STAGES } from '../../lib/stages';
 import { resolveCropData } from '../../lib/cropDb';
-import { processStageChange } from '../../lib/stages';
+import { processStageChange, isVineFamily, promoteNextBatch } from '../../lib/stages';
 import { formatDateShort, today } from '../../lib/dates';
 import { logDeviation } from '../../lib/learning';
 import { sendTelegramMessage } from '../../lib/telegram';
@@ -33,7 +33,11 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [done, setDone] = useState(false);
 
   const cropData = resolveCropData(cropDb, crop.cropName);
-  const validStages = VALID_NEXT_STAGES[crop.plantStage] ?? [];
+  const isVine = isVineFamily(crop.cropName);
+  const validStages = (VALID_NEXT_STAGES[crop.plantStage] ?? []).filter(s => {
+    if ((s === 'Grafting' || s === 'Healing') && !isVine) return false;
+    return true;
+  });
 
   const [tickGerminated, setTickGerminated] = useState(!!crop.germinationDate);
   const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
@@ -58,6 +62,12 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     
     await db.crops.put(updatedCrop);
     await db.stageLogs.add(stageLog);
+    
+    // Continuous Harvest Promotion Logic
+    if (newStage === 'Harvested' && crop.isContinuous) {
+      await promoteNextBatch(crop, db);
+    }
+
     if (harvestLog) {
       await db.harvestLogs.add(harvestLog);
       
@@ -115,8 +125,11 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
     if (tickHarvested) {
       update.harvestDateActual = dateNowStr;
-      update.status = crop.isContinuous ? 'Active' : 'Harvested';
+      update.status = 'Harvested';
       update.plantStage = 'Harvested';
+      if (crop.isContinuous) {
+        await promoteNextBatch(crop, db);
+      }
     } else {
       update.harvestDateActual = '';
       update.daysTransplantHarvest = 0;

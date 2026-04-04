@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import db from '../../db/db';
 import type { Crop, CropData } from '../../types';
 import { parseDate, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
@@ -11,6 +13,10 @@ interface CropCardProps {
 }
 
 export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
+  const confirmedBatches = useLiveQuery(() => 
+    db.batchPlantingLogs.where('cropTrackingId').equals(crop.id).toArray()
+  , [crop.id]);
+
   const planted = parseDate(crop.plantingDate);
   const harvestEst = parseDate(crop.harvestDateEstimated);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
@@ -29,7 +35,14 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
     >
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate">{crop.cropName}</h3>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h3 className="font-semibold text-gray-900 truncate">{crop.cropName}</h3>
+            {confirmedBatches && confirmedBatches.length > 0 && confirmedBatches.map(b => (
+              <span key={b.id} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                B{b.batchNumber}
+              </span>
+            ))}
+          </div>
           {crop.variety && <p className="text-sm text-muted-foreground">{crop.variety}</p>}
         </div>
         <span

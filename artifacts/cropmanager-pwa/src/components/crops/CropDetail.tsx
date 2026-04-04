@@ -31,12 +31,14 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('cropId').equals(crop.id).sortBy('date'), [crop.id]);
   const stageLogs = useLiveQuery(() => db.stageLogs.where('trackingId').equals(crop.id).sortBy('date'), [crop.id]);
   const batchLogs = useLiveQuery(() => db.batchPlantingLogs.where('cropTrackingId').equals(crop.id).toArray(), [crop.id]);
+  const activeBatches = useLiveQuery(() => db.crops.where('parentCropId').equals(crop.id).toArray(), [crop.id]);
   const [showFert, setShowFert] = useState(false);
 
   const cropData = resolveCropData(cropDb, crop.cropName);
   const batchDates = crop.isContinuous && cropData ? calculateBatchPlantingDates(crop, cropData, 3) : [];
   
   const confirmedBatchNumbers = new Set(batchLogs?.map(l => l.batchNumber) || []);
+  const createdBatchNumbers = new Set(activeBatches?.map(c => c.batchNumber) || []);
   
   // Find the next batch to confirm: the first one that isn't confirmed yet
   const nextBatchToConfirm = batchDates.find(b => !confirmedBatchNumbers.has(b.batchNumber));
@@ -85,15 +87,73 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
             <div className="space-y-2">
               {batchDates.map(b => {
                 const isConfirmed = confirmedBatchNumbers.has(b.batchNumber);
+                const isCreated = createdBatchNumbers.has(b.batchNumber);
                 const isNext = nextBatchToConfirm?.batchNumber === b.batchNumber;
                 const dateArrived = b.date <= today();
+
+                const handleCreateClone = async () => {
+                  try {
+                    const batchId = generateId('CT');
+                    const batchDateStr = formatDateShort(b.date);
+                    
+                    // 1. Create the new crop record
+                    const newCrop: Crop = {
+                      ...crop,
+                      id: batchId,
+                      cropName: `${crop.cropName} [Batch ${b.batchNumber}]`,
+                      plantingDate: batchDateStr,
+                      batchNumber: b.batchNumber,
+                      parentCropId: crop.id,
+                      plantStage: 'Seed',
+                      germinationDate: '',
+                      transplantDateActual: '',
+                      harvestDateActual: '',
+                      updatedAt: Date.now(),
+                    };
+                    
+                    // Recalculate transplant and harvest dates for the new crop
+                    if (cropData) {
+                      const newTransplant = calculateTransplantDate(b.date, null, cropData, [], crop.cropName, crop.variety);
+                      if (newTransplant) newCrop.transplantDateScheduled = formatDateShort(newTransplant);
+                      
+                      const newHarvest = calculateHarvestDate(newCrop, cropData, []);
+                      if (newHarvest) newCrop.harvestDateEstimated = formatDateShort(newHarvest);
+                    }
+
+                    await db.crops.add(newCrop);
+
+                    // 2. Add the log entry if it wasn't confirmed yet
+                    if (!isConfirmed) {
+                      await db.batchPlantingLogs.add({
+                        id: `${crop.id}_B${b.batchNumber}`,
+                        cropTrackingId: crop.id,
+                        cropName: crop.cropName,
+                        batchNumber: b.batchNumber,
+                        batchPlantingDate: batchDateStr,
+                        confirmedPlantedDate: formatDateShort(today()),
+                        nextBatchDate: '',
+                        status: 'active',
+                        notes: '',
+                        updatedAt: Date.now(),
+                      });
+                    }
+                  } catch (err) {
+                    console.error('Failed to create batch clone:', err);
+                  }
+                };
 
                 return (
                   <div key={b.batchNumber} className={`flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 border ${isConfirmed ? 'border-green-100' : 'border-amber-100/50'}`}>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-1.5">
-                        <span className={`text-xs font-bold ${isConfirmed ? 'text-green-900' : 'text-amber-900'}`}>Batch #{b.batchNumber}</span>
+                        <span 
+                          className={`text-xs font-bold ${isConfirmed ? 'text-green-900' : 'text-amber-900'} ${isConfirmed && !isCreated ? 'cursor-pointer hover:underline' : ''}`}
+                          onClick={() => { if (isConfirmed && !isCreated) handleCreateClone(); }}
+                        >
+                          Batch #{b.batchNumber}
+                        </span>
                         {isConfirmed && <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">Confirmed</span>}
+                        {isConfirmed && isCreated && <span className="text-[9px] bg-blue-100 text-blue-700 px-1 rounded">Created</span>}
                       </div>
                       <span className="text-[10px] text-amber-700 uppercase font-medium">Planting Date</span>
                     </div>
@@ -102,54 +162,7 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
                       {isNext && dateArrived && !isConfirmed && (
                         <button
                           className="text-[10px] px-2 py-1 rounded bg-amber-600 text-white font-bold uppercase hover:bg-amber-700 transition-colors"
-                          onClick={async () => {
-                            try {
-                              const batchId = generateId('CT');
-                              const batchDateStr = formatDateShort(b.date);
-                              
-                              // 1. Create the new crop record
-                              const newCrop: Crop = {
-                                ...crop,
-                                id: batchId,
-                                cropName: `${crop.cropName} [Batch ${b.batchNumber}]`,
-                                plantingDate: batchDateStr,
-                                batchNumber: b.batchNumber,
-                                parentCropId: crop.id,
-                                plantStage: 'Seed',
-                                germinationDate: '',
-                                transplantDateActual: '',
-                                harvestDateActual: '',
-                                updatedAt: Date.now(),
-                              };
-                              
-                              // Recalculate transplant and harvest dates for the new crop
-                              if (cropData) {
-                                const newTransplant = calculateTransplantDate(b.date, null, cropData, [], crop.cropName, crop.variety);
-                                if (newTransplant) newCrop.transplantDateScheduled = formatDateShort(newTransplant);
-                                
-                                const newHarvest = calculateHarvestDate(newCrop, cropData, []);
-                                if (newHarvest) newCrop.harvestDateEstimated = formatDateShort(newHarvest);
-                              }
-
-                              await db.crops.add(newCrop);
-
-                              // 2. Add the log entry to the original crop
-                              await db.batchPlantingLogs.add({
-                                id: `${crop.id}_B${b.batchNumber}`,
-                                cropTrackingId: crop.id,
-                                cropName: crop.cropName,
-                                batchNumber: b.batchNumber,
-                                batchPlantingDate: batchDateStr,
-                                confirmedPlantedDate: formatDateShort(today()),
-                                nextBatchDate: '',
-                                status: 'active',
-                                notes: '',
-                                updatedAt: Date.now(),
-                              });
-                            } catch (err) {
-                              console.error('Failed to confirm batch:', err);
-                            }
-                          }}
+                          onClick={handleCreateClone}
                         >Confirm</button>
                       )}
                     </div>

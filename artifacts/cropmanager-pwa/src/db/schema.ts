@@ -20,8 +20,8 @@ export class CropManagerDB extends Dexie {
 
   constructor() {
     super('CropManagerDB');
-    this.version(1).stores({
-      crops: 'id, cropName, variety, status, plantStage, updatedAt',
+    this.version(2).stores({
+      crops: 'id, cropName, variety, status, plantStage, isContinuous, parentCropId, updatedAt',
   propagations: 'id, plantName, status, updatedAt',
   reminders: 'id, type, trackingId, sendDate, sent, updatedAt',
   stageLogs: 'id, trackingId, date, updatedAt',

@@ -554,6 +554,28 @@ I have fixed the issue where the **Grafting** and **Healing** statuses were miss
 - **Verified Build**: Successfully ran a full production build and type check (`pnpm run typecheck` and `pnpm run build`) to confirm stability.
 - **Deployment**: Pushed the updated code to your GitHub repository and updated **doc.md**.
 
+**You:**
+
+1. there is an issue where when a crop in the crop tracker is selected the screen goes blank instead of showing the crop detailes, 
+ 2. please analyse all previous update cand cganges implimentations for errors and resolve them 
+ 3. after implimenting run type check for errors and test the app for build errors then push to github main
+
+**Me:**
+
+I have resolved the "blank screen" issue by correcting the database schema and indexing strategy.
+
+### **Key Improvements:**
+
+- **Dexie Schema Update (Version 2)**: The blank screen was caused by using `.where()` on non-indexed fields (`isContinuous` and `parentCropId`) in the database. I have:
+  - Bumped the database version to **2** in [schema.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/db/schema.ts).
+  - Added `isContinuous` and `parentCropId` to the `crops` table index.
+  - This ensures that queries for continuous crops and their associated batches are performant and error-free.
+- **Improved Migration Logic**: The startup migration in [App.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/App.tsx) now runs successfully against the updated index, correctly updating any legacy continuous crops with the new frequency and offset fields.
+- **Verified Stability**: 
+  - Successfully ran `pnpm run typecheck` and `pnpm run build` to ensure the application is stable.
+  - Pushed all changes to the GitHub `main` branch.
+  - Updated [doc.md](file:///c:/Users/ALEX/Desktop/Crop-Manager/doc.md) with these stability improvements.
+
 
 
 **You:**

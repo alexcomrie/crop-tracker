@@ -105,6 +105,10 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
                       batchNumber: b.batchNumber,
                       parentCropId: crop.id,
                       plantStage: 'Seed',
+                      isContinuous: true, // Keep continuous status for the batch
+                      harvestFrequency: crop.harvestFrequency, // Copy C-H metadata
+                      numPlots: crop.numPlots,
+                      batchOffset: crop.batchOffset,
                       germinationDate: '',
                       transplantDateActual: '',
                       harvestDateActual: '',

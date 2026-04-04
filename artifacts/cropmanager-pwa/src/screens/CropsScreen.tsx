@@ -61,12 +61,41 @@ export function CropsScreen() {
       const planted = new Date(c.plantingDate);
       const tDate = calculateTransplantDate(planted, null, cd, adjustments, c.cropName.toLowerCase(), c.variety);
       const hDate = calculateHarvestDate(c, cd, adjustments);
+      
       const patch: Partial<Crop> = { updatedAt: Date.now() };
       if (tDate) patch.transplantDateScheduled = formatDateShort(tDate);
       if (hDate) patch.harvestDateEstimated = formatDateShort(hDate);
+
+      // Apply C-H Logic Update if enabled
+      if (c.isContinuous) {
+        // Calculate based on the newly updated C-H logic (same as CropForm)
+        const growDays = cd.growing_time_days || 60;
+        const harvestWks = cd.number_of_weeks_harvest || 1;
+        const harvestDays = harvestWks * 7;
+        const harvestIntv = cd.harvest_interval || 7;
+        const isMulti = harvestWks > 1;
+        
+        const freqDays = c.harvestFrequency || 7;
+        
+        let batchOffset: number;
+        if (!isMulti) {
+          batchOffset = freqDays;
+        } else {
+          const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
+          batchOffset = Math.max(naturalOffset, freqDays);
+        }
+        
+        let numBatches: number;
+        if (!isMulti) numBatches = Math.ceil(growDays / batchOffset);
+        else numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
+
+        patch.batchOffset = batchOffset;
+        patch.numPlots = numBatches;
+      }
+
       await db.crops.update(c.id, patch);
     }
-    alert('Timings refreshed from current Crop DB.');
+    alert('Timings and Continuous Harvest logic refreshed.');
   }
   const handleDeleteCrop = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {

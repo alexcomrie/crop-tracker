@@ -140,3 +140,6 @@ The Crop Manager application is a well-architected, modern web application. The 
 ### Manual Batch Recovery
 - **Clickable Batch Badges**: Added a manual recovery path in [CropDetail.tsx](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/components/crops/CropDetail.tsx). If a batch was confirmed but the clone wasn't created (e.g., due to an error or manual deletion), the batch number in the details card becomes clickable. Clicking it will manually trigger the cloning process.
 - **Batch Status Visibility**: Added "Created" badges to the batch schedule list to clearly distinguish between batches that are merely confirmed and those that have active crop records in the tracker.
+
+### Stability & Performance
+- **Dexie Schema Optimization**: Updated the [schema.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/db/schema.ts) to version 2, adding `isContinuous` and `parentCropId` to the `crops` table index. This resolved a critical "blank screen" issue caused by calling `.where()` on non-indexed fields, ensuring smooth performance and reliable data retrieval for continuous harvest tracking.

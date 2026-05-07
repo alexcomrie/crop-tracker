@@ -22,13 +22,15 @@ interface UpdateCropFormProps {
 type UpdateMode = 'stage' | 'treatment' | 'notes';
 
 export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
-  const { cropDb, settings } = useAppStore();
+  const { cropDb, fertDb, settings } = useAppStore();
   const [mode, setMode] = useState<UpdateMode>('stage');
   const [newStage, setNewStage] = useState('');
   const [treatmentType, setTreatmentType] = useState('');
   const [product, setProduct] = useState('');
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [notes, setNotes] = useState('');
+  const [fertilizerInterval, setFertilizerInterval] = useState('7');
+  const [fertProfile, setFertProfile] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
@@ -43,7 +45,13 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
   const [tickHarvested, setTickHarvested] = useState(!!crop.harvestDateActual);
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
-
+  
+  const fertProfiles = fertDb?.crops ? Object.entries(fertDb.crops).map(([key, val]) => ({
+    key,
+    name: (val as any).display_name || key,
+    profile: (val as any).fert_profile || key
+  })) : [];
+  
   async function handleStageChange() {
     if (!newStage) return;
     setSaving(true);
@@ -165,6 +173,14 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     const update: Partial<Crop> = { updatedAt: Date.now() };
     if (treatmentType === 'fungus') update.fungusSprayDates = [crop.fungusSprayDates, formatDateShort(now)].filter(Boolean).join(', ');
     if (treatmentType === 'pest') update.pestSprayDates = [crop.pestSprayDates, formatDateShort(now)].filter(Boolean).join(', ');
+    // Track fertilizer next application
+    if (treatmentType === 'fertilizer') {
+      const interval = parseInt(fertilizerInterval, 10) || 7;
+      const nextDate = new Date(now.getTime() + interval * 86400000);
+      update.fertilizerType = product;
+      update.fertilizerDays = interval;
+      update.nextFertilizerDate = formatDateShort(nextDate);
+    }
     await db.crops.where('id').equals(crop.id).modify(update);
     setSaving(false);
     setDone(true);
@@ -261,6 +277,33 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
                 </button>
               ))}
             </div>
+            {treatmentType === 'fertilizer' && (
+              <>
+                <select 
+                  className="w-full border rounded-lg p-2 text-sm bg-white"
+                  value={fertProfile}
+                  onChange={e => setFertProfile(e.target.value)}
+                >
+                  <option value="">Select fertilizer profile...</option>
+                  {fertProfiles.map(fp => (
+                    <option key={fp.key} value={fp.profile}>{fp.name} ({fp.profile})</option>
+                  ))}
+                </select>
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm text-muted-foreground">Repeat every</span>
+                  <select 
+                    className="border rounded-lg p-2 text-sm bg-white"
+                    value={fertilizerInterval}
+                    onChange={e => setFertilizerInterval(e.target.value)}
+                  >
+                    <option value="7">7 days</option>
+                    <option value="14">14 days</option>
+                    <option value="21">21 days</option>
+                    <option value="28">28 days</option>
+                  </select>
+                </div>
+              </>
+            )}
             <Input placeholder="Product name" value={product} onChange={e => setProduct(e.target.value)} />
             <Input placeholder="Notes (optional)" value={treatmentNotes} onChange={e => setTreatmentNotes(e.target.value)} />
             <Button className="w-full" onClick={handleTreatment} disabled={!treatmentType || !product || saving}>

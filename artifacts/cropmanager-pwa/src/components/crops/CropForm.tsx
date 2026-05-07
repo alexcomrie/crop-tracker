@@ -127,6 +127,7 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
         nextConsistentPlanting: editCrop?.nextConsistentPlanting || '',
         batchNumber: editCrop?.batchNumber || 1,
         fungusSprayDates: '', pestSprayDates: '',
+        fertilizerType: '', fertilizerDays: 0, nextFertilizerDate: '',
         status: editCrop?.status || 'Active', 
         notes: notesStr,
         daysSeedGerm: editCrop?.daysSeedGerm || 0, 

@@ -113,6 +113,9 @@ export interface Crop {
   batchNumber: number;
   fungusSprayDates: string;
   pestSprayDates: string;
+  fertilizerType: string;     // Selected fertilizer profile for tracking
+  fertilizerDays: number;    // Days between fertilizer applications
+  nextFertilizerDate: string;
   status: string;
   notes: string;
   daysSeedGerm: number;

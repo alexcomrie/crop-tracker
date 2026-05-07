@@ -26,6 +26,10 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
   const transSched = crop.transplantDateScheduled ? parseDate(crop.transplantDateScheduled) : null;
   const overdueTransplant = transSched && !crop.transplantDateActual && transSched < today();
 
+  const fertDue = crop.nextFertilizerDate ? parseDate(crop.nextFertilizerDate) : null;
+  const daysToFert = fertDue ? daysBetween(today(), fertDue) : null;
+  const fertilizerDueSoon = daysToFert !== null && daysToFert <= 3;
+
   const stageColor = STAGE_COLORS[crop.plantStage] ?? '#9e9e9e';
 
   return (
@@ -37,6 +41,11 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <h3 className="font-semibold text-gray-900 truncate">{crop.cropName}</h3>
+            {fertilizerDueSoon && (
+              <span className="inline-flex items-center gap-0.5 text-blue-600 text-xs font-bold" title={`Fertilizer due ${daysToFert} days`}>
+                💧
+              </span>
+            )}
             {confirmedBatches && confirmedBatches.length > 0 && confirmedBatches.map(b => (
               <span key={b.id} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
                 B{b.batchNumber}

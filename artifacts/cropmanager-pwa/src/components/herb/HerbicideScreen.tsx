@@ -88,7 +88,11 @@ function statusOf(h: HerbEntry): 'active' | 'check' | 'done' | 'unknown' {
 }
 
 export function HerbicideScreen({ onClose }: { onClose: () => void }) {
-  const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('type').equals('herbicide').toArray(), []) ?? [];
+  const treatmentLogsResult = useLiveQuery(() => 
+    db.treatmentLogs.where('type').equals('herbicide').toArray(), 
+  []);
+  const treatmentLogs = treatmentLogsResult ?? [];
+  
   const herbLog: HerbEntry[] = useMemo(() => {
     if (!treatmentLogs || treatmentLogs.length === 0) return HERB_SEED;
     return treatmentLogs.map(t => {

@@ -55,8 +55,14 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   async function handleStageChange() {
     if (!newStage) return;
     setSaving(true);
-    const parts = stageDate.split('-').map(s => parseInt(s, 10));
-    const dateNow = (parts.length === 3) ? new Date(parts[0], parts[1]-1, parts[2]) : today();
+    // Always use today if no valid date is provided
+    let dateNow = today();
+    if (stageDate) {
+      const parts = stageDate.split('-').map(s => parseInt(s, 10));
+      if (parts.length === 3 && parts[0] > 0 && parts[1] >= 1 && parts[1] <= 12 && parts[2] >= 1) {
+        dateNow = new Date(parts[0], parts[1]-1, parts[2]);
+      }
+    }
     
     // Fetch adjustments and existing harvest logs
     const [adjustments, existingHarvestLogs] = await Promise.all([

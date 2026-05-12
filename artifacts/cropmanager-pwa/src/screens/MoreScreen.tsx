@@ -6,6 +6,7 @@ import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen
 import { CropHistoryScreen } from '../components/reports/CropHistory';
 import { HerbicideScreen } from '../components/herb/HerbicideScreen';
 import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
+import { ActivityScreen } from '../components/activity/ActivityScreen';
 
 interface MoreItemProps {
   title: string;
@@ -35,7 +36,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | 'activity' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -77,6 +78,13 @@ export function MoreScreen() {
               icon={<Bell className="w-6 h-6 text-purple-600" />}
               iconColor="bg-purple-50"
               onClick={() => setActiveTab('reminders')}
+            />
+            <MoreItem
+              title="Activity Log"
+              subtitle="Record and track field activities"
+              icon={<span className="text-lg">📋</span>}
+              iconColor="bg-orange-50"
+              onClick={() => setActivePanel('activity')}
             />
           </div>
         </section>
@@ -131,6 +139,11 @@ export function MoreScreen() {
       {activePanel === 'ch-calc' && (
         <div className="fixed inset-0 z-[60] bg-white">
           <CHCalculatorScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'activity' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <ActivityScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
     </div>

@@ -3,6 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { addDays, formatDateShort, formatDateDisplay, today } from '../lib/dates';
 import { useWeather } from '../hooks/useWeather';
+import { useAppStore } from '../store/useAppStore';
+import { ChevronLeft } from 'lucide-react';
 
 const TYPE_EMOJI: Record<string, string> = {
   harvest: '🥬', transplant: '🌱', spray_fungus: '🍄', spray_pest: '🐛',
@@ -12,6 +14,7 @@ const TYPE_EMOJI: Record<string, string> = {
 
 export function CalendarScreen() {
   const [weekOffset, setWeekOffset] = useState(0);
+  const { setActiveTab } = useAppStore();
   const { forecasts } = useWeather();
 
   const start = addDays(today(), weekOffset * 7);
@@ -25,6 +28,13 @@ export function CalendarScreen() {
 
   return (
     <div className="pb-24 pt-2">
+      {/* Header with back button */}
+      <div className="flex items-center gap-2 px-4 mb-2">
+        <button onClick={() => setActiveTab('more')} className="p-1.5 rounded-lg border bg-white text-gray-600">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <h1 className="font-bold text-lg">Calendar</h1>
+      </div>
       {/* Week navigation */}
       <div className="flex items-center justify-between px-4 mb-3">
         <button onClick={() => setWeekOffset(w => w - 1)} className="p-2 rounded-lg hover:bg-gray-100 text-xl">‹</button>

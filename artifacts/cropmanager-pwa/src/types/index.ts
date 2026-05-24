@@ -314,6 +314,7 @@ export interface LedgerEntry {
   expiryDate: string;
   batch: string;
   cropName: string;
+  purchaseLocation: string;
   notes: string;
   updatedAt: number;
 }

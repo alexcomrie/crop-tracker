@@ -9,8 +9,9 @@ import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
 import { autoAdjustTransplantSchedule } from '../lib/stages';
 import db from '../db/db';
-import { formatDateShort } from '../lib/dates';
+import { formatDateShort, today, daysBetween, parseDate } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
+import { generateId } from '../lib/ids';
 
 const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
 
@@ -36,6 +37,39 @@ export function CropsScreen() {
       }
     })();
   }, [crops, cropDb]);
+
+  // Auto-transition Germinated → Seedling after 7 days
+  useEffect(() => {
+    (async () => {
+      const germinatedCrops = crops.filter(c => c.plantStage === 'Germinated' && c.germinationDate);
+      for (const c of germinatedCrops) {
+        const germDate = parseDate(c.germinationDate);
+        if (!germDate) continue;
+        const daysSinceGerm = daysBetween(germDate, today());
+        if (daysSinceGerm >= 7) {
+          const now = today();
+          const stageLog = {
+            id: generateId('SL'),
+            trackingId: c.id,
+            cropName: c.cropName,
+            variety: c.variety,
+            stageFrom: 'Germinated',
+            stageTo: 'Seedling',
+            date: formatDateShort(now),
+            daysElapsed: daysBetween(germDate, now),
+            method: c.plantingMethod,
+            notes: 'Auto-transitioned after 7 days in Germinated',
+            updatedAt: Date.now(),
+          };
+          await db.stageLogs.add(stageLog);
+          await db.crops.update(c.id, {
+            plantStage: 'Seedling',
+            updatedAt: Date.now(),
+          });
+        }
+      }
+    })();
+  }, [crops]);
 
   useEffect(() => {
     (async () => {

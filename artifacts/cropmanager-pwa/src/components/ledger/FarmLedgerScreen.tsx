@@ -3,12 +3,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, Beaker, TrendingUp, BarChart3 } from 'lucide-react';
+import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, Beaker, TrendingUp, BarChart3, Pencil } from 'lucide-react';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today } from '../../lib/dates';
 import type { LedgerEntry, LedgerEntryType } from '../../types';
 
 const EXPENSE_CATEGORIES = ['Seeds', 'Tools', 'Fertilizer', 'Pesticide', 'Herbicide', 'Equipment', 'Labor', 'Irrigation', 'Soil/Media', 'Transport', 'Packaging', 'Other'];
+const AUTO_INVENTORY_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Pesticide'];
 const SALE_CATEGORIES = ['Wholesale', 'Retail', 'Direct-to-Consumer', 'Farmers Market', 'Other'];
 const INVENTORY_CATEGORIES = ['Harvested Produce', 'Seeds', 'Treatments', 'Fertilizer', 'Tools'];
 const TREATMENT_CATEGORIES = ['Pesticide', 'Herbicide', 'Fertilizer', 'Fungicide'];
@@ -25,6 +26,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<LedgerTab>('expense');
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     date: formatDateShort(today()),
     type: 'expense' as LedgerEntryType,
@@ -38,6 +40,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
     expiryDate: '',
     batch: '',
     cropName: '',
+    purchaseLocation: '',
     notes: '',
   });
 
@@ -49,29 +52,31 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const totalSales = useMemo(() => sales.reduce((s, e) => s + e.amount, 0), [sales]);
 
-  function resetForm() {
+  function resetForm(entry?: LedgerEntry) {
+    setEditId(entry?.id || null);
     setForm({
-      date: formatDateShort(today()),
-      type: 'expense' as LedgerEntryType,
-      category: '',
-      amount: '',
-      quantity: '',
-      unit: '',
-      description: '',
-      buyer: '',
-      paymentStatus: 'paid',
-      expiryDate: '',
-      batch: '',
-      cropName: '',
-      notes: '',
+      date: entry?.date || formatDateShort(today()),
+      type: entry?.type || 'expense' as LedgerEntryType,
+      category: entry?.category || '',
+      amount: entry?.amount?.toString() || '',
+      quantity: entry?.quantity?.toString() || '',
+      unit: entry?.unit || '',
+      description: entry?.description || '',
+      buyer: entry?.buyer || '',
+      paymentStatus: entry?.paymentStatus || 'paid',
+      expiryDate: entry?.expiryDate || '',
+      batch: entry?.batch || '',
+      cropName: entry?.cropName || '',
+      purchaseLocation: entry?.purchaseLocation || '',
+      notes: entry?.notes || '',
     });
   }
 
   async function handleSave() {
     if (!form.category || !form.amount) return;
     setSaving(true);
-    const entry: LedgerEntry = {
-      id: generateId('LED'),
+    const entryData: LedgerEntry = {
+      id: editId || generateId('LED'),
       type: form.type,
       date: form.date || formatDateShort(today()),
       category: form.category,
@@ -84,12 +89,45 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
       expiryDate: form.expiryDate,
       batch: form.batch,
       cropName: form.cropName,
+      purchaseLocation: form.purchaseLocation,
       notes: form.notes,
       updatedAt: Date.now(),
     };
-    await db.ledgerEntries.add(entry);
+    await db.ledgerEntries.put(entryData);
+    // Auto-log inventory for expense categories Seeds, Fungicide, Herbicide, Pesticide
+    if (form.type === 'expense' && AUTO_INVENTORY_CATEGORIES.includes(form.category)) {
+      const invEntry: LedgerEntry = {
+        id: generateId('LED'),
+        type: 'inventory',
+        date: form.date || formatDateShort(today()),
+        category: form.category,
+        amount: 0,
+        quantity: parseFloat(form.quantity) || 0,
+        unit: form.unit,
+        description: `Auto-logged from ${form.category} purchase: ${form.description || form.category}`,
+        buyer: '',
+        paymentStatus: 'paid',
+        expiryDate: form.expiryDate,
+        batch: form.batch || `B${Date.now()}`,
+        cropName: '',
+        purchaseLocation: form.purchaseLocation,
+        notes: `Auto-inventory: ${form.purchaseLocation ? `Purchased at ${form.purchaseLocation}. ` : ''}${form.notes || ''}`,
+        updatedAt: Date.now(),
+      };
+      // Check if similar inventory entry exists and update quantity instead
+      const existing = await db.ledgerEntries
+        .where('type').equals('inventory')
+        .and(e => e.category === form.category && e.batch === (form.batch || `B${Date.now()}`))
+        .toArray();
+      if (existing.length > 0 && invEntry.category !== 'Seeds') {
+        invEntry.quantity += existing[0].quantity;
+        invEntry.id = existing[0].id;
+      }
+      await db.ledgerEntries.put(invEntry);
+    }
     setSaving(false);
     setShowForm(false);
+    setEditId(null);
     resetForm();
   }
 
@@ -149,6 +187,14 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
     return Object.entries(cats).sort(([, a], [, b]) => b - a);
   }, [sales]);
 
+  const purchaseLocations = useMemo(() => {
+    const locs = new Set<string>();
+    for (const e of expenses) {
+      if (e.purchaseLocation) locs.add(e.purchaseLocation);
+    }
+    return Array.from(locs).sort();
+  }, [expenses]);
+
   return (
     <div className="absolute inset-0 bg-[#f5f5f0] flex flex-col z-[60] animate-in slide-in-from-right duration-300">
       <div className="bg-white border-b border-gray-200 h-14 flex items-center gap-3 px-4 shrink-0">
@@ -177,7 +223,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         {showForm && tab !== 'pnl' && tab !== 'charts' && (
           <div className="p-4 border-b border-gray-100 bg-white">
             <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-              <h3 className="font-semibold text-sm">New {tab === 'expense' ? 'Expense' : tab === 'sales' ? 'Sale' : tab === 'inventory' ? 'Inventory' : 'Treatment'} Entry</h3>
+              <h3 className="font-semibold text-sm">{editId ? 'Edit' : 'New'} {tab === 'expense' ? 'Expense' : tab === 'sales' ? 'Sale' : tab === 'inventory' ? 'Inventory' : 'Treatment'} Entry</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase">Date</label>
@@ -208,6 +254,23 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase">Unit</label>
                     <Input value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="mt-1" placeholder="kg, L, pcs..." />
+                  </div>
+                </div>
+              )}
+              {tab === 'expense' && (
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase">Purchase Location</label>
+                  <div className="flex gap-2 mt-1">
+                    <input
+                      list="purchaseLocs"
+                      value={form.purchaseLocation}
+                      onChange={e => setForm({...form, purchaseLocation: e.target.value})}
+                      className="flex-1 border rounded-lg p-2 text-sm bg-white"
+                      placeholder="Farm store name..."
+                    />
+                    <datalist id="purchaseLocs">
+                      {purchaseLocations.map(l => <option key={l} value={l} />)}
+                    </datalist>
                   </div>
                 </div>
               )}
@@ -251,7 +314,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
               </div>
               <div className="flex gap-2 pt-1">
                 <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving...' : '💾 Save'}
+                  {saving ? 'Saving...' : editId ? '💾 Update' : '💾 Save'}
                 </Button>
                 <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
               </div>
@@ -276,9 +339,12 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="font-semibold text-[14px]">{e.category} — <span className="text-red-600">${e.amount.toFixed(2)}</span></div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">{fmtDate(e.date)}{e.buyer ? ` · ${e.buyer}` : ''}</div>
+                    <div className="text-[11px] text-gray-500 mt-0.5">{fmtDate(e.date)}{e.buyer ? ` · ${e.buyer}` : ''}{e.purchaseLocation ? ` · 🏪 ${e.purchaseLocation}` : ''}</div>
                   </div>
-                  <button onClick={() => handleDelete(e.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => { resetForm(e); setShowForm(true); }} className="text-gray-400 hover:text-blue-500"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(e.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                  </div>
                 </div>
                 {e.description && <div className="text-sm text-gray-600 mt-1">{e.description}</div>}
                 {e.quantity > 0 && <div className="text-xs text-gray-500 mt-0.5">Qty: {e.quantity} {e.unit}</div>}
@@ -313,6 +379,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                       s.paymentStatus === 'pending' ? 'bg-yellow-50 text-yellow-700' :
                       'bg-red-50 text-red-700'
                     }`}>{s.paymentStatus}</span>
+                    <button onClick={() => { resetForm(s); setShowForm(true); }} className="text-gray-400 hover:text-blue-500"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(s.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
@@ -340,6 +407,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex items-center gap-2">
                     {i.quantity > 0 && <span className="text-sm font-bold">{i.quantity} {i.unit}</span>}
+                    <button onClick={() => { resetForm(i); setShowForm(true); }} className="text-gray-400 hover:text-blue-500"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(i.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
@@ -372,6 +440,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex items-center gap-2">
                     {t.quantity > 0 && <span className="text-sm font-bold">{t.quantity} {t.unit}</span>}
+                    <button onClick={() => { resetForm(t); setShowForm(true); }} className="text-gray-400 hover:text-blue-500"><Pencil className="w-4 h-4" /></button>
                     <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>

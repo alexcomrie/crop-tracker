@@ -297,3 +297,23 @@ export interface FertScheduleData {
   applicationRules: string[];
   currentActiveStageKey: string;
 }
+
+export type LedgerEntryType = 'expense' | 'sale' | 'inventory' | 'treatment';
+
+export interface LedgerEntry {
+  id: string;
+  type: LedgerEntryType;
+  date: string;
+  category: string;
+  amount: number;
+  quantity: number;
+  unit: string;
+  description: string;
+  buyer: string;
+  paymentStatus: string;
+  expiryDate: string;
+  batch: string;
+  cropName: string;
+  notes: string;
+  updatedAt: number;
+}

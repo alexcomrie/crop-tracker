@@ -7,6 +7,7 @@ import { CropHistoryScreen } from '../components/reports/CropHistory';
 import { HerbicideScreen } from '../components/herb/HerbicideScreen';
 import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
 import { ActivityScreen } from '../components/activity/ActivityScreen';
+import { FarmLedgerScreen } from '../components/ledger/FarmLedgerScreen';
 
 interface MoreItemProps {
   title: string;
@@ -36,7 +37,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | 'activity' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | 'activity' | 'ledger' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -102,6 +103,18 @@ export function MoreScreen() {
           </div>
         </section>
         <section>
+          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Finance</h2>
+          <div className="space-y-3">
+            <MoreItem
+              title="Farm Ledger"
+              subtitle="Expenses, sales, inventory, treatments, P&L"
+              icon={<span className="text-lg">📊</span>}
+              iconColor="bg-emerald-50"
+              onClick={() => setActivePanel('ledger')}
+            />
+          </div>
+        </section>
+        <section>
           <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Schedule</h2>
           <div className="space-y-3">
             <MoreItem
@@ -144,6 +157,11 @@ export function MoreScreen() {
       {activePanel === 'activity' && (
         <div className="fixed inset-0 z-[60] bg-white">
           <ActivityScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'ledger' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <FarmLedgerScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
     </div>

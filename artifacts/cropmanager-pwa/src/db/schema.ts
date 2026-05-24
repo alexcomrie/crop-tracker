@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type {
   Crop, Propagation, Reminder, StageLog, HarvestLog,
   TreatmentLog, CropDbAdjustment, PropDbAdjustment,
-  BatchPlantingLog, CropSearchLog
+  BatchPlantingLog, CropSearchLog, LedgerEntry
 } from '../types';
 
 export class CropManagerDB extends Dexie {
@@ -28,10 +28,11 @@ export class CropManagerDB extends Dexie {
     cropIds: string[];
     updatedAt: number;
   }>;
+  ledgerEntries!: Table<LedgerEntry>;
 
   constructor() {
     super('CropManagerDB');
-    this.version(2).stores({
+    this.version(3).stores({
       crops: 'id, cropName, variety, status, plantStage, isContinuous, parentCropId, updatedAt',
       propagations: 'id, plantName, status, updatedAt',
       reminders: 'id, type, trackingId, sendDate, sent, updatedAt',
@@ -44,6 +45,7 @@ export class CropManagerDB extends Dexie {
       cropSearchLogs: 'id, cropKey, updatedAt',
       successionGaps: 'id, updatedAt',
       activities: 'id, date, type, reminderDate, updatedAt',
+      ledgerEntries: 'id, type, date, category, updatedAt',
     });
   }
 }

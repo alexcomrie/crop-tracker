@@ -94,6 +94,21 @@ export function CropsScreen() {
       }
 
       await db.crops.update(c.id, patch);
+
+      // Update existing batch planting logs with recalculated dates
+      if (c.isContinuous && patch.batchOffset) {
+        const existingBatches = await db.batchPlantingLogs.where('cropTrackingId').equals(c.id).toArray();
+        const planted = new Date(c.plantingDate);
+        for (const batch of existingBatches) {
+          const batchDate = new Date(planted.getTime() + (batch.batchNumber - 1) * patch.batchOffset * 86400000);
+          const nextBatchDate = new Date(planted.getTime() + batch.batchNumber * patch.batchOffset * 86400000);
+          await db.batchPlantingLogs.update(batch.id, {
+            batchPlantingDate: formatDateShort(batchDate),
+            nextBatchDate: formatDateShort(nextBatchDate),
+            updatedAt: Date.now(),
+          });
+        }
+      }
     }
     alert('Timings and Continuous Harvest logic refreshed.');
   }

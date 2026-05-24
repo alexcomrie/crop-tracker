@@ -78,7 +78,9 @@ export function CropsScreen() {
         const freqDays = c.harvestFrequency || 7;
         
         let batchOffset: number;
-        if (!isMulti) {
+        if (cd.batch_offset_days && cd.batch_offset_days > 0) {
+          batchOffset = cd.batch_offset_days;
+        } else if (!isMulti) {
           batchOffset = freqDays;
         } else {
           const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);

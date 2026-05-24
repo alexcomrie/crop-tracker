@@ -62,7 +62,9 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
     const harvestIntv = val.harvest_interval || 7;
     const isMulti     = harvestWks > 1;
     let batchOffset: number;
-    if (!isMulti) {
+    if (val.batch_offset_days && val.batch_offset_days > 0) {
+      batchOffset = val.batch_offset_days;
+    } else if (!isMulti) {
       batchOffset = freqDays;
     } else {
       const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);

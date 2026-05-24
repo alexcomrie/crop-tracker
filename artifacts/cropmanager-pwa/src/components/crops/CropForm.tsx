@@ -68,7 +68,9 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
     const harvestIntv = selectedCropData.harvest_interval || 7;
     const isMulti     = harvestWks > 1;
     let batchOffset: number;
-    if (!isMulti) {
+    if (selectedCropData.batch_offset_days && selectedCropData.batch_offset_days > 0) {
+      batchOffset = selectedCropData.batch_offset_days;
+    } else if (!isMulti) {
       batchOffset = freqDays;
     } else {
       const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);

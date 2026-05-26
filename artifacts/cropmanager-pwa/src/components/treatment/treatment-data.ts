@@ -11,10 +11,11 @@ export interface TreatmentRate {
 export interface TreatmentProduct {
   id: string;
   name: string;
-  category: 'Fungicide' | 'Insecticide';
+  category: 'Fungicide' | 'Insecticide' | 'Herbicide' | 'Fertilizer' | 'Other';
   classification: 'Contact' | 'Systemic' | 'Both';
   rates: TreatmentRate[];
   notes?: string;
+  isCustom?: boolean;
 }
 
 const FUNGICIDES: TreatmentProduct[] = [

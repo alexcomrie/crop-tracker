@@ -3,20 +3,19 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, Beaker, TrendingUp, BarChart3, Pencil } from 'lucide-react';
+import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, TrendingUp, BarChart3, Pencil } from 'lucide-react';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today } from '../../lib/dates';
 import type { LedgerEntry, LedgerEntryType } from '../../types';
 
-const EXPENSE_CATEGORIES = ['Seeds', 'Tools', 'Fertilizer', 'Pesticide', 'Herbicide', 'Equipment', 'Labor', 'Irrigation', 'Soil/Media', 'Transport', 'Packaging', 'Other'];
-const AUTO_INVENTORY_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Pesticide'];
+const EXPENSE_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Insecticide', 'Pesticide', 'Fertilizer', 'Tools', 'Equipment', 'Labor', 'Irrigation', 'Soil/Media', 'Transport', 'Packaging', 'Other'];
+const AUTO_INVENTORY_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Insecticide', 'Pesticide'];
 const SALE_CATEGORIES = ['Wholesale', 'Retail', 'Direct-to-Consumer', 'Farmers Market', 'Other'];
-const INVENTORY_CATEGORIES = ['Harvested Produce', 'Seeds', 'Treatments', 'Fertilizer', 'Tools'];
-const TREATMENT_CATEGORIES = ['Pesticide', 'Herbicide', 'Fertilizer', 'Fungicide'];
+const INVENTORY_CATEGORIES = ['Harvested Produce', 'Seeds', 'Fungicide', 'Herbicide', 'Insecticide', 'Pesticide', 'Fertilizer', 'Tools'];
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-type LedgerTab = 'expense' | 'sales' | 'inventory' | 'treatment' | 'pnl' | 'charts';
+type LedgerTab = 'expense' | 'sales' | 'inventory' | 'pnl' | 'charts';
 
 export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const entries = useLiveQuery(() => 
@@ -27,6 +26,8 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkInput, setBulkInput] = useState('');
   const [form, setForm] = useState({
     date: formatDateShort(today()),
     type: 'expense' as LedgerEntryType,
@@ -47,16 +48,15 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const expenses = useMemo(() => entries.filter(e => e.type === 'expense'), [entries]);
   const sales = useMemo(() => entries.filter(e => e.type === 'sale'), [entries]);
   const inventory = useMemo(() => entries.filter(e => e.type === 'inventory'), [entries]);
-  const treatments = useMemo(() => entries.filter(e => e.type === 'treatment'), [entries]);
-
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const totalSales = useMemo(() => sales.reduce((s, e) => s + e.amount, 0), [sales]);
 
   function resetForm(entry?: LedgerEntry) {
     setEditId(entry?.id || null);
+    const defaultType = tab === 'expense' ? 'expense' : tab === 'sales' ? 'sale' : 'inventory';
     setForm({
       date: entry?.date || formatDateShort(today()),
-      type: entry?.type || 'expense' as LedgerEntryType,
+      type: entry?.type || defaultType,
       category: entry?.category || '',
       amount: entry?.amount?.toString() || '',
       quantity: entry?.quantity?.toString() || '',
@@ -131,6 +131,36 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
     resetForm();
   }
 
+  async function handleBulkSave() {
+    const lines = bulkInput.split('\n').map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      const parts = line.split('\t').map(p => p.trim());
+      const [cat, val, desc, qty, unit, extra] = parts;
+      if (!cat || !val) continue;
+      const entry: LedgerEntry = {
+        id: generateId('LED'),
+        type: tab === 'sales' ? 'sale' : (tab === 'inventory' ? 'inventory' : 'expense'),
+        date: formatDateShort(today()),
+        category: cat,
+        amount: tab === 'inventory' ? 0 : (parseFloat(val) || 0),
+        quantity: parseFloat(tab === 'inventory' ? val : (qty || '0')) || 0,
+        unit: tab === 'inventory' ? '' : (unit || ''),
+        description: desc || '',
+        buyer: tab === 'sales' ? (desc || '') : '',
+        paymentStatus: tab === 'sales' ? (extra || 'paid') : 'paid',
+        expiryDate: '',
+        batch: tab === 'inventory' ? (qty || '') : '',
+        cropName: tab === 'sales' ? (qty || '') : '',
+        purchaseLocation: tab === 'expense' ? (extra || '') : '',
+        notes: '',
+        updatedAt: Date.now(),
+      };
+      await db.ledgerEntries.put(entry);
+    }
+    setBulkMode(false);
+    setBulkInput('');
+  }
+
   async function handleDelete(id: string) {
     if (confirm('Delete this entry?')) {
       await db.ledgerEntries.delete(id);
@@ -145,20 +175,16 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
 
   const categories = tab === 'expense' ? EXPENSE_CATEGORIES
     : tab === 'sales' ? SALE_CATEGORIES
-    : tab === 'inventory' ? INVENTORY_CATEGORIES
-    : TREATMENT_CATEGORIES;
+    : INVENTORY_CATEGORIES;
 
   const currentEntries = tab === 'expense' ? expenses
     : tab === 'sales' ? sales
-    : tab === 'inventory' ? inventory
-    : tab === 'treatment' ? treatments
-    : [];
+    : inventory;
 
   const TABS: { key: LedgerTab; label: string; icon: React.ReactNode }[] = [
     { key: 'expense', label: 'Expenses', icon: <DollarSign className="w-4 h-4" /> },
     { key: 'sales', label: 'Sales', icon: <ShoppingCart className="w-4 h-4" /> },
     { key: 'inventory', label: 'Inventory', icon: <Package className="w-4 h-4" /> },
-    { key: 'treatment', label: 'Treatments', icon: <Beaker className="w-4 h-4" /> },
     { key: 'pnl', label: 'P&L', icon: <TrendingUp className="w-4 h-4" /> },
     { key: 'charts', label: 'Charts', icon: <BarChart3 className="w-4 h-4" /> },
   ];
@@ -203,7 +229,10 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         </button>
         <h2 className="font-semibold text-[16px] flex-1">🌱 Farm Ledger</h2>
         {tab !== 'pnl' && tab !== 'charts' && (
-          <Button className="h-8" onClick={() => { resetForm(); setShowForm(true); }}>+ Add</Button>
+          <div className="flex gap-1">
+            <Button className="h-8" onClick={() => { resetForm(); setShowForm(true); }}>+ Add</Button>
+            <Button variant="outline" className="h-8" onClick={() => { setBulkMode(!bulkMode); setBulkInput(''); }}>Bulk</Button>
+          </div>
         )}
       </div>
 
@@ -223,7 +252,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         {showForm && tab !== 'pnl' && tab !== 'charts' && (
           <div className="p-4 border-b border-gray-100 bg-white">
             <div className="bg-gray-50 rounded-xl p-4 space-y-3">
-              <h3 className="font-semibold text-sm">{editId ? 'Edit' : 'New'} {tab === 'expense' ? 'Expense' : tab === 'sales' ? 'Sale' : tab === 'inventory' ? 'Inventory' : 'Treatment'} Entry</h3>
+              <h3 className="font-semibold text-sm">{editId ? 'Edit' : 'New'} {tab === 'expense' ? 'Expense' : tab === 'sales' ? 'Sale' : 'Inventory'} Entry</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase">Date</label>
@@ -296,7 +325,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                   </div>
                 </>
               )}
-              {(tab === 'inventory' || tab === 'treatment') && (
+              {tab === 'inventory' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase">Batch #</label>
@@ -317,6 +346,29 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                   {saving ? 'Saving...' : editId ? '💾 Update' : '💾 Save'}
                 </Button>
                 <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {bulkMode && (
+          <div className="p-4 border-b border-gray-100 bg-white">
+            <div className="bg-yellow-50 rounded-xl p-4 space-y-3">
+              <h3 className="font-semibold text-sm">Bulk Add {tab === 'expense' ? 'Expenses' : tab === 'sales' ? 'Sales' : 'Inventory'}</h3>
+              <p className="text-xs text-gray-500">One entry per line, tab-separated fields:
+                {tab === 'expense' && <span className="block mt-1 font-mono">Category ⇥ Amount ⇥ Description ⇥ Quantity ⇥ Unit ⇥ Location</span>}
+                {tab === 'sales' && <span className="block mt-1 font-mono">Category ⇥ Amount ⇥ Buyer ⇥ Crop ⇥ PaymentStatus</span>}
+                {tab === 'inventory' && <span className="block mt-1 font-mono">Category ⇥ Quantity ⇥ Unit ⇥ Batch ⇥ Expiry</span>}
+              </p>
+              <textarea
+                value={bulkInput}
+                onChange={e => setBulkInput(e.target.value)}
+                className="w-full border rounded-lg p-3 text-sm font-mono bg-white h-32 resize-none"
+                placeholder={tab === 'expense' ? 'Seeds\t50\tTomato seeds\t2\tkg\tFarm Store\nFertilizer\t25\t10-10-10\t1\tbag' : tab === 'sales' ? 'Retail\t100\tJohn Doe\tTomato\tpaid' : 'Seeds\t50\tkg\tB001\t2026-12-31'}
+              />
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={handleBulkSave}>Save All</Button>
+                <Button variant="outline" onClick={() => setBulkMode(false)}>Cancel</Button>
               </div>
             </div>
           </div>
@@ -418,40 +470,6 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
                     {new Date(i.expiryDate) < new Date() && <span className="text-red-500 ml-1 font-semibold">⚠ EXPIRED</span>}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Treatment Tab */}
-        {tab === 'treatment' && (
-          <div className="p-4 space-y-3">
-            {treatments.length === 0 ? (
-              <div className="flex flex-col items-center py-12 text-gray-400">
-                <Beaker className="w-10 h-10 mb-2" />
-                <p className="text-sm">No treatment inventory recorded.</p>
-              </div>
-            ) : treatments.map(t => (
-              <div key={t.id} className="bg-white border border-[#e0e0e0] rounded-xl p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="font-semibold text-[14px]">{t.category}{t.cropName ? ` → ${t.cropName}` : ''}</div>
-                    <div className="text-[11px] text-gray-500 mt-0.5">{fmtDate(t.date)}{t.batch ? ` · Batch: ${t.batch}` : ''}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {t.quantity > 0 && <span className="text-sm font-bold">{t.quantity} {t.unit}</span>}
-                    <button onClick={() => { resetForm(t); setShowForm(true); }} className="text-gray-400 hover:text-blue-500"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => handleDelete(t.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                </div>
-                {t.description && <div className="text-sm text-gray-600 mt-1">{t.description}</div>}
-                {t.expiryDate && (
-                  <div className="text-xs text-gray-500 mt-1">
-                    Expires: {fmtDate(t.expiryDate)}
-                    {new Date(t.expiryDate) < new Date() && <span className="text-red-500 ml-1 font-semibold">⚠ EXPIRED</span>}
-                  </div>
-                )}
-                {t.notes && <div className="text-xs text-gray-400 mt-1">{t.notes}</div>}
               </div>
             ))}
           </div>

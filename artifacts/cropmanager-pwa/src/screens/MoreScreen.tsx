@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Calendar, Database, Beaker, ShieldAlert, Bell, ChevronRight, BarChart2 } from 'lucide-react';
+import { Calendar, Database, Beaker, Bell, ChevronRight, BarChart2, FlaskConical } from 'lucide-react';
 import { CropDatabaseScreen } from '../components/CropDatabaseScreen';
 import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen';
 import { CropHistoryScreen } from '../components/reports/CropHistory';
-import { HerbicideScreen } from '../components/herb/HerbicideScreen';
 import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
 import { ActivityScreen } from '../components/activity/ActivityScreen';
 import { FarmLedgerScreen } from '../components/ledger/FarmLedgerScreen';
+import { TreatmentAppRatesScreen } from '../components/treatment/TreatmentAppRatesScreen';
 
 interface MoreItemProps {
   title: string;
@@ -37,7 +37,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'herb' | 'ch-calc' | 'activity' | 'ledger' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'ch-calc' | 'activity' | 'ledger' | 'treatment-rates' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -67,11 +67,11 @@ export function MoreScreen() {
               onClick={() => setActivePanel('history')}
             />
             <MoreItem
-              title="Herbicide Schedule"
-              subtitle="Manage herbicide application timing"
-              icon={<span className="text-lg">🌿</span>}
-              iconColor="bg-red-100"
-              onClick={() => setActivePanel('herb')}
+              title="Treatment App Rates"
+              subtitle="Calculate fungicide/insecticide application rates"
+              icon={<FlaskConical className="w-6 h-6 text-cyan-600" />}
+              iconColor="bg-cyan-50"
+              onClick={() => setActivePanel('treatment-rates')}
             />
             <MoreItem
               title="Reminders"
@@ -144,9 +144,9 @@ export function MoreScreen() {
           <CropHistoryScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
-      {activePanel === 'herb' && (
+      {activePanel === 'treatment-rates' && (
         <div className="fixed inset-0 z-[60] bg-white">
-          <HerbicideScreen onClose={() => setActivePanel(null)} />
+          <TreatmentAppRatesScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
       {activePanel === 'ch-calc' && (

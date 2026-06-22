@@ -324,13 +324,27 @@ export interface GeoPoint {
   lng: number;
 }
 
+export interface RowDetail {
+  rowNumber: number;
+  cropName: string;
+  spacingInRow: number;
+  notes?: string;
+}
+
 export interface FarmArea {
   id: string;
+  tag: string;
   name: string;
   points: GeoPoint[];
   areaSqM: number;
   areaDisplay: string;
   color: string;
+  status: 'unmapped' | 'mapped' | 'cultivated';
+  rowCount: number;
+  rowSpacing: number;
+  rowDetails: RowDetail[];
+  plantingMethod: string;
+  notes: string;
   createdAt: string;
   updatedAt: number;
 }

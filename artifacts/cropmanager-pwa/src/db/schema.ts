@@ -2,7 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import type {
   Crop, Propagation, Reminder, StageLog, HarvestLog,
   TreatmentLog, CropDbAdjustment, PropDbAdjustment,
-  BatchPlantingLog, CropSearchLog, LedgerEntry, FarmArea
+  BatchPlantingLog, CropSearchLog, LedgerEntry, FarmArea, FarmLand
 } from '../types';
 
 export class CropManagerDB extends Dexie {
@@ -29,6 +29,7 @@ export class CropManagerDB extends Dexie {
     updatedAt: number;
   }>;
   ledgerEntries!: Table<LedgerEntry>;
+  farmLands!: Table<FarmLand>;
   farmAreas!: Table<FarmArea>;
 
   constructor() {
@@ -63,6 +64,23 @@ export class CropManagerDB extends Dexie {
       activities: 'id, date, type, reminderDate, updatedAt',
       ledgerEntries: 'id, type, date, category, updatedAt',
       farmAreas: 'id, name, updatedAt',
+    });
+    this.version(5).stores({
+      crops: 'id, cropName, variety, status, plantStage, isContinuous, parentCropId, updatedAt',
+      propagations: 'id, plantName, status, updatedAt',
+      reminders: 'id, type, trackingId, sendDate, sent, updatedAt',
+      stageLogs: 'id, trackingId, date, updatedAt',
+      harvestLogs: 'id, cropTrackingId, harvestDate, updatedAt',
+      treatmentLogs: 'id, cropId, date, updatedAt',
+      cropDbAdjustments: 'id, cropKey, variety, field, updatedAt',
+      propDbAdjustments: 'id, plantKey, method, updatedAt',
+      batchPlantingLogs: 'id, cropTrackingId, status, updatedAt',
+      cropSearchLogs: 'id, cropKey, updatedAt',
+      successionGaps: 'id, updatedAt',
+      activities: 'id, date, type, reminderDate, updatedAt',
+      ledgerEntries: 'id, type, date, category, updatedAt',
+      farmLands: 'id, name, updatedAt',
+      farmAreas: 'id, landId, name, updatedAt',
     });
   }
 }

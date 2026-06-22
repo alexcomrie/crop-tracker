@@ -2,9 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { generateId } from '../../lib/ids';
-import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil } from 'lucide-react';
+import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { GeoPoint, FarmArea, RowDetail } from '../../types';
+import type { GeoPoint, FarmArea, FarmLand, RowDetail } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
 const PLANTING_METHODS = ['Direct Ground', 'Seed Bed', 'Seed Tray', 'Pot / Container', 'Hydroponic'];
@@ -81,18 +81,20 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${colors[status] || colors.unmapped}`}>{status}</span>;
 }
 
-async function getNextAreaTag(): Promise<string> {
-  const all = await db.farmAreas.toArray();
-  const nextNum = all.length + 1;
-  return `AREA${nextNum.toString().padStart(4, '0')}`;
+async function getNextPlotTag(): Promise<string> {
+  const count = await db.farmAreas.count();
+  return `PLOT${(count + 1).toString().padStart(4, '0')}`;
 }
 
 export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
-  const areas = useLiveQuery(() => db.farmAreas.toArray(), []);
-  const [mode, setMode] = useState<'list' | 'gps' | 'manual' | 'details'>('list');
+  const lands = useLiveQuery(() => db.farmLands.toArray(), []);
+  const [selectedLand, setSelectedLand] = useState<FarmLand | null>(null);
+  const plots = useLiveQuery(() => selectedLand ? db.farmAreas.where('landId').equals(selectedLand.id).toArray() : [], [selectedLand]);
+  const [mode, setMode] = useState<'lands' | 'land-gps' | 'plots' | 'gps' | 'manual' | 'details'>('lands');
   const [currentPoints, setCurrentPoints] = useState<GeoPoint[]>([]);
-  const [areaTag, setAreaTag] = useState('');
-  const [areaName, setAreaName] = useState('');
+  const [plotTag, setPlotTag] = useState('');
+  const [plotName, setPlotName] = useState('');
+  const [landName, setLandName] = useState('');
   const [watchId, setWatchId] = useState<number | null>(null);
   const [gpsStatus, setGpsStatus] = useState('');
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -184,10 +186,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
 
   function undoLastPoint() { setCurrentPoints(prev => prev.slice(0, -1)); }
 
-  function resetForm() {
+  function resetPlotForm() {
     setCurrentPoints([]);
-    setAreaTag('');
-    setAreaName('');
+    setPlotTag('');
+    setPlotName('');
     setEditId(null);
     setStatus('unmapped');
     setRowCount(1);
@@ -195,43 +197,87 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setRowDetails([{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
     setPlantingMethod('Direct Ground');
     setFarmNotes('');
+    setGpsAccuracy(null);
+    setGpsStatus('');
   }
 
-  async function saveArea() {
-    if (currentPoints.length < 3 || !areaName.trim()) return;
+  // ─── LAND OPERATIONS ───
+
+  async function saveLand() {
+    if (!landName.trim()) return;
+    try {
+      const land: FarmLand = {
+        id: generateId('LD'),
+        name: landName.trim(),
+        location: currentPoints.length > 0 ? currentPoints[0] : { lat: 0, lng: 0 },
+        color: COLORS[(lands?.length || 0) % COLORS.length],
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+      };
+      await db.farmLands.put(land);
+      setLandName('');
+      setCurrentPoints([]);
+      setMode('lands');
+    } catch (err) {
+      alert('Failed to save land: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }
+
+  async function deleteLand(id: string) {
+    if (!window.confirm('Delete this land and all its plots?')) return;
+    await db.farmAreas.where('landId').equals(id).delete();
+    await db.farmLands.delete(id);
+  }
+
+  function selectLand(land: FarmLand) {
+    setSelectedLand(land);
+    setMode('plots');
+  }
+
+  function backToLands() {
+    setSelectedLand(null);
+    resetPlotForm();
+    setMode('lands');
+  }
+
+  // ─── PLOT OPERATIONS ───
+
+  async function savePlot() {
+    if (currentPoints.length < 3 || !plotName.trim() || !selectedLand) return;
     try {
       const { sqM, display } = calcArea(currentPoints);
-      const tag = editId ? areaTag : await getNextAreaTag();
-      const area: FarmArea = {
+      const tag = editId ? plotTag : await getNextPlotTag();
+      const plot: FarmArea = {
         id: editId || generateId('FA'),
+        landId: selectedLand.id,
         tag,
-        name: areaName.trim(),
+        name: plotName.trim(),
         points: currentPoints,
         areaSqM: sqM,
         areaDisplay: display,
-        color: COLORS[(areas?.length || 0) % COLORS.length],
+        color: COLORS[(plots?.length || 0) % COLORS.length],
         status: status === 'unmapped' ? 'mapped' : status,
         rowCount,
         rowSpacing,
         rowDetails: rowDetails.filter(r => r.rowNumber <= rowCount),
         plantingMethod,
         notes: farmNotes,
-        createdAt: editId ? (areas?.find(a => a.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
+        createdAt: editId ? (plots?.find(p => p.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
         updatedAt: Date.now(),
       };
-      await db.farmAreas.put(area);
-      resetForm();
-      setMode('list');
+      await db.farmAreas.put(plot);
+      resetPlotForm();
+      setMode('plots');
     } catch (err) {
-      alert('Failed to save area: ' + (err instanceof Error ? err.message : String(err)));
+      alert('Failed to save plot: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  async function saveDetails() {
+  async function savePlotDetails() {
     if (!editId) return;
     try {
       await db.farmAreas.update(editId, {
-        name: areaName.trim(),
+        name: plotName.trim(),
         rowCount,
         rowSpacing,
         rowDetails: rowDetails.filter(r => r.rowNumber <= rowCount),
@@ -240,40 +286,40 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         status: 'cultivated',
         updatedAt: Date.now(),
       });
-      resetForm();
-      setMode('list');
+      resetPlotForm();
+      setMode('plots');
     } catch (err) {
       alert('Failed to save details: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
-  async function deleteArea(id: string) {
-    if (window.confirm('Delete this area?')) await db.farmAreas.delete(id);
+  async function deletePlot(id: string) {
+    if (window.confirm('Delete this plot?')) await db.farmAreas.delete(id);
   }
 
-  function editPerimeter(area: FarmArea) {
-    setCurrentPoints(area.points);
-    setAreaTag(area.tag);
-    setAreaName(area.name);
-    setEditId(area.id);
-    setStatus(area.status);
-    setRowCount(area.rowCount || 1);
-    setRowSpacing(area.rowSpacing || 30);
-    setRowDetails(area.rowDetails?.length ? area.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
-    setPlantingMethod(area.plantingMethod || 'Direct Ground');
-    setFarmNotes(area.notes || '');
+  function editPlotPerimeter(plot: FarmArea) {
+    setCurrentPoints(plot.points);
+    setPlotTag(plot.tag);
+    setPlotName(plot.name);
+    setEditId(plot.id);
+    setStatus(plot.status);
+    setRowCount(plot.rowCount || 1);
+    setRowSpacing(plot.rowSpacing || 30);
+    setRowDetails(plot.rowDetails?.length ? plot.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+    setPlantingMethod(plot.plantingMethod || 'Direct Ground');
+    setFarmNotes(plot.notes || '');
     setMode('gps');
   }
 
-  function openDetails(area: FarmArea) {
-    setEditId(area.id);
-    setAreaTag(area.tag);
-    setAreaName(area.name);
-    setRowCount(area.rowCount || 1);
-    setRowSpacing(area.rowSpacing || 30);
-    setRowDetails(area.rowDetails?.length ? area.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
-    setPlantingMethod(area.plantingMethod || 'Direct Ground');
-    setFarmNotes(area.notes || '');
+  function openPlotDetails(plot: FarmArea) {
+    setEditId(plot.id);
+    setPlotTag(plot.tag);
+    setPlotName(plot.name);
+    setRowCount(plot.rowCount || 1);
+    setRowSpacing(plot.rowSpacing || 30);
+    setRowDetails(plot.rowDetails?.length ? plot.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+    setPlantingMethod(plot.plantingMethod || 'Direct Ground');
+    setFarmNotes(plot.notes || '');
     setMode('details');
   }
 
@@ -305,50 +351,134 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     );
   }
 
+  function renderPlotForm(primaryColor: string) {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Plot Details</p>
+        <input type="text" placeholder="Plot name (e.g. North Bed)" value={plotName} onChange={e => setPlotName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+        <div className="grid grid-cols-2 gap-2">
+          <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+          <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+        </div>
+        <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+          {PLANTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        {rowDetails.slice(0, rowCount).map((row, i) => (
+          <div key={i} className="border rounded-lg p-3 space-y-2 bg-gray-50">
+            <p className="text-xs font-semibold text-gray-500 uppercase">Row {i + 1}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="text" placeholder="Crop name" value={row.cropName} onChange={e => updateRow(i, 'cropName', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <input type="number" placeholder="Spacing (cm)" value={row.spacingInRow} onChange={e => updateRow(i, 'spacingInRow', Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" min={1} />
+            </div>
+            <input type="text" placeholder="Row notes" value={row.notes || ''} onChange={e => updateRow(i, 'notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+          </div>
+        ))}
+        <textarea placeholder="General notes about this plot..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={resetPlotForm} className="flex-1"><RotateCcw className="w-4 h-4" /> Reset</Button>
+          <Button onClick={savePlot} className="flex-1 text-white" style={{ backgroundColor: primaryColor }} disabled={!plotName.trim()}><Save className="w-4 h-4" /> Save Plot</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const backBtn = (onBack: () => void) => (
+    <button onClick={onBack} className="text-gray-600 text-lg">←</button>
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b sticky top-0 z-10">
-        <button onClick={() => { if (mode !== 'list') { resetForm(); if (watchId !== null) navigator.geolocation.clearWatch(watchId); setWatchId(null); setMode('list'); } else onClose(); }} className="text-gray-600 text-lg">←</button>
+        {mode === 'lands' ? backBtn(onClose) : mode === 'plots' ? backBtn(backToLands) : backBtn(() => { stopGps(); resetPlotForm(); setMode('plots'); })}
         <h1 className="font-bold text-lg">Area Mapper</h1>
+        {(mode === 'plots' || mode === 'gps' || mode === 'manual' || mode === 'details') && selectedLand && (
+          <span className="text-sm text-gray-400 ml-1">— {selectedLand.name}</span>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* ─── LIST MODE ─── */}
-        {mode === 'list' && (
+        {/* ─── LAND LIST ─── */}
+        {mode === 'lands' && (
           <>
             <div className="flex gap-2">
-              <button onClick={() => { resetForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
-              <button onClick={() => { resetForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
+              <button onClick={() => { setLandName(''); setCurrentPoints([]); setMode('land-gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Add Land</button>
             </div>
-            {(!areas || areas.length === 0) && (
-              <div className="text-center py-20 text-gray-400"><MapPin className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No areas mapped yet</p><p className="text-sm">Walk a perimeter or tap points on a grid</p></div>
+            {(!lands || lands.length === 0) && (
+              <div className="text-center py-20 text-gray-400"><Home className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No farm lands yet</p><p className="text-sm">Add your first land parcel to start mapping plots</p></div>
             )}
-            {areas?.map(a => {
-              const { sqM } = calcArea(a.points);
+            {lands?.map(l => (
+              <div key={l.id} onClick={() => selectLand(l)} className="bg-white rounded-xl border p-4 flex items-center gap-3 active:scale-[0.98] transition-all cursor-pointer">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ backgroundColor: l.color + '20' }}><Home className="w-5 h-5" style={{ color: l.color }} /></div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">{l.name}</h3>
+                  <p className="text-xs text-gray-500">{l.location.lat.toFixed(4)}, {l.location.lng.toFixed(4)}</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-300" />
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ─── LAND GPS LOCATION ─── */}
+        {mode === 'land-gps' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border p-4 space-y-3">
+              <h2 className="font-semibold">Set Land Location</h2>
+              <p className="text-sm text-gray-500">Walk to the center of your land and record a GPS point, or enter the name manually.</p>
+              <input type="text" placeholder="Land name (e.g. North Property)" value={landName} onChange={e => setLandName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
+                {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
+                {currentPoints.length > 0 && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints[0].lat.toFixed(4)}, {currentPoints[0].lng.toFixed(4)}</span>}
+              </div>
+              {watchId === null ? (
+                <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> Record Location</Button>
+              ) : (
+                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Stop</Button>
+              )}
+              <p className="text-xs text-gray-500">{gpsStatus}</p>
+              <Button onClick={saveLand} className="w-full bg-green-600 text-white" disabled={!landName.trim()}><Save className="w-4 h-4" /> Save Land</Button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── PLOT LIST ─── */}
+        {mode === 'plots' && selectedLand && (
+          <>
+            <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''} in {selectedLand.name}</p>
+            <div className="flex gap-2">
+              <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
+              <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
+            </div>
+            {(!plots || plots.length === 0) && (
+              <div className="text-center py-16 text-gray-400"><MapPin className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No plots mapped in this land</p><p className="text-sm">Walk a perimeter or tap points on a grid</p></div>
+            )}
+            {plots?.map(p => {
+              const { sqM } = calcArea(p.points);
               return (
-                <div key={a.id} className="bg-white rounded-xl border p-3 flex gap-3">
-                  <AreaSvgThumb points={a.points} />
+                <div key={p.id} className="bg-white rounded-xl border p-3 flex gap-3">
+                  <AreaSvgThumb points={p.points} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm">{a.tag}</span>
-                      {a.name && <span className="text-xs text-gray-500 truncate">— {a.name}</span>}
-                      <StatusBadge status={a.status} />
+                      <span className="font-semibold text-sm">{p.tag}</span>
+                      {p.name && <span className="text-xs text-gray-500 truncate">— {p.name}</span>}
+                      <StatusBadge status={p.status} />
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{formatAreaShort(sqM)} · {a.points.length} points</p>
-                    {(a.rowCount || 0) > 0 && <p className="text-xs text-gray-500">{a.rowCount} row{(a.rowCount || 0) !== 1 ? 's' : ''}{a.rowSpacing ? ` · ${a.rowSpacing} cm spacing` : ''}</p>}
-                    {a.plantingMethod && <p className="text-xs text-gray-500">{a.plantingMethod}</p>}
-                    {(a.rowDetails || []).length > 0 && (
+                    <p className="text-xs text-gray-500 mt-0.5">{formatAreaShort(sqM)} · {p.points.length} points</p>
+                    {(p.rowCount || 0) > 0 && <p className="text-xs text-gray-500">{p.rowCount} row{(p.rowCount || 0) !== 1 ? 's' : ''}{p.rowSpacing ? ` · ${p.rowSpacing} cm` : ''}</p>}
+                    {p.plantingMethod && <p className="text-xs text-gray-500">{p.plantingMethod}</p>}
+                    {(p.rowDetails || []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {[...new Set(a.rowDetails.map(r => r.cropName).filter(Boolean))].map(crop => (
+                        {[...new Set(p.rowDetails.map(r => r.cropName).filter(Boolean))].map(crop => (
                           <span key={crop} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{crop}</span>
                         ))}
                       </div>
                     )}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <button onClick={() => editPerimeter(a)} className="p-1.5 hover:bg-green-50 rounded-lg" title="Re-walk perimeter"><Navigation className="w-4 h-4 text-green-600" /></button>
-                    <button onClick={() => openDetails(a)} className="p-1.5 hover:bg-blue-50 rounded-lg" title="Edit details"><Pencil className="w-4 h-4 text-blue-500" /></button>
-                    <button onClick={() => deleteArea(a.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                    <button onClick={() => editPlotPerimeter(p)} className="p-1.5 hover:bg-green-50 rounded-lg" title="Re-walk perimeter"><Navigation className="w-4 h-4 text-green-600" /></button>
+                    <button onClick={() => openPlotDetails(p)} className="p-1.5 hover:bg-blue-50 rounded-lg" title="Edit details"><Pencil className="w-4 h-4 text-blue-500" /></button>
+                    <button onClick={() => deletePlot(p.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 </div>
               );
@@ -356,11 +486,11 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
           </>
         )}
 
-        {/* ─── GPS MODE ─── */}
+        {/* ─── GPS MODE (Plot creation) ─── */}
         {mode === 'gps' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              <h2 className="font-semibold flex items-center gap-2"><Navigation className="w-5 h-5 text-green-600" /> Perimeter Walk{areaTag ? ` — ${areaTag}` : ''}</h2>
+              <h2 className="font-semibold flex items-center gap-2"><Navigation className="w-5 h-5 text-green-600" /> Perimeter Walk{plotTag ? ` — ${plotTag}` : ''}</h2>
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
@@ -381,36 +511,13 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             </div>
             {currentPoints.length >= 3 && (
               <div className="bg-white rounded-xl border p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Area Details</p>
-                <input type="text" placeholder="Area name (e.g. North Field)" value={areaName} onChange={e => setAreaName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-                  <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-                </div>
-                <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-                  {PLANTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-                {rowDetails.slice(0, rowCount).map((row, i) => (
-                  <div key={i} className="border rounded-lg p-3 space-y-2 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-500 uppercase">Row {i + 1}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="text" placeholder="Crop name" value={row.cropName} onChange={e => updateRow(i, 'cropName', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                      <input type="number" placeholder="Spacing (cm)" value={row.spacingInRow} onChange={e => updateRow(i, 'spacingInRow', Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" min={1} />
-                    </div>
-                    <input type="text" placeholder="Row notes (optional)" value={row.notes || ''} onChange={e => updateRow(i, 'notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                ))}
-                <textarea placeholder="General notes about this area..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={resetForm} className="flex-1"><RotateCcw className="w-4 h-4" /> Reset</Button>
-                  <Button onClick={saveArea} className="flex-1 bg-green-600 text-white" disabled={!areaName.trim()}><Save className="w-4 h-4" /> Save Area</Button>
-                </div>
+                {renderPlotForm('#16a34a')}
               </div>
             )}
           </div>
         )}
 
-        {/* ─── MANUAL MODE ─── */}
+        {/* ─── MANUAL MODE (Plot creation) ─── */}
         {mode === 'manual' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
@@ -428,30 +535,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             </div>
             {currentPoints.length >= 3 && (
               <div className="bg-white rounded-xl border p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Area Details</p>
-                <input type="text" placeholder="Area name" value={areaName} onChange={e => setAreaName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-                  <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-                </div>
-                <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-                  {PLANTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-                {rowDetails.slice(0, rowCount).map((row, i) => (
-                  <div key={i} className="border rounded-lg p-3 space-y-2 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-500 uppercase">Row {i + 1}</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="text" placeholder="Crop name" value={row.cropName} onChange={e => updateRow(i, 'cropName', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                      <input type="number" placeholder="Spacing (cm)" value={row.spacingInRow} onChange={e => updateRow(i, 'spacingInRow', Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" min={1} />
-                    </div>
-                    <input type="text" placeholder="Row notes" value={row.notes || ''} onChange={e => updateRow(i, 'notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                  </div>
-                ))}
-                <textarea placeholder="General notes..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={resetForm} className="flex-1"><RotateCcw className="w-4 h-4" /> Reset</Button>
-                  <Button onClick={saveArea} className="flex-1 bg-blue-600 text-white" disabled={!areaName.trim()}><Save className="w-4 h-4" /> Save Area</Button>
-                </div>
+                {renderPlotForm('#2563eb')}
               </div>
             )}
           </div>
@@ -461,8 +545,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {mode === 'details' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              <h2 className="font-semibold flex items-center gap-2"><Edit3 className="w-5 h-5 text-blue-600" /> Edit Details — {areaTag}</h2>
-              <input type="text" placeholder="Area name" value={areaName} onChange={e => setAreaName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <h2 className="font-semibold flex items-center gap-2"><Edit3 className="w-5 h-5 text-blue-600" /> Edit Details — {plotTag}</h2>
+              <input type="text" placeholder="Plot name" value={plotName} onChange={e => setPlotName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
               <div className="grid grid-cols-2 gap-2">
                 <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
                 <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
@@ -482,8 +566,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               ))}
               <textarea placeholder="General notes..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { resetForm(); setMode('list'); }} className="flex-1">Cancel</Button>
-                <Button onClick={saveDetails} className="flex-1 bg-blue-600 text-white"><Save className="w-4 h-4" /> Save Details</Button>
+                <Button variant="outline" onClick={() => { resetPlotForm(); setMode('plots'); }} className="flex-1">Cancel</Button>
+                <Button onClick={savePlotDetails} className="flex-1 bg-blue-600 text-white"><Save className="w-4 h-4" /> Save Details</Button>
               </div>
             </div>
           </div>
@@ -491,4 +575,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
+
+  function stopGps() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); }
+  }
 }

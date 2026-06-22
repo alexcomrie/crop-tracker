@@ -331,8 +331,18 @@ export interface RowDetail {
   notes?: string;
 }
 
+export interface FarmLand {
+  id: string;
+  name: string;
+  location: GeoPoint;
+  color: string;
+  createdAt: string;
+  updatedAt: number;
+}
+
 export interface FarmArea {
   id: string;
+  landId: string;
   tag: string;
   name: string;
   points: GeoPoint[];

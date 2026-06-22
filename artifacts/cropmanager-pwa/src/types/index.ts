@@ -334,7 +334,9 @@ export interface RowDetail {
 export interface FarmLand {
   id: string;
   name: string;
-  location: GeoPoint;
+  points: GeoPoint[];
+  areaSqM: number;
+  areaDisplay: string;
   color: string;
   createdAt: string;
   updatedAt: number;

@@ -2,13 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { generateId } from '../../lib/ids';
-import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight } from 'lucide-react';
+import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { GeoPoint, FarmArea, FarmLand, RowDetail } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
 const PLANTING_METHODS = ['Direct Ground', 'Seed Bed', 'Seed Tray', 'Pot / Container', 'Hydroponic'];
-const CANVAS_W = 320;
+const CANVAS_W = 340;
 const CANVAS_H = 280;
 const MIN_POINT_DISTANCE = 1.5;
 
@@ -38,10 +38,11 @@ function calcArea(points: GeoPoint[]): { sqM: number; display: string } {
   return { sqM: area, display: `${area.toFixed(1)} m²` };
 }
 
-function gpsToSvg(points: GeoPoint[], w: number, h: number, pad = 20): { x: number; y: number }[] {
-  if (points.length === 0) return [];
-  const lats = points.map(p => p.lat);
-  const lngs = points.map(p => p.lng);
+function gpsToSvgAll(allPoints: GeoPoint[][], w: number, h: number, pad = 20): { x: number; y: number }[][] {
+  if (allPoints.length === 0 || allPoints.every(p => p.length === 0)) return [];
+  const flat = allPoints.filter(p => p.length > 0).flat();
+  const lats = flat.map(p => p.lat);
+  const lngs = flat.map(p => p.lng);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs);
@@ -50,10 +51,12 @@ function gpsToSvg(points: GeoPoint[], w: number, h: number, pad = 20): { x: numb
   const lngRange = (maxLng - minLng) || 0.0001;
   const uw = w - pad * 2;
   const uh = h - pad * 2;
-  return points.map(p => ({
-    x: pad + ((p.lng - minLng) / lngRange) * uw,
-    y: pad + ((maxLat - p.lat) / latRange) * uh,
-  }));
+  return allPoints.map(pts =>
+    pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
+      x: pad + ((p.lng - minLng) / lngRange) * uw,
+      y: pad + ((maxLat - p.lat) / latRange) * uh,
+    }))
+  );
 }
 
 function formatAreaShort(sqm: number): string {
@@ -63,11 +66,11 @@ function formatAreaShort(sqm: number): string {
 }
 
 function AreaSvgThumb({ points, w = 120, h = 80 }: { points: GeoPoint[]; w?: number; h?: number }) {
-  const svgPts = gpsToSvg(points, w, h, 8);
-  const polyStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
+  const svg = points.length >= 3 ? gpsToSvgAll([points], w, h, 8)[0] : [];
+  const polyStr = svg.map(p => `${p.x},${p.y}`).join(' ');
   return (
     <svg width={w} height={h} className="rounded bg-green-50 border shrink-0">
-      {svgPts.length >= 3 ? (
+      {polyStr ? (
         <polygon points={polyStr} fill="rgba(34,197,94,0.3)" stroke="#16a34a" strokeWidth="1.5" />
       ) : (
         <text x={w / 2} y={h / 2} textAnchor="middle" fontSize="10" fill="#86efac">Not mapped</text>
@@ -86,15 +89,55 @@ async function getNextPlotTag(): Promise<string> {
   return `PLOT${(count + 1).toString().padStart(4, '0')}`;
 }
 
+/** Render a combined SVG map with land polygon as background and plot overlays */
+function LandMap({ land, plots, w = CANVAS_W, h = CANVAS_H }: { land: FarmLand; plots: FarmArea[]; w?: number; h?: number }) {
+  const allPolys = gpsToSvgAll(
+    [land.points, ...plots.filter(p => p.points.length >= 3).map(p => p.points)],
+    w, h, 15
+  );
+  const landSvg = allPolys[0] || [];
+  const plotsSvg = allPolys.slice(1);
+
+  if (!landSvg.length) return null;
+  const landPolyStr = landSvg.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="rounded border bg-gray-50">
+      {/* Land polygon as background */}
+      <polygon points={landPolyStr} fill="rgba(0,0,0,0.06)" stroke="#333" strokeWidth="2" strokeDasharray="6,3" />
+      {/* Plot overlays */}
+      {plotsSvg.map((svgPts, i) => {
+        const plot = plots[i];
+        if (!svgPts.length) return null;
+        const polyStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
+        const centroid = svgPts.reduce((a, p) => ({ x: a.x + p.x / svgPts.length, y: a.y + p.y / svgPts.length }), { x: 0, y: 0 });
+        return (
+          <g key={plot?.id || i}>
+            <polygon points={polyStr} fill={(plot?.color || '#4CAF50') + '40'} stroke={plot?.color || '#4CAF50'} strokeWidth="2" />
+            <text x={centroid.x} y={centroid.y} textAnchor="middle" fontSize="9" fill="#333" fontWeight="bold">{plot?.tag || ''}</text>
+          </g>
+        );
+      })}
+      {/* Empty state */}
+      {plotsSvg.length === 0 && (
+        <text x={w / 2} y={h / 2 + 20} textAnchor="middle" fontSize="11" fill="#999">Add plots to see them on the map</text>
+      )}
+      {/* Land name label */}
+      <text x={15} y={h - 8} fontSize="9" fill="#666" fontStyle="italic">{land.name} ({land.areaDisplay})</text>
+    </svg>
+  );
+}
+
 export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const lands = useLiveQuery(() => db.farmLands.toArray(), []);
   const [selectedLand, setSelectedLand] = useState<FarmLand | null>(null);
   const plots = useLiveQuery(() => selectedLand ? db.farmAreas.where('landId').equals(selectedLand.id).toArray() : [], [selectedLand]);
-  const [mode, setMode] = useState<'lands' | 'land-gps' | 'plots' | 'gps' | 'manual' | 'details'>('lands');
+  const [mode, setMode] = useState<'lands' | 'land-gps' | 'plots' | 'gps' | 'manual' | 'details' | 'land-edit'>('lands');
   const [currentPoints, setCurrentPoints] = useState<GeoPoint[]>([]);
   const [plotTag, setPlotTag] = useState('');
   const [plotName, setPlotName] = useState('');
   const [landName, setLandName] = useState('');
+  const [landEditId, setLandEditId] = useState<string | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [gpsStatus, setGpsStatus] = useState('');
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -201,23 +244,33 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setGpsStatus('');
   }
 
+  function resetLandForm() {
+    setCurrentPoints([]);
+    setLandName('');
+    setLandEditId(null);
+    setGpsAccuracy(null);
+    setGpsStatus('');
+  }
+
   // ─── LAND OPERATIONS ───
 
   async function saveLand() {
-    if (!landName.trim()) return;
+    if (currentPoints.length < 3 || !landName.trim()) return;
     try {
+      const { sqM, display } = calcArea(currentPoints);
       const land: FarmLand = {
-        id: generateId('LD'),
+        id: landEditId || generateId('LD'),
         name: landName.trim(),
-        location: currentPoints.length > 0 ? currentPoints[0] : { lat: 0, lng: 0 },
+        points: currentPoints,
+        areaSqM: sqM,
+        areaDisplay: display,
         color: COLORS[(lands?.length || 0) % COLORS.length],
-        createdAt: new Date().toISOString(),
+        createdAt: landEditId ? (lands?.find(l => l.id === landEditId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
         updatedAt: Date.now(),
       };
       await db.farmLands.put(land);
-      setLandName('');
-      setCurrentPoints([]);
-      setMode('lands');
+      if (landEditId) { setSelectedLand(land); setMode('plots'); }
+      else { resetLandForm(); setMode('lands'); }
     } catch (err) {
       alert('Failed to save land: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -234,9 +287,17 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setMode('plots');
   }
 
+  function editLandPerimeter(land: FarmLand) {
+    setCurrentPoints(land.points);
+    setLandName(land.name);
+    setLandEditId(land.id);
+    setMode('land-edit');
+  }
+
   function backToLands() {
     setSelectedLand(null);
     resetPlotForm();
+    resetLandForm();
     setMode('lands');
   }
 
@@ -335,7 +396,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
 
   function renderLiveSvg(pts: GeoPoint[]) {
     if (pts.length === 0) return null;
-    const svgPts = gpsToSvg(pts, CANVAS_W, CANVAS_H, 20);
+    const svgPts = gpsToSvgAll([pts], CANVAS_W, CANVAS_H, 20)[0] || [];
     const polylineStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
     const polygonStr = pts.length >= 3 ? polylineStr : '';
     return (
@@ -386,12 +447,18 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     <button onClick={onBack} className="text-gray-600 text-lg">←</button>
   );
 
+  const backToPlots = () => { stopGps(); resetPlotForm(); setMode('plots'); };
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b sticky top-0 z-10">
-        {mode === 'lands' ? backBtn(onClose) : mode === 'plots' ? backBtn(backToLands) : backBtn(() => { stopGps(); resetPlotForm(); setMode('plots'); })}
+        {mode === 'lands' ? backBtn(onClose)
+          : mode === 'land-gps' ? backBtn(() => { stopGps(); resetLandForm(); setMode('lands'); })
+          : mode === 'land-edit' ? backBtn(() => { stopGps(); resetLandForm(); setMode('plots'); })
+          : mode === 'plots' ? backBtn(backToLands)
+          : backBtn(backToPlots)}
         <h1 className="font-bold text-lg">Area Mapper</h1>
-        {(mode === 'plots' || mode === 'gps' || mode === 'manual' || mode === 'details') && selectedLand && (
+        {(mode === 'plots' || mode === 'land-edit' || mode === 'gps' || mode === 'manual' || mode === 'details') && selectedLand && (
           <span className="text-sm text-gray-400 ml-1">— {selectedLand.name}</span>
         )}
       </div>
@@ -401,57 +468,101 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {mode === 'lands' && (
           <>
             <div className="flex gap-2">
-              <button onClick={() => { setLandName(''); setCurrentPoints([]); setMode('land-gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Add Land</button>
+              <button onClick={() => { resetLandForm(); setMode('land-gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Plus className="w-5 h-5" /> Add Land</button>
             </div>
             {(!lands || lands.length === 0) && (
-              <div className="text-center py-20 text-gray-400"><Home className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No farm lands yet</p><p className="text-sm">Add your first land parcel to start mapping plots</p></div>
+              <div className="text-center py-20 text-gray-400"><Home className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No farm lands yet</p><p className="text-sm">Walk the perimeter of your land to start mapping plots</p></div>
             )}
             {lands?.map(l => (
-              <div key={l.id} onClick={() => selectLand(l)} className="bg-white rounded-xl border p-4 flex items-center gap-3 active:scale-[0.98] transition-all cursor-pointer">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ backgroundColor: l.color + '20' }}><Home className="w-5 h-5" style={{ color: l.color }} /></div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">{l.name}</h3>
-                  <p className="text-xs text-gray-500">{l.location.lat.toFixed(4)}, {l.location.lng.toFixed(4)}</p>
+              <div key={l.id} onClick={() => selectLand(l)} className="bg-white rounded-xl border p-3 flex gap-3 active:scale-[0.98] transition-all cursor-pointer">
+                <AreaSvgThumb points={l.points} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Home className="w-4 h-4 shrink-0" style={{ color: l.color }} />
+                    <h3 className="font-semibold truncate">{l.name}</h3>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">{l.areaDisplay} · {l.points.length} points</p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-300" />
+                <ChevronRight className="w-5 h-5 text-gray-300 shrink-0 mt-1" />
               </div>
             ))}
           </>
         )}
 
-        {/* ─── LAND GPS LOCATION ─── */}
+        {/* ─── LAND PERIMETER WALK (creation) ─── */}
         {mode === 'land-gps' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              <h2 className="font-semibold">Set Land Location</h2>
-              <p className="text-sm text-gray-500">Walk to the center of your land and record a GPS point, or enter the name manually.</p>
+              <h2 className="font-semibold">Walk Land Perimeter</h2>
+              <p className="text-sm text-gray-500">Walk around the boundary of your land to map its shape.</p>
               <input type="text" placeholder="Land name (e.g. North Property)" value={landName} onChange={e => setLandName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
-                {currentPoints.length > 0 && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints[0].lat.toFixed(4)}, {currentPoints[0].lng.toFixed(4)}</span>}
+                <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
+                {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
               </div>
+              {renderLiveSvg(currentPoints)}
               {watchId === null ? (
-                <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> Record Location</Button>
+                <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
-                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Stop</Button>
+                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Pause Recording</Button>
               )}
-              <p className="text-xs text-gray-500">{gpsStatus}</p>
-              <Button onClick={saveLand} className="w-full bg-green-600 text-white" disabled={!landName.trim()}><Save className="w-4 h-4" /> Save Land</Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={undoLastPoint} disabled={currentPoints.length === 0}>Undo Point</Button>
+                <Button variant="outline" onClick={() => { setCurrentPoints([]); setGpsAccuracy(null); setGpsStatus(''); }} disabled={currentPoints.length === 0}>Clear</Button>
+              </div>
+              {currentPoints.length >= 3 && (
+                <Button onClick={saveLand} className="w-full bg-green-600 text-white" disabled={!landName.trim()}><Save className="w-4 h-4" /> Save Land</Button>
+              )}
             </div>
           </div>
         )}
 
-        {/* ─── PLOT LIST ─── */}
+        {/* ─── LAND PERIMETER EDIT (re-walk) ─── */}
+        {mode === 'land-edit' && selectedLand && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border p-4 space-y-3">
+              <h2 className="font-semibold">Edit Land Perimeter — {selectedLand.name}</h2>
+              <p className="text-sm text-gray-500">Walk around the boundary to update the land shape.</p>
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
+                {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
+                <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
+                {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
+              </div>
+              {renderLiveSvg(currentPoints)}
+              {watchId === null ? (
+                <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
+              ) : (
+                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Pause Recording</Button>
+              )}
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={undoLastPoint} disabled={currentPoints.length === 0}>Undo Point</Button>
+                <Button variant="outline" onClick={() => { setCurrentPoints([]); setGpsAccuracy(null); setGpsStatus(''); }} disabled={currentPoints.length === 0}>Clear</Button>
+              </div>
+              {currentPoints.length >= 3 && (
+                <Button onClick={saveLand} className="w-full bg-green-600 text-white"><Save className="w-4 h-4" /> Update Land</Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ─── PLOT LIST (with combined map) ─── */}
         {mode === 'plots' && selectedLand && (
           <>
-            <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''} in {selectedLand.name}</p>
+            {/* Combined map: land background + plot overlays */}
+            {selectedLand.points.length >= 3 && <LandMap land={selectedLand} plots={plots || []} />}
             <div className="flex gap-2">
               <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
               <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
             </div>
+            {selectedLand.points.length >= 3 && (
+              <button onClick={() => editLandPerimeter(selectedLand)} className="w-full text-xs text-gray-500 border border-dashed rounded-lg py-2 hover:bg-gray-50 flex items-center justify-center gap-1"><Pencil className="w-3 h-3" /> Edit land perimeter</button>
+            )}
+            <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''}</p>
             {(!plots || plots.length === 0) && (
-              <div className="text-center py-16 text-gray-400"><MapPin className="w-12 h-12 mx-auto mb-3 opacity-40" /><p>No plots mapped in this land</p><p className="text-sm">Walk a perimeter or tap points on a grid</p></div>
+              <div className="text-center py-10 text-gray-400"><MapPin className="w-10 h-10 mx-auto mb-2 opacity-40" /><p className="text-sm">No plots mapped yet</p></div>
             )}
             {plots?.map(p => {
               const { sqM } = calcArea(p.points);
@@ -476,7 +587,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                     )}
                   </div>
                   <div className="flex flex-col gap-1">
-                    <button onClick={() => editPlotPerimeter(p)} className="p-1.5 hover:bg-green-50 rounded-lg" title="Re-walk perimeter"><Navigation className="w-4 h-4 text-green-600" /></button>
+                    <button onClick={() => editPlotPerimeter(p)} className="p-1.5 hover:bg-green-50 rounded-lg" title="Re-walk"><Navigation className="w-4 h-4 text-green-600" /></button>
                     <button onClick={() => openPlotDetails(p)} className="p-1.5 hover:bg-blue-50 rounded-lg" title="Edit details"><Pencil className="w-4 h-4 text-blue-500" /></button>
                     <button onClick={() => deletePlot(p.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
@@ -490,7 +601,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {mode === 'gps' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
-              <h2 className="font-semibold flex items-center gap-2"><Navigation className="w-5 h-5 text-green-600" /> Perimeter Walk{plotTag ? ` — ${plotTag}` : ''}</h2>
+              <h2 className="font-semibold flex items-center gap-2"><Navigation className="w-5 h-5 text-green-600" /> Walk Plot Perimeter{plotTag ? ` — ${plotTag}` : ''}</h2>
               <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
@@ -541,7 +652,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* ─── DETAILS EDIT MODE ─── */}
+        {/* ─── PLOT DETAILS EDIT ─── */}
         {mode === 'details' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">

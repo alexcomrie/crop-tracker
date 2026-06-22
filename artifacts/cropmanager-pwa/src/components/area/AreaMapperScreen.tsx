@@ -443,6 +443,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     );
   }
 
+  function stopGps() {
+    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); }
+  }
+
   const backBtn = (onBack: () => void) => (
     <button onClick={onBack} className="text-gray-600 text-lg">←</button>
   );
@@ -686,8 +690,4 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-
-  function stopGps() {
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); }
-  }
 }

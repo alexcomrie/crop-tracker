@@ -154,22 +154,26 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
 
   async function saveArea() {
     if (currentPoints.length < 3 || !areaName.trim()) return;
-    const { sqM, display } = calcArea(currentPoints);
-    const area: FarmArea = {
-      id: editId || generateId('FA'),
-      name: areaName.trim(),
-      points: currentPoints,
-      areaSqM: sqM,
-      areaDisplay: display,
-      color: COLORS[(areas?.length || 0) % COLORS.length],
-      createdAt: new Date().toISOString(),
-      updatedAt: Date.now(),
-    };
-    await db.farmAreas.put(area);
-    setCurrentPoints([]);
-    setAreaName('');
-    setEditId(null);
-    setMode('list');
+    try {
+      const { sqM, display } = calcArea(currentPoints);
+      const area: FarmArea = {
+        id: editId || generateId('FA'),
+        name: areaName.trim(),
+        points: currentPoints,
+        areaSqM: sqM,
+        areaDisplay: display,
+        color: COLORS[(areas?.length || 0) % COLORS.length],
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+      };
+      await db.farmAreas.put(area);
+      setCurrentPoints([]);
+      setAreaName('');
+      setEditId(null);
+      setMode('list');
+    } catch (err) {
+      alert('Failed to save area: ' + (err instanceof Error ? err.message : String(err)));
+    }
   }
 
   async function deleteArea(id: string) {

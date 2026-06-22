@@ -318,3 +318,19 @@ export interface LedgerEntry {
   notes: string;
   updatedAt: number;
 }
+
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
+export interface FarmArea {
+  id: string;
+  name: string;
+  points: GeoPoint[];
+  areaSqM: number;
+  areaDisplay: string;
+  color: string;
+  createdAt: string;
+  updatedAt: number;
+}

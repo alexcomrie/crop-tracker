@@ -12,8 +12,9 @@ import db from '../db/db';
 import { formatDateShort, today, daysBetween, parseDate } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
 import { generateId } from '../lib/ids';
+import { autoTransitionCrop, getStageSequence } from '../lib/stages';
 
-const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
+const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Middle Vegetative', 'Final Vegetative', 'Harvested'];
 
 export function CropsScreen() {
   const [filter, setFilter] = useState('All');
@@ -25,51 +26,35 @@ export function CropsScreen() {
   const [editCrop, setEditCrop] = useState<Crop | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
 
-  // Auto-adjust transplant schedule if overdue
+  // Auto-transition crops through all stages based on their timeframes
   useEffect(() => {
     (async () => {
       for (const c of crops) {
+        if (c.status === 'Harvested' || c.status === 'Deleted') continue;
         const cd = resolveCropData(cropDb, c.cropName);
-        const updated = autoAdjustTransplantSchedule(c, cd);
-        if (updated) {
-          await db.crops.put(updated);
+        if (!cd) continue;
+
+        // Auto-adjust transplant schedule if overdue
+        const adjusted = autoAdjustTransplantSchedule(c, cd);
+        if (adjusted) await db.crops.put(adjusted);
+
+        // Auto-transition through stages
+        const needsTransplant = (cd.transplant_days || 0) > 0;
+        if (needsTransplant && c.plantStage === 'Seedling' && !c.transplantDateActual) continue;
+
+        let didTransition = true;
+        let currentCrop = c;
+        while (didTransition) {
+          const result = await autoTransitionCrop(currentCrop, cd, { stageLogs: db.stageLogs, crops: db.crops });
+          didTransition = result;
+          if (result) {
+            const updated = await db.crops.get(currentCrop.id);
+            if (updated) currentCrop = updated;
+          }
         }
       }
     })();
   }, [crops, cropDb]);
-
-  // Auto-transition Germinated → Seedling after 7 days
-  useEffect(() => {
-    (async () => {
-      const germinatedCrops = crops.filter(c => c.plantStage === 'Germinated' && c.germinationDate);
-      for (const c of germinatedCrops) {
-        const germDate = parseDate(c.germinationDate);
-        if (!germDate) continue;
-        const daysSinceGerm = daysBetween(germDate, today());
-        if (daysSinceGerm >= 7) {
-          const now = today();
-          const stageLog = {
-            id: generateId('SL'),
-            trackingId: c.id,
-            cropName: c.cropName,
-            variety: c.variety,
-            stageFrom: 'Germinated',
-            stageTo: 'Seedling',
-            date: formatDateShort(now),
-            daysElapsed: daysBetween(germDate, now),
-            method: c.plantingMethod,
-            notes: 'Auto-transitioned after 7 days in Germinated',
-            updatedAt: Date.now(),
-          };
-          await db.stageLogs.add(stageLog);
-          await db.crops.update(c.id, {
-            plantStage: 'Seedling',
-            updatedAt: Date.now(),
-          });
-        }
-      }
-    })();
-  }, [crops]);
 
   useEffect(() => {
     (async () => {

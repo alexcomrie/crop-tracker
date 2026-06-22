@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { ALL_PRODUCTS, type TreatmentProduct, type TreatmentRate } from './treatment-data';
 
 type WaterUnit = 'gal' | 'L' | 'mL' | 'oz' | 'ha' | 'ac';
-type TreatUnit = 'mL' | 'L' | 'gal' | 'fl_oz' | 'tsp' | 'Tbsp' | 'g' | 'kg' | 'oz' | 'lb';
+type TreatUnit = 'mL' | 'L' | 'gal' | 'fl_oz' | 'tsp' | 'Tbsp' | 'cup' | 'quarter_cup' | 'half_cup' | 'g' | 'kg' | 'oz' | 'lb';
 
 const WATER_UNITS: { key: WaterUnit; label: string; toML: number; isArea: boolean }[] = [
   { key: 'gal', label: 'Gallons (gal)', toML: 3785.41, isArea: false },
@@ -18,26 +18,18 @@ const WATER_UNITS: { key: WaterUnit; label: string; toML: number; isArea: boolea
 
 const UNIT_LABELS: Record<TreatUnit, string> = {
   mL: 'mL', L: 'L', gal: 'gal', fl_oz: 'fl oz', tsp: 'tsp', Tbsp: 'Tbsp',
+  cup: 'cup', quarter_cup: '¼ cup', half_cup: '½ cup',
   g: 'g', kg: 'kg', oz: 'oz', lb: 'lb',
 };
 
 function convertValue(v: number, fromUnit: string, toUnit: TreatUnit): number {
-  const volRates: Record<string, number> = { mL: 1, L: 1000, gal: 3785.41, fl_oz: 29.5735, tsp: 5, Tbsp: 15 };
+  const volRates: Record<string, number> = { mL: 1, L: 1000, gal: 3785.41, fl_oz: 29.5735, tsp: 5, Tbsp: 15, cup: 237, quarter_cup: 59.25, half_cup: 118.5 };
   const weightRates: Record<string, number> = { g: 1, kg: 1000, oz: 28.35, lb: 453.592 };
   if (volRates[fromUnit] !== undefined && volRates[toUnit] !== undefined) return v * volRates[fromUnit] / volRates[toUnit];
   if (weightRates[fromUnit] !== undefined && weightRates[toUnit] !== undefined) return v * weightRates[fromUnit] / weightRates[toUnit];
   return v;
 }
 
-function getLiquidUnits(): TreatUnit[] {
-  return ['mL', 'L', 'gal', 'fl_oz', 'tsp', 'Tbsp'];
-}
-function getDryUnits(): TreatUnit[] {
-  return ['g', 'kg', 'oz', 'lb'];
-}
-function isLiquidProduct(p: TreatmentProduct): boolean {
-  return p.rates[0]?.unit === 'mL' || p.rates[0]?.unit === 'L';
-}
 function isAreaBased(p: TreatmentProduct | null): boolean {
   return p?.rates[0]?.perVolumeUnit === 'ha';
 }
@@ -47,7 +39,7 @@ function getUnits(p: TreatmentProduct | null): TreatUnit[] {
     const u = p.rates[0]?.unit;
     return u === 'L' ? ['L', 'mL'] : ['mL', 'L'];
   }
-  return isLiquidProduct(p) ? getLiquidUnits() : getDryUnits();
+  return ['mL', 'L', 'gal', 'fl_oz', 'tsp', 'Tbsp', 'cup', 'quarter_cup', 'half_cup', 'g', 'kg', 'oz', 'lb'];
 }
 function perVolumeToML(r: TreatmentRate): number {
   if (r.perVolumeUnit === 'L') return r.perVolume * 1000;

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { Crop } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
-import { VALID_NEXT_STAGES } from '../../lib/stages';
+import { getValidNextStages, getStageSequence } from '../../lib/stages';
 import { resolveCropData } from '../../lib/cropDb';
 import { processStageChange, isVineFamily, promoteNextBatch } from '../../lib/stages';
 import { formatDateShort, today } from '../../lib/dates';
@@ -36,7 +36,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
   const cropData = resolveCropData(cropDb, crop.cropName);
   const isVine = isVineFamily(crop.cropName, cropData?.plant_type);
-  const validStages = (VALID_NEXT_STAGES[crop.plantStage] ?? []).filter(s => {
+  const validStages = getValidNextStages(crop.plantStage, cropData).filter(s => {
     if ((s === 'Grafting' || s === 'Healing') && !isVine) return false;
     return true;
   });

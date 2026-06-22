@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { Calendar, Database, Beaker, Bell, ChevronRight, BarChart2, FlaskConical } from 'lucide-react';
+import { Calendar, Database, Beaker, Bell, ChevronRight, BarChart2, FlaskConical, MapPin } from 'lucide-react';
 import { CropDatabaseScreen } from '../components/CropDatabaseScreen';
 import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen';
 import { CropHistoryScreen } from '../components/reports/CropHistory';
@@ -8,6 +8,7 @@ import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
 import { ActivityScreen } from '../components/activity/ActivityScreen';
 import { FarmLedgerScreen } from '../components/ledger/FarmLedgerScreen';
 import { TreatmentAppRatesScreen } from '../components/treatment/TreatmentAppRatesScreen';
+import { AreaMapperScreen } from '../components/area/AreaMapperScreen';
 
 interface MoreItemProps {
   title: string;
@@ -37,7 +38,7 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 
 export function MoreScreen() {
   const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'ch-calc' | 'activity' | 'ledger' | 'treatment-rates' | null>(null);
+  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'ch-calc' | 'activity' | 'ledger' | 'treatment-rates' | 'area-mapper' | null>(null);
 
   return (
     <div className="relative h-full overflow-hidden">
@@ -124,6 +125,13 @@ export function MoreScreen() {
               iconColor="bg-green-50"
               onClick={() => setActiveTab('calendar')}
             />
+            <MoreItem
+              title="Area Mapper"
+              subtitle="GPS walk or manual points to map farm areas"
+              icon={<MapPin className="w-6 h-6 text-rose-600" />}
+              iconColor="bg-rose-50"
+              onClick={() => setActivePanel('area-mapper')}
+            />
           </div>
         </section>
       </div>
@@ -162,6 +170,11 @@ export function MoreScreen() {
       {activePanel === 'ledger' && (
         <div className="fixed inset-0 z-[60] bg-white">
           <FarmLedgerScreen onClose={() => setActivePanel(null)} />
+        </div>
+      )}
+      {activePanel === 'area-mapper' && (
+        <div className="fixed inset-0 z-[60] bg-white">
+          <AreaMapperScreen onClose={() => setActivePanel(null)} />
         </div>
       )}
     </div>

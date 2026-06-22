@@ -6,7 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import type { Crop } from '../../types';
 import { parseDate, formatDateDisplay, daysBetween, today, formatDateShort } from '../../lib/dates';
-import { STAGE_COLORS } from '../../lib/stages';
+import { STAGE_COLORS, getStageSequence } from '../../lib/stages';
 import { FertScheduleView } from './FertScheduleView';
 import { calculateTransplantDate, calculateHarvestDate } from '../../lib/harvest';
 import { generateId } from '../../lib/ids';
@@ -24,8 +24,6 @@ interface CropDetailProps {
   onDelete: () => void;
 }
 
-const STAGE_ORDER = ['Seed', 'Germinated', 'Seedling', 'Transplanted', 'Vegetative', 'Flowering', 'Fruiting', 'Harvested'];
-
 export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDetailProps) {
   const { cropDb } = useAppStore();
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.where('cropId').equals(crop.id).sortBy('date'), [crop.id]);
@@ -40,17 +38,25 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
   const confirmedBatchNumbers = new Set(batchLogs?.map(l => l.batchNumber) || []);
   const createdBatchNumbers = new Set(activeBatches?.map(c => c.batchNumber) || []);
   
-  // Find the next batch to confirm: the first one that isn't confirmed yet
   const nextBatchToConfirm = batchDates.find(b => !confirmedBatchNumbers.has(b.batchNumber));
   
   const planted = parseDate(crop.plantingDate);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
 
+  const STAGE_ORDER = getStageSequence(cropData);
   const stages = [
     { label: 'Planted', date: crop.plantingDate, done: !!crop.plantingDate },
-    { label: 'Germinated', date: crop.germinationDate, done: !!crop.germinationDate },
-    { label: 'Transplanted', date: crop.transplantDateActual, done: !!crop.transplantDateActual },
-    { label: 'Harvested', date: crop.harvestDateActual, done: !!crop.harvestDateActual },
+    ...STAGE_ORDER.filter(s => s !== 'Seed').map(s => {
+      let date = '';
+      let done = false;
+      if (s === 'Germinated') { date = crop.germinationDate; done = !!crop.germinationDate; }
+      else if (s === 'Transplanted') { date = crop.transplantDateActual; done = !!crop.transplantDateActual; }
+      else if (s === 'Harvested') { date = crop.harvestDateActual; done = !!crop.harvestDateActual; }
+      else {
+        done = STAGE_ORDER.indexOf(crop.plantStage) >= STAGE_ORDER.indexOf(s);
+      }
+      return { label: s, date, done };
+    }),
   ];
 
   return (
@@ -67,16 +73,27 @@ export function CropDetail({ crop, onClose, onUpdate, onEdit, onDelete }: CropDe
 
         <StageTimeline stages={stages} />
 
-        <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <p className="text-muted-foreground">Planted</p><p className="font-medium">{crop.plantingDate || '—'}</p>
-            <p className="text-muted-foreground">Germinated</p><p className="font-medium">{crop.germinationDate || '—'}</p>
-            <p className="text-muted-foreground">Transplant Sched.</p><p className="font-medium">{crop.transplantDateScheduled || '—'}</p>
-            <p className="text-muted-foreground">Transplanted</p><p className="font-medium">{crop.transplantDateActual || '—'}</p>
-            <p className="text-muted-foreground">Est. Harvest</p><p className="font-medium text-green-700">{crop.harvestDateEstimated || '—'}</p>
-            <p className="text-muted-foreground">Actual Harvest</p><p className="font-medium">{crop.harvestDateActual || '—'}</p>
+          <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <p className="text-muted-foreground">Planted</p><p className="font-medium">{crop.plantingDate || '—'}</p>
+              {STAGE_ORDER.filter(s => !['Seed'].includes(s)).map(s => {
+                let val = '';
+                if (s === 'Germinated') val = crop.germinationDate || '—';
+                else if (s === 'Transplanted') val = crop.transplantDateActual || '—';
+                else if (s === 'Harvested') val = crop.harvestDateActual || '—';
+                else if (crop.plantStage === s) val = '✓ Current';
+                else if (STAGE_ORDER.indexOf(crop.plantStage) > STAGE_ORDER.indexOf(s)) val = '✓ Done';
+                else val = '—';
+                return (
+                  <React.Fragment key={s}>
+                    <p className="text-muted-foreground">{s}</p>
+                    <p className="font-medium">{val}</p>
+                  </React.Fragment>
+                );
+              })}
+              <p className="text-muted-foreground">Est. Harvest</p><p className="font-medium text-green-700">{crop.harvestDateEstimated || '—'}</p>
+            </div>
           </div>
-        </div>
 
         {batchDates.length > 0 && (
           <div className="bg-amber-50 rounded-xl border border-amber-100 p-4 space-y-3">

@@ -20,8 +20,8 @@ function haversineMeters(a: GeoPoint, b: GeoPoint): number {
   return R * 2 * Math.atan2(Math.sqrt(sin2), Math.sqrt(1 - sin2));
 }
 
-function calcArea(points: GeoPoint[]): { sqM: number; display: string } {
-  if (points.length < 3) return { sqM: 0, display: '0 m²' };
+function calcArea(points: GeoPoint[] | undefined | null): { sqM: number; display: string } {
+  if (!points || points.length < 3) return { sqM: 0, display: '0 m²' };
   const avgLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
   const mPerDegLat = 111320;
   const mPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
@@ -38,9 +38,10 @@ function calcArea(points: GeoPoint[]): { sqM: number; display: string } {
   return { sqM: area, display: `${area.toFixed(1)} m²` };
 }
 
-function gpsToSvgAll(allPoints: GeoPoint[][], w: number, h: number, pad = 20): { x: number; y: number }[][] {
-  if (allPoints.length === 0 || allPoints.every(p => p.length === 0)) return [];
-  const flat = allPoints.filter(p => p.length > 0).flat();
+function gpsToSvgAll(allPoints: (GeoPoint[] | undefined | null)[], w: number, h: number, pad = 20): { x: number; y: number }[][] {
+  const valid = allPoints.filter((p): p is GeoPoint[] => !!p);
+  if (valid.length === 0 || valid.every(p => p.length === 0)) return [];
+  const flat = valid.filter(p => p.length > 0).flat();
   const lats = flat.map(p => p.lat);
   const lngs = flat.map(p => p.lng);
   const minLat = Math.min(...lats);
@@ -51,7 +52,7 @@ function gpsToSvgAll(allPoints: GeoPoint[][], w: number, h: number, pad = 20): {
   const lngRange = (maxLng - minLng) || 0.0001;
   const uw = w - pad * 2;
   const uh = h - pad * 2;
-  return allPoints.map(pts =>
+  return valid.map(pts =>
     pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
       x: pad + ((p.lng - minLng) / lngRange) * uw,
       y: pad + ((maxLat - p.lat) / latRange) * uh,
@@ -65,8 +66,8 @@ function formatAreaShort(sqm: number): string {
   return `${(sqm * 10000).toFixed(0)} cm²`;
 }
 
-function AreaSvgThumb({ points, w = 120, h = 80 }: { points: GeoPoint[]; w?: number; h?: number }) {
-  const svg = points.length >= 3 ? gpsToSvgAll([points], w, h, 8)[0] : [];
+function AreaSvgThumb({ points, w = 120, h = 80 }: { points: GeoPoint[] | undefined | null; w?: number; h?: number }) {
+  const svg = points && points.length >= 3 ? gpsToSvgAll([points], w, h, 8)[0] : [];
   const polyStr = svg.map(p => `${p.x},${p.y}`).join(' ');
   return (
     <svg width={w} height={h} className="rounded bg-green-50 border shrink-0">
@@ -91,8 +92,9 @@ async function getNextPlotTag(): Promise<string> {
 
 /** Render a combined SVG map with land polygon as background and plot overlays */
 function LandMap({ land, plots, w = CANVAS_W, h = CANVAS_H }: { land: FarmLand; plots: FarmArea[]; w?: number; h?: number }) {
+  const validPlots = (plots || []).filter(p => p.points?.length >= 3);
   const allPolys = gpsToSvgAll(
-    [land.points, ...plots.filter(p => p.points.length >= 3).map(p => p.points)],
+    [land.points, ...validPlots.map(p => p.points)],
     w, h, 15
   );
   const landSvg = allPolys[0] || [];
@@ -107,12 +109,12 @@ function LandMap({ land, plots, w = CANVAS_W, h = CANVAS_H }: { land: FarmLand; 
       <polygon points={landPolyStr} fill="rgba(0,0,0,0.06)" stroke="#333" strokeWidth="2" strokeDasharray="6,3" />
       {/* Plot overlays */}
       {plotsSvg.map((svgPts, i) => {
-        const plot = plots[i];
         if (!svgPts.length) return null;
         const polyStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
         const centroid = svgPts.reduce((a, p) => ({ x: a.x + p.x / svgPts.length, y: a.y + p.y / svgPts.length }), { x: 0, y: 0 });
+        const plot = validPlots[i];
         return (
-          <g key={plot?.id || i}>
+          <g key={plot?.id || `plot-${i}`}>
             <polygon points={polyStr} fill={(plot?.color || '#4CAF50') + '40'} stroke={plot?.color || '#4CAF50'} strokeWidth="2" />
             <text x={centroid.x} y={centroid.y} textAnchor="middle" fontSize="9" fill="#333" fontWeight="bold">{plot?.tag || ''}</text>
           </g>
@@ -123,7 +125,7 @@ function LandMap({ land, plots, w = CANVAS_W, h = CANVAS_H }: { land: FarmLand; 
         <text x={w / 2} y={h / 2 + 20} textAnchor="middle" fontSize="11" fill="#999">Add plots to see them on the map</text>
       )}
       {/* Land name label */}
-      <text x={15} y={h - 8} fontSize="9" fill="#666" fontStyle="italic">{land.name} ({land.areaDisplay})</text>
+      <text x={15} y={h - 8} fontSize="9" fill="#666" fontStyle="italic">{land.name} ({land.areaDisplay || 'N/A'})</text>
     </svg>
   );
 }
@@ -288,7 +290,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   }
 
   function editLandPerimeter(land: FarmLand) {
-    setCurrentPoints(land.points);
+    setCurrentPoints(land.points || []);
     setLandName(land.name);
     setLandEditId(land.id);
     setMode('land-edit');
@@ -359,7 +361,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   }
 
   function editPlotPerimeter(plot: FarmArea) {
-    setCurrentPoints(plot.points);
+    setCurrentPoints(plot.points || []);
     setPlotTag(plot.tag);
     setPlotName(plot.name);
     setEditId(plot.id);
@@ -485,7 +487,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                     <Home className="w-4 h-4 shrink-0" style={{ color: l.color }} />
                     <h3 className="font-semibold truncate">{l.name}</h3>
                   </div>
-                  <p className="text-xs text-gray-500 mt-0.5">{l.areaDisplay} · {l.points.length} points</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{l.areaDisplay || 'N/A'} · {l.points?.length ?? 0} points</p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-300 shrink-0 mt-1" />
               </div>
@@ -556,12 +558,12 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {mode === 'plots' && selectedLand && (
           <>
             {/* Combined map: land background + plot overlays */}
-            {selectedLand.points.length >= 3 && <LandMap land={selectedLand} plots={plots || []} />}
+            {selectedLand.points?.length >= 3 && <LandMap land={selectedLand} plots={plots || []} />}
             <div className="flex gap-2">
               <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
               <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
             </div>
-            {selectedLand.points.length >= 3 && (
+            {selectedLand.points?.length >= 3 && (
               <button onClick={() => editLandPerimeter(selectedLand)} className="w-full text-xs text-gray-500 border border-dashed rounded-lg py-2 hover:bg-gray-50 flex items-center justify-center gap-1"><Pencil className="w-3 h-3" /> Edit land perimeter</button>
             )}
             <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''}</p>
@@ -579,7 +581,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                       {p.name && <span className="text-xs text-gray-500 truncate">— {p.name}</span>}
                       <StatusBadge status={p.status} />
                     </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{formatAreaShort(sqM)} · {p.points.length} points</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{formatAreaShort(sqM)} · {p.points?.length ?? 0} points</p>
                     {(p.rowCount || 0) > 0 && <p className="text-xs text-gray-500">{p.rowCount} row{(p.rowCount || 0) !== 1 ? 's' : ''}{p.rowSpacing ? ` · ${p.rowSpacing} cm` : ''}</p>}
                     {p.plantingMethod && <p className="text-xs text-gray-500">{p.plantingMethod}</p>}
                     {(p.rowDetails || []).length > 0 && (

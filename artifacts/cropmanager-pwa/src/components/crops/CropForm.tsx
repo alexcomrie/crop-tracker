@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today, addDays } from '../../lib/dates';
@@ -166,6 +167,7 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
 
       reset();
       onClose();
+      toast.success(editCrop ? 'Crop updated' : 'Crop added');
     } finally {
       setSaving(false);
     }

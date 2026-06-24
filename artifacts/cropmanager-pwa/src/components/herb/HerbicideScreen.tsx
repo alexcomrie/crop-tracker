@@ -262,7 +262,7 @@ export function HerbicideScreen({ onClose }: { onClose: () => void }) {
   }
 
   async function deleteHerbEntry(id: string) {
-    if (!confirm('Delete this herbicide record?')) return;
+    if (!window.confirm('Delete this herbicide record?')) return;
     await db.treatmentLogs.delete(id);
     closeHerbDetail();
   }

@@ -13,14 +13,16 @@ const FILTERS = ['All', 'Propagating', 'Callusing', 'Rooted', 'Potted / Transpla
 
 export function PropagationsScreen() {
   const [filter, setFilter] = useState('All');
-  const props = useProps(filter) ?? [];
+  const propsData = useProps(filter);
+  const props = propsData ?? [];
+  const isLoading = propsData === undefined;
 
   const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
   const [editProp, setEditProp] = useState<Propagation | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this propagation?')) {
+    if (window.confirm('Delete this propagation?')) {
       await db.propagations.delete(id);
       await db.reminders.where('trackingId').equals(id).delete();
       setSelectedProp(null);
@@ -51,7 +53,11 @@ export function PropagationsScreen() {
       </div>
 
       <div className="px-4 pt-2">
-        {props.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : props.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
             <p className="text-4xl mb-3">🌿</p>
             <p className="font-semibold text-lg">No propagations yet</p>

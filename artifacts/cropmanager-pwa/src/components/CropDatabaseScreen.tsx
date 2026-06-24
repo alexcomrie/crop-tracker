@@ -3,6 +3,7 @@ import { Search, Plus, Trash2, Download, ChevronLeft, X, ArrowRight, Tag, ArrowL
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { loadCropDatabase, getNonAliasCrops, getAliases, isAlias, saveCropDatabaseOverride } from '../lib/cropDb';
 import type { CropDatabase, CropData, CropDbRecord } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -63,7 +64,7 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
     if (!db || !newKey) return;
     const key = newKey.toLowerCase().replace(/\s+/g, '_');
     if (db[key]) {
-      alert('Key already exists');
+      toast.error('Key already exists');
       return;
     }
     const entry: CropData = {
@@ -95,7 +96,7 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
     if (!db) return;
     saveCropDatabaseOverride(db);
     setCropDb(db);
-    alert('Crop Database saved locally on this device.');
+    toast.success('Crop Database saved locally on this device.');
   };
 
   const exportJson = () => {

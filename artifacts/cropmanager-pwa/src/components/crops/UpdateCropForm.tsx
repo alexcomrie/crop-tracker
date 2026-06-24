@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import type { Crop } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { getValidNextStages, getStageSequence } from '../../lib/stages';
@@ -112,6 +113,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     }
     setSaving(false);
     setDone(true);
+    toast.success(`Stage changed to ${newStage}`);
     setTimeout(onClose, 1500);
   }
 
@@ -154,7 +156,8 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     await db.crops.update(crop.id, update);
     setSaving(false);
     setDone(true);
-    setTimeout(onClose, 1200);
+    toast.success('Manual progress applied');
+    setTimeout(onClose, 1500);
   }
 
   async function handleTreatment() {
@@ -242,23 +245,23 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
               {saving ? 'Saving...' : 'Confirm Stage Change'}
             </Button>
 
-            <div className="mt-5 border-t pt-4">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Manual Progression</p>
-              <div className="flex items-center justify-between py-1.5">
-                <label className="text-sm">Germinated</label>
-                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickGerminated} onChange={e => setTickGerminated(e.target.checked)} />
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <label className="text-sm">Transplanted</label>
-                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => setTickTransplanted(e.target.checked)} />
-              </div>
-              <div className="flex items-center justify-between py-1.5">
-                <label className="text-sm">Harvested</label>
-                <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickHarvested} onChange={e => setTickHarvested(e.target.checked)} />
-              </div>
-              <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
-                {saving ? 'Saving...' : 'Apply Manual Progress'}
-              </Button>
+              <div className="mt-5 border-t pt-4">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Manual Progression</p>
+                <div className="flex items-center justify-between py-1.5">
+                  <label className="text-sm">Germinated</label>
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickGerminated} onChange={e => { setTickGerminated(e.target.checked); if (!e.target.checked && tickTransplanted) setTickTransplanted(false); }} />
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <label className="text-sm">Transplanted</label>
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => { setTickTransplanted(e.target.checked); if (e.target.checked) setTickGerminated(true); if (e.target.checked && tickHarvested) setTickHarvested(false); }} />
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <label className="text-sm">Harvested</label>
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickHarvested} onChange={e => { setTickHarvested(e.target.checked); if (e.target.checked) { setTickGerminated(true); setTickTransplanted(true); } }} />
+                </div>
+                <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
+                  {saving ? 'Saving...' : 'Apply Manual Progress'}
+                </Button>
               <button
                 className="w-full mt-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm font-semibold"
                 onClick={async () => {

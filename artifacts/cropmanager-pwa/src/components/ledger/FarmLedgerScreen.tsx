@@ -18,9 +18,11 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 type LedgerTab = 'expense' | 'sales' | 'inventory' | 'pnl' | 'charts';
 
 export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
-  const entries = useLiveQuery(() => 
+  const entriesData = useLiveQuery(() => 
     db.ledgerEntries.orderBy('date').reverse().toArray()
-  ) ?? [];
+  );
+  const entries = entriesData ?? [];
+  const isLoading = entriesData === undefined;
 
   const [tab, setTab] = useState<LedgerTab>('expense');
   const [showForm, setShowForm] = useState(false);
@@ -162,7 +164,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   }
 
   async function handleDelete(id: string) {
-    if (confirm('Delete this entry?')) {
+    if (window.confirm('Delete this entry?')) {
       await db.ledgerEntries.delete(id);
     }
   }
@@ -374,8 +376,11 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {/* Expense Tab */}
-        {tab === 'expense' && (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : tab === 'expense' && (
           <div className="p-4 space-y-3">
             <div className="bg-white border border-[#e0e0e0] rounded-xl p-4 flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-600">Total Expenses</span>

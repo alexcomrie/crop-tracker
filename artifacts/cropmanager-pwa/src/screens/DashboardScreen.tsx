@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
+import { LandPlotPreview } from '../components/area/LandPlotPreview';
 import { useTodayReminders } from '../hooks/useReminders';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
@@ -49,16 +50,24 @@ export function DashboardScreen() {
   const todayReminders = useTodayReminders() ?? [];
   const todayStr = formatDateShort(today());
 
-  const upcomingReminders = useLiveQuery(async () => {
+  const upcomingData = useLiveQuery(async () => {
     const all = await db.reminders.where('sent').equals(0).toArray();
     return all
       .filter(r => r.sendDate !== todayStr && parseDate(r.sendDate) && parseDate(r.sendDate)! > today())
       .sort((a, b) => (parseDate(a.sendDate)?.getTime() || 0) - (parseDate(b.sendDate)?.getTime() || 0))
       .slice(0, 5);
-  }, [todayStr]) ?? [];
+  }, [todayStr]);
+  const upcomingReminders = upcomingData ?? [];
+  const upcomingLoading = upcomingData === undefined;
 
-  const activeCropsCount = useLiveQuery(() => db.crops.where('status').equals('Active').count()) ?? 0;
-  const dbEntriesCount = 34; // Constant as requested in prompt
+  const activeCropsData = useLiveQuery(() => db.crops.where('status').equals('Active').count());
+  const activeCropsCount = activeCropsData ?? 0;
+  const countsLoading = activeCropsData === undefined;
+
+  const dbEntriesData = useLiveQuery(() => (
+    db.crops.count().then(c => db.propagations.count().then(p => db.reminders.count().then(r => db.activities.count().then(a => db.ledgerEntries.count().then(l => c + p + r + a + l)))))
+  ));
+  const dbEntriesCount = dbEntriesData ?? 0;
 
   const [showFAB, setShowFAB] = useState(false);
   const [fabDate, setFabDate] = useState(today());
@@ -132,7 +141,11 @@ export function DashboardScreen() {
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-              <p className="text-3xl font-bold text-[#2d6a2d]">{activeCropsCount}</p>
+              {countsLoading ? (
+                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin mx-auto" />
+              ) : (
+                <p className="text-3xl font-bold text-[#2d6a2d]">{activeCropsCount}</p>
+              )}
               <p className="text-[11px] text-gray-500 font-medium mt-1">Active crops</p>
             </div>
             <button 
@@ -143,7 +156,11 @@ export function DashboardScreen() {
               <p className="text-[11px] text-gray-500 font-medium mt-1">Succession</p>
             </button>
             <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-              <p className="text-3xl font-bold text-[#2d6a2d]">{dbEntriesCount}</p>
+              {countsLoading ? (
+                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin mx-auto" />
+              ) : (
+                <p className="text-3xl font-bold text-[#2d6a2d]">{dbEntriesCount}</p>
+              )}
               <p className="text-[11px] text-gray-500 font-medium mt-1">DB entries</p>
             </div>
           </div>
@@ -157,7 +174,11 @@ export function DashboardScreen() {
             </h2>
           </div>
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {upcomingReminders.length === 0 ? (
+            {upcomingLoading ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : upcomingReminders.length === 0 ? (
               <div className="p-6 text-center text-sm text-gray-400 italic">No upcoming tasks scheduled</div>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -178,6 +199,11 @@ export function DashboardScreen() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* Land & Plot Map Preview */}
+        <section>
+          <LandPlotPreview />
         </section>
       </div>
 

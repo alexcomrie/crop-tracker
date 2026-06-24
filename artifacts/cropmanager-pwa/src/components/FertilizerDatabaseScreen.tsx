@@ -3,6 +3,7 @@ import { Search, ChevronLeft, Download, Info, ArrowLeft, Leaf, Droplets, Flower2
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { loadFertDatabase, getFertCrops, saveFertDatabaseOverride } from '../lib/fertDb';
 import type { FertDatabase, FertCropEntry, FertStage, FertMix } from '../types';
 import { useAppStore } from '../store/useAppStore';
@@ -106,7 +107,7 @@ export function FertilizerDatabaseScreen({ onClose }: { onClose: () => void }) {
     if (!db) return;
     saveFertDatabaseOverride(db);
     setFertDb(db);
-    alert('Fertilizer Database saved locally on this device.');
+    toast.success('Fertilizer Database saved locally on this device.');
   };
 
   const exportJson = () => {

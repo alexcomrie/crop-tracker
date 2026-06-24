@@ -43,10 +43,12 @@ interface Activity {
 }
 
 export function ActivityScreen({ onClose }: { onClose: () => void }) {
-  const activities = useLiveQuery(() => 
+  const activitiesData = useLiveQuery(() => 
     db.activities.orderBy('date').reverse().toArray()
-  ) ?? [];
-  
+  );
+  const activities = activitiesData ?? [];
+  const isLoadingActivities = activitiesData === undefined;
+
   const crops = useLiveQuery(() => 
     db.crops.where('status').equals('Active').toArray()
   ) ?? [];
@@ -110,7 +112,7 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
   }
 
   async function handleDelete(id: string) {
-    if (confirm('Delete this activity?')) {
+    if (window.confirm('Delete this activity?')) {
       await db.activities.delete(id);
     }
   }
@@ -236,7 +238,11 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
 
       {view === 'list' && (
         <div className="flex-1 overflow-y-auto p-4">
-          {activities.length === 0 ? (
+          {isLoadingActivities ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : activities.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="text-4xl mb-2">📋</div>
               <div className="text-sm font-medium">No activities logged yet.</div>

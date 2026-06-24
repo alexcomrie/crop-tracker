@@ -4,6 +4,8 @@ import db from '../../db/db';
 import { generateId } from '../../lib/ids';
 import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { InteractiveMap } from './InteractiveMap';
 import type { GeoPoint, FarmArea, FarmLand, RowDetail } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
@@ -90,45 +92,7 @@ async function getNextPlotTag(): Promise<string> {
   return `PLOT${(count + 1).toString().padStart(4, '0')}`;
 }
 
-/** Render a combined SVG map with land polygon as background and plot overlays */
-function LandMap({ land, plots, w = CANVAS_W, h = CANVAS_H }: { land: FarmLand; plots: FarmArea[]; w?: number; h?: number }) {
-  const validPlots = (plots || []).filter(p => p.points?.length >= 3);
-  const allPolys = gpsToSvgAll(
-    [land.points, ...validPlots.map(p => p.points)],
-    w, h, 15
-  );
-  const landSvg = allPolys[0] || [];
-  const plotsSvg = allPolys.slice(1);
 
-  if (!landSvg.length) return null;
-  const landPolyStr = landSvg.map(p => `${p.x},${p.y}`).join(' ');
-
-  return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} className="rounded border bg-gray-50">
-      {/* Land polygon as background */}
-      <polygon points={landPolyStr} fill="rgba(0,0,0,0.06)" stroke="#333" strokeWidth="2" strokeDasharray="6,3" />
-      {/* Plot overlays */}
-      {plotsSvg.map((svgPts, i) => {
-        if (!svgPts.length) return null;
-        const polyStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
-        const centroid = svgPts.reduce((a, p) => ({ x: a.x + p.x / svgPts.length, y: a.y + p.y / svgPts.length }), { x: 0, y: 0 });
-        const plot = validPlots[i];
-        return (
-          <g key={plot?.id || `plot-${i}`}>
-            <polygon points={polyStr} fill={(plot?.color || '#4CAF50') + '40'} stroke={plot?.color || '#4CAF50'} strokeWidth="2" />
-            <text x={centroid.x} y={centroid.y} textAnchor="middle" fontSize="9" fill="#333" fontWeight="bold">{plot?.tag || ''}</text>
-          </g>
-        );
-      })}
-      {/* Empty state */}
-      {plotsSvg.length === 0 && (
-        <text x={w / 2} y={h / 2 + 20} textAnchor="middle" fontSize="11" fill="#999">Add plots to see them on the map</text>
-      )}
-      {/* Land name label */}
-      <text x={15} y={h - 8} fontSize="9" fill="#666" fontStyle="italic">{land.name} ({land.areaDisplay || 'N/A'})</text>
-    </svg>
-  );
-}
 
 export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const lands = useLiveQuery(() => db.farmLands.toArray(), []);
@@ -310,10 +274,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         updatedAt: Date.now(),
       };
       await db.farmLands.put(land);
-      if (landEditId) { setSelectedLand(land); setMode('plots'); }
-      else { resetLandForm(); setMode('lands'); }
+      if (landEditId) { setSelectedLand(land); setMode('plots'); toast.success('Land updated'); }
+      else { resetLandForm(); setMode('lands'); toast.success('Land saved'); }
     } catch (err) {
-      alert('Failed to save land: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('Failed to save land: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -370,8 +334,9 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       await db.farmAreas.put(plot);
       resetPlotForm();
       setMode('plots');
+      toast.success('Plot saved');
     } catch (err) {
-      alert('Failed to save plot: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('Failed to save plot: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -390,8 +355,9 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       });
       resetPlotForm();
       setMode('plots');
+      toast.success('Plot details saved');
     } catch (err) {
-      alert('Failed to save details: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('Failed to save details: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -635,7 +601,13 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {mode === 'plots' && selectedLand && (
           <>
             {/* Combined map: land background + plot overlays */}
-            {selectedLand.points?.length >= 3 && <LandMap land={selectedLand} plots={plots || []} />}
+            {selectedLand.points?.length >= 3 && (
+              <InteractiveMap
+                mapData={[{ land: selectedLand, plots: plots || [] }]}
+                onSelectPlot={plot => { if (plot) toast.info(`Selected: ${plot.tag} — ${plot.name || ''}`); }}
+                readOnly
+              />
+            )}
             <div className="flex gap-2">
               <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
               <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>

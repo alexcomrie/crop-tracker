@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { useAppStore } from '../../store/useAppStore';
 import { exportJsonBackup, importJsonBackupFromFile } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
@@ -75,7 +76,7 @@ export function DataManagement() {
     ]);
     setClearInput('');
     setShowClear(false);
-    alert('Local data cleared.');
+    toast.success('Local data cleared.');
   }
 
   return (

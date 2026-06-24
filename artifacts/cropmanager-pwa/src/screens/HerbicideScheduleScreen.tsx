@@ -38,7 +38,7 @@ export function HerbicideScheduleScreen() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this entry?')) {
+    if (window.confirm('Delete this entry?')) {
       await db.treatmentLogs.delete(id);
     }
   };

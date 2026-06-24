@@ -23,9 +23,11 @@ const REM_TYPES = [
 
 export function RemindersScreen() {
   const { setActiveTab } = useAppStore();
-  const reminders = useLiveQuery(() => 
+  const remindersData = useLiveQuery(() => 
     db.reminders.orderBy('sendDate').reverse().toArray()
-  ) ?? [];
+  );
+  const reminders = remindersData ?? [];
+  const isLoading = remindersData === undefined;
 
   const [showForm, setShowForm] = useState(false);
   const [plant, setPlant] = useState('');
@@ -56,7 +58,7 @@ export function RemindersScreen() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete this reminder?')) {
+    if (window.confirm('Delete this reminder?')) {
       await db.reminders.delete(id);
     }
   };
@@ -130,7 +132,11 @@ export function RemindersScreen() {
         )}
 
         <div className="space-y-3">
-          {reminders.length === 0 ? (
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : reminders.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
               <Bell className="w-12 h-12 mb-3" />
               <p className="font-semibold">No reminders found</p>

@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useCrops } from '../hooks/useCrops';
 import { CropCard } from '../components/crops/CropCard';
 import { CropDetail } from '../components/crops/CropDetail';
 import { CropForm } from '../components/crops/CropForm';
 import { UpdateCropForm } from '../components/crops/UpdateCropForm';
+import { toast } from 'sonner';
 import type { Crop } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
@@ -19,17 +20,24 @@ const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiti
 export function CropsScreen() {
   const [filter, setFilter] = useState('All');
   const { cropDb } = useAppStore();
-  const crops = useCrops(filter) ?? [];
+  const cropsData = useCrops(filter);
+  const crops = cropsData ?? [];
+  const isLoading = cropsData === undefined;
 
   const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
   const [updateCrop, setUpdateCrop] = useState<Crop | null>(null);
   const [editCrop, setEditCrop] = useState<Crop | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // Auto-transition crops through all stages based on their timeframes
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       for (const c of crops) {
+        if (cancelled || !mountedRef.current) return;
         if (c.status === 'Harvested' || c.status === 'Deleted') continue;
         const cd = resolveCropData(cropDb, c.cropName);
         if (!cd) continue;
@@ -45,6 +53,7 @@ export function CropsScreen() {
         let didTransition = true;
         let currentCrop = c;
         while (didTransition) {
+          if (cancelled || !mountedRef.current) return;
           const result = await autoTransitionCrop(currentCrop, cd, { stageLogs: db.stageLogs, crops: db.crops });
           didTransition = result;
           if (result) {
@@ -54,6 +63,7 @@ export function CropsScreen() {
         }
       }
     })();
+    return () => { cancelled = true; };
   }, [crops, cropDb]);
 
   useEffect(() => {
@@ -131,7 +141,7 @@ export function CropsScreen() {
         }
       }
     }
-    alert('Timings and Continuous Harvest logic refreshed.');
+    toast.success('Timings and Continuous Harvest logic refreshed.');
   }
   const handleDeleteCrop = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {
@@ -147,8 +157,7 @@ export function CropsScreen() {
       
       setSelectedCrop(null);
     } catch (err) {
-      console.error('Failed to delete crop:', err);
-      alert('Failed to delete crop. Please try again.');
+      toast.error('Failed to delete crop. Please try again.');
     }
   };
 
@@ -168,7 +177,11 @@ export function CropsScreen() {
       </div>
 
       <div className="px-4 pt-2">
-        {crops.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : crops.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-4xl mb-3">🌱</p>
             <p className="font-semibold text-lg">No crops yet</p>

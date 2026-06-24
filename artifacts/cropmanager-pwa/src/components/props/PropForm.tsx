@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, addDays, today } from '../../lib/dates';
@@ -74,6 +75,7 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
       if (reminders.length) await db.reminders.bulkAdd(reminders);
       reset();
       onClose();
+      toast.success(editProp ? 'Propagation updated' : 'Propagation added');
     } finally {
       setSaving(false);
     }

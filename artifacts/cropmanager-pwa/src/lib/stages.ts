@@ -113,11 +113,11 @@ export function getValidNextStages(currentStage: string, cropData: CropData | nu
     }
     return ['Harvested', 'Deleted'];
   }
-  const next = seq.slice(idx + 1, idx + 2);
+  const next = seq.slice(idx + 1);
   if (currentStage === 'Seedling') {
     const hasTransplant = cropData && cropData.transplant_days != null && cropData.transplant_days > 0;
-    if (hasTransplant) return ['Transplanted', ...seq.slice(idx + 1)];
-    return seq.slice(idx + 1);
+    if (hasTransplant) return ['Transplanted', ...next];
+    return next;
   }
   return next.length > 0 ? next : ['Harvested', 'Deleted'];
 }

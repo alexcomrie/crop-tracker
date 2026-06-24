@@ -151,6 +151,40 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [plantingMethod, setPlantingMethod] = useState('Direct Ground');
   const [farmNotes, setFarmNotes] = useState('');
   const manualCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [obstacleActive, setObstacleActive] = useState(false);
+  const [obstacleStartPos, setObstacleStartPos] = useState<GeoPoint | null>(null);
+  const [obstacleCurrentPos, setObstacleCurrentPos] = useState<GeoPoint | null>(null);
+  const obstacleActiveRef = useRef(false);
+
+  function interpolatePoints(start: GeoPoint, end: GeoPoint): GeoPoint[] {
+    const dist = haversineMeters(start, end);
+    const numPoints = Math.max(2, Math.round(dist / MIN_POINT_DISTANCE));
+    const pts: GeoPoint[] = [];
+    for (let i = 1; i < numPoints; i++) {
+      const t = i / numPoints;
+      pts.push({ lat: start.lat + (end.lat - start.lat) * t, lng: start.lng + (end.lng - start.lng) * t });
+    }
+    return pts;
+  }
+
+  function startObstacle() {
+    if (currentPoints.length === 0) return;
+    obstacleActiveRef.current = true;
+    setObstacleActive(true);
+    setObstacleStartPos(currentPoints[currentPoints.length - 1]);
+    setGpsStatus('Obstacle mode: walk around the obstacle');
+  }
+
+  function stopObstacle() {
+    if (!obstacleStartPos || !obstacleCurrentPos) return;
+    const newPoints = interpolatePoints(obstacleStartPos, obstacleCurrentPos);
+    setCurrentPoints(prev => [...prev, ...newPoints]);
+    obstacleActiveRef.current = false;
+    setObstacleActive(false);
+    setObstacleStartPos(null);
+    setObstacleCurrentPos(null);
+    setGpsStatus(`Obstacle bypassed: ${newPoints.length} points added`);
+  }
 
   useEffect(() => {
     return () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); };
@@ -197,11 +231,16 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       pos => {
         const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setGpsAccuracy(pos.coords.accuracy);
-        setCurrentPoints(prev => {
-          if (prev.length === 0) return [pt];
-          if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
-          return [...prev, pt];
-        });
+        if (obstacleActiveRef.current) {
+          setObstacleCurrentPos(pt);
+          setGpsStatus('Obstacle mode: monitoring GPS...');
+        } else {
+          setCurrentPoints(prev => {
+            if (prev.length === 0) return [pt];
+            if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
+            return [...prev, pt];
+          });
+        }
       },
       err => setGpsStatus(`GPS error: ${err.message}`),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
@@ -414,6 +453,21 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     );
   }
 
+  function renderObstaclePreview(pts: GeoPoint[], start: GeoPoint, current: GeoPoint) {
+    const allSvg = gpsToSvgAll([pts, [start, current]], CANVAS_W, CANVAS_H, 20);
+    if (allSvg.length < 2) return null;
+    const obsSvg = allSvg[1];
+    if (!obsSvg || obsSvg.length < 2) return null;
+    const lineStr = obsSvg.map(p => `${p.x},${p.y}`).join(' ');
+    return (
+      <svg width="100%" height={CANVAS_H} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} className="absolute top-0 left-0 pointer-events-none">
+        <polyline points={lineStr} fill="none" stroke="#f59e0b" strokeWidth="3" strokeDasharray="6,4" />
+        <circle cx={obsSvg[0].x} cy={obsSvg[0].y} r="5" fill="#f59e0b" stroke="white" strokeWidth="1.5" />
+        <text x={obsSvg[0].x + 8} y={obsSvg[0].y + 4} fontSize="10" fill="#f59e0b" fontWeight="bold">OBSTACLE</text>
+      </svg>
+    );
+  }
+
   function renderPlotForm(primaryColor: string) {
     return (
       <div className="space-y-3">
@@ -489,7 +543,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">{l.areaDisplay || 'N/A'} · {l.points?.length ?? 0} points</p>
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-300 shrink-0 mt-1" />
+                <div className="flex flex-col gap-1 shrink-0">
+                  <button onClick={e => { e.stopPropagation(); deleteLand(l.id); }} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
+                  <ChevronRight className="w-5 h-5 text-gray-300 mt-1" />
+                </div>
               </div>
             ))}
           </>
@@ -508,11 +565,21 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
               </div>
-              {renderLiveSvg(currentPoints)}
+              <div className="relative">
+                {renderLiveSvg(currentPoints)}
+                {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
+              </div>
               {watchId === null ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
-                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                <div className="flex gap-2">
+                  <Button onClick={stopGpsWalk} className="flex-1 bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                  {obstacleActive ? (
+                    <Button onClick={stopObstacle} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"><Eye className="w-4 h-4" /> Obstacle Stop</Button>
+                  ) : (
+                    <Button onClick={startObstacle} variant="outline" className="flex-1 border-amber-400 text-amber-700" disabled={currentPoints.length === 0}><Eye className="w-4 h-4" /> Obstacle Start</Button>
+                  )}
+                </div>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={undoLastPoint} disabled={currentPoints.length === 0}>Undo Point</Button>
@@ -537,11 +604,21 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
               </div>
-              {renderLiveSvg(currentPoints)}
+              <div className="relative">
+                {renderLiveSvg(currentPoints)}
+                {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
+              </div>
               {watchId === null ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
-                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                <div className="flex gap-2">
+                  <Button onClick={stopGpsWalk} className="flex-1 bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                  {obstacleActive ? (
+                    <Button onClick={stopObstacle} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"><Eye className="w-4 h-4" /> Obstacle Stop</Button>
+                  ) : (
+                    <Button onClick={startObstacle} variant="outline" className="flex-1 border-amber-400 text-amber-700" disabled={currentPoints.length === 0}><Eye className="w-4 h-4" /> Obstacle Start</Button>
+                  )}
+                </div>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={undoLastPoint} disabled={currentPoints.length === 0}>Undo Point</Button>
@@ -614,12 +691,22 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
               </div>
-              {renderLiveSvg(currentPoints)}
+              <div className="relative">
+                {renderLiveSvg(currentPoints)}
+                {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
+              </div>
               <p className="text-xs text-gray-500">{gpsStatus}</p>
               {watchId === null ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
-                <Button onClick={stopGpsWalk} className="w-full bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                <div className="flex gap-2">
+                  <Button onClick={stopGpsWalk} className="flex-1 bg-red-600 hover:bg-red-700">Pause Recording</Button>
+                  {obstacleActive ? (
+                    <Button onClick={stopObstacle} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white"><Eye className="w-4 h-4" /> Obstacle Stop</Button>
+                  ) : (
+                    <Button onClick={startObstacle} variant="outline" className="flex-1 border-amber-400 text-amber-700" disabled={currentPoints.length === 0}><Eye className="w-4 h-4" /> Obstacle Start</Button>
+                  )}
+                </div>
               )}
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={undoLastPoint} disabled={currentPoints.length === 0}>Undo Point</Button>

@@ -190,26 +190,60 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     if (!navigator.geolocation) { setGpsStatus('Geolocation not available'); return; }
     setCurrentPoints([]);
     setGpsAccuracy(null);
-    setGpsStatus('Acquiring GPS...');
-    const id = navigator.geolocation.watchPosition(
-      pos => {
-        const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setGpsAccuracy(pos.coords.accuracy);
-        if (obstacleActiveRef.current) {
-          setObstacleCurrentPos(pt);
-          setGpsStatus('Obstacle mode: monitoring GPS...');
-        } else {
-          setCurrentPoints(prev => {
-            if (prev.length === 0) return [pt];
-            if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
-            return [...prev, pt];
-          });
-        }
+    setGpsStatus('Getting starting position...');
+    // Get an immediate starting position first, then switch to watchPosition
+    navigator.geolocation.getCurrentPosition(
+      initialPos => {
+        const startPt: GeoPoint = { lat: initialPos.coords.latitude, lng: initialPos.coords.longitude };
+        setCurrentPoints([startPt]);
+        setGpsAccuracy(initialPos.coords.accuracy);
+        setGpsStatus('Starting position acquired — now recording...');
+        // Now start the continuous watch for subsequent points
+        const id = navigator.geolocation.watchPosition(
+          pos => {
+            const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setGpsAccuracy(pos.coords.accuracy);
+            if (obstacleActiveRef.current) {
+              setObstacleCurrentPos(pt);
+              setGpsStatus('Obstacle mode: monitoring GPS...');
+            } else {
+              setCurrentPoints(prev => {
+                if (prev.length === 0) return [pt];
+                if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
+                return [...prev, pt];
+              });
+            }
+          },
+          err => setGpsStatus(`GPS error: ${err.message}`),
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        );
+        setWatchId(id);
       },
-      err => setGpsStatus(`GPS error: ${err.message}`),
-      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+      err => {
+        // Fallback: start watchPosition directly if getCurrentPosition fails
+        setGpsStatus('Fast fix unavailable, acquiring GPS...');
+        const id = navigator.geolocation.watchPosition(
+          pos => {
+            const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setGpsAccuracy(pos.coords.accuracy);
+            if (obstacleActiveRef.current) {
+              setObstacleCurrentPos(pt);
+              setGpsStatus('Obstacle mode: monitoring GPS...');
+            } else {
+              setCurrentPoints(prev => {
+                if (prev.length === 0) return [pt];
+                if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
+                return [...prev, pt];
+              });
+            }
+          },
+          err2 => setGpsStatus(`GPS error: ${err2.message}`),
+          { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        );
+        setWatchId(id);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 2000 }
     );
-    setWatchId(id);
   }
 
   function stopGpsWalk() {

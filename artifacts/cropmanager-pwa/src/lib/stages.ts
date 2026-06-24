@@ -103,23 +103,25 @@ export function getStageSequence(cropData: CropData | null): string[] {
 
 export function getValidNextStages(currentStage: string, cropData: CropData | null): string[] {
   const seq = getStageSequence(cropData);
-  const idx = seq.indexOf(currentStage);
-  if (idx === -1) {
-    if (currentStage === 'Grafting') return ['Healing'];
-    if (currentStage === 'Healing') return ['Seedling', 'Transplanted'];
-    if (currentStage === 'Transplanted') {
-      const nextSeq = seq.slice(seq.indexOf('Seedling') + 1).filter(s => s !== 'Harvested');
-      return [...nextSeq, 'Harvested'];
-    }
-    return ['Harvested', 'Deleted'];
+  const result = seq.filter(s => s !== currentStage);
+
+  if (currentStage === 'Grafting') {
+    result.push('Healing');
   }
-  const next = seq.slice(idx + 1);
+  if (currentStage === 'Healing') {
+    if (!result.includes('Seedling')) result.push('Seedling');
+    if (!result.includes('Transplanted')) result.push('Transplanted');
+  }
   if (currentStage === 'Seedling') {
     const hasTransplant = cropData && cropData.transplant_days != null && cropData.transplant_days > 0;
-    if (hasTransplant) return ['Transplanted', ...next];
-    return next;
+    if (hasTransplant) result.push('Transplanted');
   }
-  return next.length > 0 ? next : ['Harvested', 'Deleted'];
+  if (!seq.includes(currentStage) && !['Grafting', 'Healing', 'Transplanted'].includes(currentStage)) {
+    if (!result.includes('Harvested')) result.push('Harvested');
+  }
+  if (currentStage !== 'Deleted') result.push('Deleted');
+
+  return result;
 }
 
 export function getStagesForCrop(cropData: CropData | null): string[] {

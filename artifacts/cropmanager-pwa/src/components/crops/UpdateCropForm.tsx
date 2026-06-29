@@ -92,8 +92,12 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
       cropId: crop.id,
       cropName: crop.cropName,
       variety: crop.variety,
-      description: `Stage changed: ${crop.plantStage} → ${newStage}`,
-      details: newStage === 'Harvested' ? `Planted: ${crop.plantingDate}` : '',
+      description: crop.plantStage === 'Seed' && newStage === 'Germinated'
+        ? `Planted in '${crop.plantingMethod || 'direct'}' · germinated`
+        : `${crop.plantStage} → ${newStage}`,
+      details: crop.plantingMethod && !(crop.plantStage === 'Seed' && newStage === 'Germinated')
+        ? `Method: ${crop.plantingMethod}`
+        : newStage === 'Harvested' ? `Planted: ${crop.plantingDate}` : '',
     });
 
     // Continuous Harvest Promotion Logic
@@ -191,8 +195,10 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
         cropId: crop.id,
         cropName: crop.cropName,
         variety: crop.variety,
-        description: `Stage changed: ${crop.plantStage} → ${s}`,
-        details: `Manual progress via checkboxes`,
+        description: s === 'Germinated'
+          ? `Planted in '${crop.plantingMethod || 'direct'}' · germinated`
+          : `${crop.plantStage} → ${s}`,
+        details: crop.plantingMethod ? `Method: ${crop.plantingMethod}` : '',
       });
     }
 

@@ -6,6 +6,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { exportJsonBackup, importJsonBackupFromFile } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
+import { ShieldAlert, Trash2, ScanEye } from 'lucide-react';
 
 export function DataManagement() {
   const { settings } = useAppStore();
@@ -154,6 +155,135 @@ export function DataManagement() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Database Cleanup */}
+      <div className="bg-white rounded-xl border border-orange-200 p-4 space-y-3">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 text-orange-600" />
+          <h3 className="font-semibold text-sm">Database Cleanup</h3>
+        </div>
+
+        <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
+          if (!window.confirm('Remove all duplicate records across the entire app?')) return;
+          let total = 0;
+
+          // Diary entries: same cropId + date + entryType + description
+          const diarySeen = new Set<string>();
+          const diaryEntries = await db.diaryEntries.toArray();
+          for (const e of diaryEntries) {
+            const key = `${e.cropId}|${e.date}|${e.entryType}|${e.description}`;
+            if (diarySeen.has(key)) { await db.diaryEntries.delete(e.id); total++; }
+            else diarySeen.add(key);
+          }
+
+          // Stage logs: same trackingId + stageFrom + stageTo + date
+          const slSeen = new Set<string>();
+          const stageLogs = await db.stageLogs.toArray();
+          for (const s of stageLogs) {
+            const key = `${s.trackingId}|${s.stageFrom}|${s.stageTo}|${s.date}`;
+            if (slSeen.has(key)) { await db.stageLogs.delete(s.id); total++; }
+            else slSeen.add(key);
+          }
+
+          // Harvest logs: same cropTrackingId + harvestNumber
+          const hlSeen = new Set<string>();
+          const harvestLogs = await db.harvestLogs.toArray();
+          for (const h of harvestLogs) {
+            const key = `${h.cropTrackingId}|${h.harvestNumber}`;
+            if (hlSeen.has(key)) { await db.harvestLogs.delete(h.id); total++; }
+            else hlSeen.add(key);
+          }
+
+          // Treatment logs: same cropId + date + product
+          const tlSeen = new Set<string>();
+          const treatmentLogs = await db.treatmentLogs.toArray();
+          for (const t of treatmentLogs) {
+            const key = `${t.cropId}|${t.date}|${t.product}`;
+            if (tlSeen.has(key)) { await db.treatmentLogs.delete(t.id); total++; }
+            else tlSeen.add(key);
+          }
+
+          // Reminders: same trackingId + type + sendDate
+          const remSeen = new Set<string>();
+          const reminders = await db.reminders.toArray();
+          for (const r of reminders) {
+            const key = `${r.trackingId}|${r.type}|${r.sendDate}`;
+            if (remSeen.has(key)) { await db.reminders.delete(r.id); total++; }
+            else remSeen.add(key);
+          }
+
+          // Crops: same cropName + variety + plantingDate
+          const cropSeen = new Set<string>();
+          const crops = await db.crops.toArray();
+          for (const c of crops) {
+            const key = `${c.cropName}|${c.variety}|${c.plantingDate}`;
+            if (cropSeen.has(key)) { await db.crops.delete(c.id); total++; }
+            else cropSeen.add(key);
+          }
+
+          // Propagations: same plantName + propagationDate
+          const propSeen = new Set<string>();
+          const propagations = await db.propagations.toArray();
+          for (const p of propagations) {
+            const key = `${p.plantName}|${p.propagationDate}`;
+            if (propSeen.has(key)) { await db.propagations.delete(p.id); total++; }
+            else propSeen.add(key);
+          }
+
+          toast.success(`Removed ${total} duplicate records across all tables`);
+        }}>
+          <Trash2 className="w-4 h-4" /> Remove All Duplicate Records
+        </Button>
+
+        <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
+          if (!window.confirm('Remove all orphaned records (data referencing crops or propagations that no longer exist)?')) return;
+          const cropIds = new Set((await db.crops.toArray()).map(c => c.id));
+          const propIds = new Set((await db.propagations.toArray()).map(p => p.id));
+          let total = 0;
+
+          const linkedTables = [
+            { table: db.stageLogs, field: 'trackingId' },
+            { table: db.harvestLogs, field: 'cropTrackingId' },
+            { table: db.treatmentLogs, field: 'cropId' },
+            { table: db.reminders, field: 'trackingId' },
+            { table: db.batchPlantingLogs, field: 'cropTrackingId' },
+            { table: db.diaryEntries, field: 'cropId' },
+          ] as const;
+
+          for (const { table, field } of linkedTables) {
+            const all = await table.toArray();
+            for (const item of all) {
+              const id = (item as any)[field];
+              if (id && !cropIds.has(id) && !propIds.has(id)) {
+                await table.delete(item.id);
+                total++;
+              }
+            }
+          }
+
+          toast.success(`Removed ${total} orphaned records`);
+        }}>
+          <ScanEye className="w-4 h-4" /> Remove All Orphaned Records
+        </Button>
+
+        <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
+          if (!window.confirm('Delete all diary entries older than 1 year?')) return;
+          const yearAgo = new Date();
+          yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+          const cutoff = yearAgo.toISOString().split('T')[0];
+          const all = await db.diaryEntries.toArray();
+          let deleted = 0;
+          for (const e of all) {
+            if (e.date && e.date < cutoff) {
+              await db.diaryEntries.delete(e.id);
+              deleted++;
+            }
+          }
+          toast.success(`Deleted ${deleted} old diary entries`);
+        }}>
+          <Trash2 className="w-4 h-4" /> Delete Diary Entries Older Than 1 Year
+        </Button>
       </div>
     </div>
   );

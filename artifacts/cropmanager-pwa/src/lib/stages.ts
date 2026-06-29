@@ -2,6 +2,7 @@ import type { Crop, StageLog, HarvestLog, CropData, CropDbAdjustment } from '../
 import { generateId } from './ids';
 import { parseDate, formatDateShort, daysBetween, addDays, today } from './dates';
 import { getAdjustedValue, calculateHarvestDate } from './harvest';
+import { addDiaryEntry } from './diary';
 
 export function processStageChange(
   crop: Crop,
@@ -234,6 +235,16 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
   );
   stageLog.notes = 'Auto-transitioned';
   await db.stageLogs.add(stageLog);
+  await addDiaryEntry({
+    entryType: 'stage_change',
+    cropId: crop.id,
+    cropName: crop.cropName,
+    variety: crop.variety,
+    description: crop.plantStage === 'Seed'
+      ? `Planted in '${crop.plantingMethod || 'direct'}' · germinated (auto)`
+      : `${crop.plantStage} → ${nextStage} (auto)`,
+    details: crop.plantingMethod ? `Method: ${crop.plantingMethod}` : '',
+  });
   await db.crops.put(updatedCrop);
   return true;
 }

@@ -71,6 +71,11 @@ export function toIsoDateStr(date: Date): string {
   return format(date, 'yyyy-MM-dd');
 }
 
+export function formatDateTime(date: Date): string {
+  if (!date || !isValid(date)) return 'N/A';
+  return format(date, 'dd-MMM-yyyy hh:mm a');
+}
+
 export function today(): Date {
   const d = new Date();
   d.setHours(0, 0, 0, 0);

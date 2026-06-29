@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { ClipboardList, Plus, Pencil, Trash2, X, Search, Save, User, Package, FileText, ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
 import type { PosOrder, PosOrderItem, PosCustomer } from '../../types';
-import { formatDateShort, today } from '../../lib/dates';
+import { formatDateShort, formatDateTime, today } from '../../lib/dates';
 import { toPng } from 'html-to-image';
 
 const UNITS = ['each', 'lb', 'kg', 'oz', 'dozen', 'half-dozen', 'bunch', 'box', 'crate', 'bag', 'tray', 'per plant', 'per head', 'liter', 'gallon', 'bottle'];
@@ -382,7 +382,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
         {quoteTarget && (
           <div ref={quoteRef} className="bg-white p-8 font-mono text-sm" style={{ width: '400px' }}>
             <p className="text-center font-bold text-lg mb-1">QUOTATION</p>
-            <p className="text-center text-xs text-gray-500 mb-4">Date: {formatDateShort(today())}</p>
+            <p className="text-center text-xs text-gray-500 mb-1">{formatDateTime(new Date())}</p>
             <p className="text-xs mb-4">Customer: {quoteTarget.customerName}</p>
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -415,7 +415,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
           <div ref={invoiceRef} className="bg-white p-8 font-mono text-sm" style={{ width: '400px' }}>
             <p className="text-center font-bold text-lg mb-1">INVOICE</p>
             <p className="text-center text-xs text-gray-500 mb-1">#{invoiceTarget.id.slice(-8).toUpperCase()}</p>
-            <p className="text-center text-xs text-gray-500 mb-4">Date: {formatDateShort(today())}</p>
+            <p className="text-center text-xs text-gray-500 mb-1">{formatDateTime(new Date())}</p>
             <p className="text-xs mb-4">Customer: {invoiceTarget.customerName}</p>
             <table className="w-full text-xs border-collapse">
               <thead>

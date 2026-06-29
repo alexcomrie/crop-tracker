@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { ShoppingCart, Trash2, Bluetooth, Search, History, Settings, X, Receipt, User, Package, Smartphone, Gift, Coins, Clock, ClipboardList, Printer, Share2 } from 'lucide-react';
 import type { PosSale, PosSaleItem, PosCustomer, PosSettings, PosHeldReceipt, PosOrder } from '../../types';
-import { formatDateShort, today } from '../../lib/dates';
+import { formatDateShort, formatDateTime, today } from '../../lib/dates';
 import { SalesHistory } from './SalesHistory';
 import { PrintLayoutEditor } from './PrintLayoutEditor';
 import { InventoryManager } from './InventoryManager';
@@ -76,6 +76,7 @@ export default function POSScreen() {
         } catch {}
         const text = buildSaleReceiptText({
           receiptNumber: nextReceiptNumber,
+          date: formatDateTime(new Date()),
           customerName: customerName || selectedCustomer?.name || '',
           items: cartItems.map(({ item }) => item),
           subtotal, discount: discountAmount, tax: taxAmount, total, paymentMethod,
@@ -256,7 +257,7 @@ export default function POSScreen() {
     try {
       const sale: PosSale = {
         id: generateId('SL'),
-        date: formatDateShort(today()),
+        date: formatDateTime(new Date()),
         items: cartItems.map(({ item }) => item),
         subtotal,
         tax: taxAmount,
@@ -750,6 +751,7 @@ export default function POSScreen() {
             {settings.businessEmail && <p className="text-center text-gray-500 text-xs">{settings.businessEmail}</p>}
             <p className="text-center text-gray-400 text-xs">{'─'.repeat(settings.printCharPerLine || 32)}</p>
             <p className="text-center font-bold text-sm">{fulfillOrder ? 'INVOICE' : 'Receipt'} #{String(nextReceiptNumber).padStart(6, '0')}</p>
+            <p className="text-center text-xs text-gray-500">{formatDateTime(new Date())}</p>
             {(customerName || selectedCustomer?.name) && settings.showCustomer && (
               <p className="text-center text-xs text-gray-500">Customer: {customerName || selectedCustomer?.name}</p>
             )}

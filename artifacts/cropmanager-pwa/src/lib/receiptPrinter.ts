@@ -136,7 +136,7 @@ export function buildSaleReceipt(
   if (settings.businessEmail) lines.push({ text: settings.businessEmail, center: true });
   lines.push({ divider: true });
   lines.push({ text: `Receipt #${String(sale.receiptNumber).padStart(6, '0')}`, center: true, bold: true });
-  lines.push({ text: `Date: ${sale.date}`, center: true });
+  lines.push({ text: sale.date, center: true });
   if (settings.showCustomer && sale.customerName) {
     lines.push({ text: `Customer: ${sale.customerName}`, center: true });
   }
@@ -173,6 +173,7 @@ export function buildSaleReceipt(
 export function buildSaleReceiptText(
   sale: {
     receiptNumber: number;
+    date?: string;
     customerName?: string;
     items: { productName: string; quantity: number; unit: string; unitPrice: number; total: number }[];
     subtotal: number;
@@ -191,6 +192,7 @@ export function buildSaleReceiptText(
   lines.push(sale.businessName);
   lines.push(sep);
   lines.push(`Receipt #${String(sale.receiptNumber).padStart(6, '0')}`);
+  if (sale.date) lines.push(sale.date);
   if (sale.customerName) lines.push(`Customer: ${sale.customerName}`);
   lines.push(sep);
   lines.push('Item'.padEnd(14) + 'Qty'.padEnd(6) + 'Price'.padEnd(6) + 'Total');

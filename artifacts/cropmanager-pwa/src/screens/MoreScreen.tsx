@@ -1,28 +1,21 @@
-import React, { useState } from 'react';
-import { useAppStore } from '../store/useAppStore';
-import { Calendar, Database, Beaker, Bell, ChevronRight, BarChart2, FlaskConical, MapPin, Download } from 'lucide-react';
-import { CropDatabaseScreen } from '../components/CropDatabaseScreen';
-import { FertilizerDatabaseScreen } from '../components/FertilizerDatabaseScreen';
-import { CropHistoryScreen } from '../components/reports/CropHistory';
-import { CHCalculatorScreen } from '../components/ch/CHCalculatorScreen';
-import { ActivityScreen } from '../components/activity/ActivityScreen';
-import { FarmLedgerScreen } from '../components/ledger/FarmLedgerScreen';
-import { TreatmentAppRatesScreen } from '../components/treatment/TreatmentAppRatesScreen';
-import { AreaMapperScreen } from '../components/area/AreaMapperScreen';
-import { DataManagement } from '../components/settings/DataManagement';
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '../lib/routes';
+import { Database, Beaker, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, ChevronRight } from 'lucide-react';
 
 interface MoreItemProps {
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   iconColor: string;
-  onClick: () => void;
+  path: string;
 }
 
-function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) {
+function MoreItem({ title, subtitle, icon, iconColor, path }: MoreItemProps) {
+  const navigate = useNavigate();
   return (
     <button
-      onClick={onClick}
+      onClick={() => navigate(path)}
       className="w-full bg-white border border-gray-100 rounded-xl p-4 flex items-center gap-4 active:scale-[0.98] transition-all text-left"
     >
       <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${iconColor}`}>
@@ -38,169 +31,125 @@ function MoreItem({ title, subtitle, icon, iconColor, onClick }: MoreItemProps) 
 }
 
 export function MoreScreen() {
-  const { setActiveTab } = useAppStore();
-  const [activePanel, setActivePanel] = useState<'crop-db' | 'fert-db' | 'history' | 'ch-calc' | 'activity' | 'ledger' | 'treatment-rates' | 'area-mapper' | 'data-mgmt' | null>(null);
-
   return (
-    <div className="relative h-full overflow-hidden">
-      <div className="pb-24 pt-4 px-4 space-y-6 overflow-y-auto h-full">
-        <section>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Databases</h2>
-          <div className="space-y-3">
-            <MoreItem
-              title="Crop Database"
-              subtitle="View and edit crop timings, varieties, sprays"
-              icon={<Database className="w-6 h-6 text-green-600" />}
-              iconColor="bg-green-50"
-              onClick={() => setActivePanel('crop-db')}
-            />
-            <MoreItem
-              title="Fertilizer Database"
-              subtitle="Edit 5-tea mix ratios per crop & stage"
-              icon={<Beaker className="w-6 h-6 text-amber-600" />}
-              iconColor="bg-amber-50"
-              onClick={() => setActivePanel('fert-db')}
-            />
-            <MoreItem
-              title="History & Averages"
-              subtitle="Stage timing averages by crop"
-              icon={<BarChart2 className="w-6 h-6 text-blue-600" />}
-              iconColor="bg-blue-50"
-              onClick={() => setActivePanel('history')}
-            />
-            <MoreItem
-              title="Treatment App Rates"
-              subtitle="Calculate fungicide/insecticide application rates"
-              icon={<FlaskConical className="w-6 h-6 text-cyan-600" />}
-              iconColor="bg-cyan-50"
-              onClick={() => setActivePanel('treatment-rates')}
-            />
-            <MoreItem
-              title="Reminders"
-              subtitle="View and manage queued Telegram reminders"
-              icon={<Bell className="w-6 h-6 text-purple-600" />}
-              iconColor="bg-purple-50"
-              onClick={() => setActiveTab('reminders')}
-            />
-            <MoreItem
-              title="Activity Log"
-              subtitle="Record and track field activities"
-              icon={<span className="text-lg">📋</span>}
-              iconColor="bg-orange-50"
-              onClick={() => setActivePanel('activity')}
-            />
-          </div>
-        </section>
+    <div className="pb-24 pt-4 px-4 space-y-6 overflow-y-auto">
+      <section>
+        <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Databases</h2>
+        <div className="space-y-3">
+          <MoreItem
+            title="Crop Database"
+            subtitle="View and edit crop timings, varieties, sprays"
+            icon={<Database className="w-6 h-6 text-green-600" />}
+            iconColor="bg-green-50"
+            path={ROUTES.MORE_CROP_DB}
+          />
+          <MoreItem
+            title="Fertilizer Database"
+            subtitle="Edit 5-tea mix ratios per crop & stage"
+            icon={<Beaker className="w-6 h-6 text-amber-600" />}
+            iconColor="bg-amber-50"
+            path={ROUTES.MORE_FERT_DB}
+          />
+          <MoreItem
+            title="History & Averages"
+            subtitle="Stage timing averages by crop"
+            icon={<BarChart2 className="w-6 h-6 text-blue-600" />}
+            iconColor="bg-blue-50"
+            path={ROUTES.MORE_HISTORY}
+          />
+          <MoreItem
+            title="Treatment App Rates"
+            subtitle="Calculate fungicide/insecticide application rates"
+            icon={<FlaskConical className="w-6 h-6 text-cyan-600" />}
+            iconColor="bg-cyan-50"
+            path={ROUTES.MORE_TREATMENT_RATES}
+          />
+          <MoreItem
+            title="Reminders"
+            subtitle="View and manage queued Telegram reminders"
+            icon={<Bell className="w-6 h-6 text-purple-600" />}
+            iconColor="bg-purple-50"
+            path={ROUTES.REMINDERS}
+          />
+          <MoreItem
+            title="Activity Log"
+            subtitle="Record and track field activities"
+            icon={<span className="text-lg">📋</span>}
+            iconColor="bg-orange-50"
+            path={ROUTES.MORE_ACTIVITY}
+          />
+        </div>
+      </section>
 
-        <section>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Planning</h2>
-          <div className="space-y-3">
-            <MoreItem
-              title="C-H Calculator"
-              subtitle="Plan plots for continuous weekly harvests"
-              icon={<span className="text-lg">♻️</span>}
-              iconColor="bg-[#e0fdf4]"
-              onClick={() => setActivePanel('ch-calc')}
-            />
-          </div>
-        </section>
-        <section>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Finance</h2>
-          <div className="space-y-3">
-            <MoreItem
-              title="Farm Ledger"
-              subtitle="Expenses, sales, inventory, treatments, P&L"
-              icon={<span className="text-lg">📊</span>}
-              iconColor="bg-emerald-50"
-              onClick={() => setActivePanel('ledger')}
-            />
-          </div>
-        </section>
-        <section>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Schedule</h2>
-          <div className="space-y-3">
-            <MoreItem
-              title="Calendar"
-              subtitle="View all upcoming events and tasks"
-              icon={<Calendar className="w-6 h-6 text-green-600" />}
-              iconColor="bg-green-50"
-              onClick={() => setActiveTab('calendar')}
-            />
-            <MoreItem
-              title="Area Mapper"
-              subtitle="GPS walk or manual points to map farm areas"
-              icon={<MapPin className="w-6 h-6 text-rose-600" />}
-              iconColor="bg-rose-50"
-              onClick={() => setActivePanel('area-mapper')}
-            />
-          </div>
-        </section>
-        <section>
-          <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Settings</h2>
-          <div className="space-y-3">
-            <MoreItem
-              title="Data Management"
-              subtitle="Export/import backup, clear local data"
-              icon={<Download className="w-6 h-6 text-gray-600" />}
-              iconColor="bg-gray-50"
-              onClick={() => setActivePanel('data-mgmt')}
-            />
-          </div>
-        </section>
-      </div>
-
-      {/* Slide-in Panels */}
-      {activePanel === 'crop-db' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <CropDatabaseScreen onClose={() => setActivePanel(null)} />
+      <section>
+        <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Planning</h2>
+        <div className="space-y-3">
+          <MoreItem
+            title="Calculator"
+            subtitle="Farm calculators + regular calculator"
+            icon={<Calculator className="w-6 h-6 text-indigo-600" />}
+            iconColor="bg-indigo-50"
+            path={ROUTES.MORE_CALCULATOR}
+          />
+          <MoreItem
+            title="C-H Calculator"
+            subtitle="Plan plots for continuous weekly harvests"
+            icon={<span className="text-lg">♻️</span>}
+            iconColor="bg-[#e0fdf4]"
+            path={ROUTES.MORE_CH_CALC}
+          />
         </div>
-      )}
-      {activePanel === 'fert-db' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <FertilizerDatabaseScreen onClose={() => setActivePanel(null)} />
+      </section>
+      <section>
+        <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Finance</h2>
+        <div className="space-y-3">
+          <MoreItem
+            title="Farm Ledger"
+            subtitle="Expenses, sales, inventory, treatments, P&L"
+            icon={<span className="text-lg">📊</span>}
+            iconColor="bg-emerald-50"
+            path={ROUTES.MORE_LEDGER}
+          />
+          <MoreItem
+            title="Point of Sale"
+            subtitle="Sell crops, print receipts, track sales"
+            icon={<Receipt className="w-6 h-6 text-indigo-600" />}
+            iconColor="bg-indigo-50"
+            path={ROUTES.MORE_POS}
+          />
         </div>
-      )}
-      {activePanel === 'history' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <CropHistoryScreen onClose={() => setActivePanel(null)} />
+      </section>
+      <section>
+        <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Schedule</h2>
+        <div className="space-y-3">
+          <MoreItem
+            title="Calendar"
+            subtitle="View all upcoming events and tasks"
+            icon={<Calendar className="w-6 h-6 text-green-600" />}
+            iconColor="bg-green-50"
+            path={ROUTES.CALENDAR}
+          />
+          <MoreItem
+            title="Area Mapper"
+            subtitle="GPS walk or manual points to map farm areas"
+            icon={<MapPin className="w-6 h-6 text-rose-600" />}
+            iconColor="bg-rose-50"
+            path={ROUTES.MORE_AREA_MAPPER}
+          />
         </div>
-      )}
-      {activePanel === 'treatment-rates' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <TreatmentAppRatesScreen onClose={() => setActivePanel(null)} />
+      </section>
+      <section>
+        <h2 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">Tracking</h2>
+        <div className="space-y-3">
+          <MoreItem
+            title="Diary"
+            subtitle="Auto-logged timeline of all crop activities"
+            icon={<BookOpen className="w-6 h-6 text-amber-600" />}
+            iconColor="bg-amber-50"
+            path={ROUTES.MORE_DIARY}
+          />
         </div>
-      )}
-      {activePanel === 'ch-calc' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <CHCalculatorScreen onClose={() => setActivePanel(null)} />
-        </div>
-      )}
-      {activePanel === 'activity' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <ActivityScreen onClose={() => setActivePanel(null)} />
-        </div>
-      )}
-      {activePanel === 'ledger' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <FarmLedgerScreen onClose={() => setActivePanel(null)} />
-        </div>
-      )}
-      {activePanel === 'area-mapper' && (
-        <div className="fixed inset-0 z-[60] bg-white">
-          <AreaMapperScreen onClose={() => setActivePanel(null)} />
-        </div>
-      )}
-      {activePanel === 'data-mgmt' && (
-        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto">
-          <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center gap-3 z-10">
-            <button onClick={() => setActivePanel(null)} className="text-gray-600 text-lg">←</button>
-            <h1 className="font-bold text-lg">Data Management</h1>
-          </div>
-          <div className="p-4">
-            <DataManagement />
-          </div>
-        </div>
-      )}
+      </section>
     </div>
   );
 }

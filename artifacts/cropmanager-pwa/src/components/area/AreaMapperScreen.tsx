@@ -2,71 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { generateId } from '../../lib/ids';
-import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye } from 'lucide-react';
+import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye, Link, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { InteractiveMap } from './InteractiveMap';
-import type { GeoPoint, FarmArea, FarmLand, RowDetail } from '../../types';
+import { LeafletMapView } from './LeafletMapView';
+import { LinkCropModal } from './LinkCropModal';
+import { haversineMeters, calcArea, gpsToSvgAll, formatAreaShort } from '../../lib/geo';
+import type { GeoPoint, FarmArea, FarmLand, RowDetail, CropAssignment } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
 const PLANTING_METHODS = ['Direct Ground', 'Seed Bed', 'Seed Tray', 'Pot / Container', 'Hydroponic'];
 const CANVAS_W = 340;
 const CANVAS_H = 280;
 const MIN_POINT_DISTANCE = 1.5;
-
-function haversineMeters(a: GeoPoint, b: GeoPoint): number {
-  const R = 6371000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const sin2 = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(sin2), Math.sqrt(1 - sin2));
-}
-
-function calcArea(points: GeoPoint[] | undefined | null): { sqM: number; display: string } {
-  if (!points || points.length < 3) return { sqM: 0, display: '0 m²' };
-  const avgLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
-  const mPerDegLat = 111320;
-  const mPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
-  const pts = points.map(p => ({ x: p.lng * mPerDegLng, y: p.lat * mPerDegLat }));
-  let area = 0;
-  const n = pts.length;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
-  }
-  area = Math.abs(area / 2);
-  if (area >= 10000) return { sqM: area, display: `${(area / 10000).toFixed(2)} ha` };
-  if (area >= 100) return { sqM: area, display: `${area.toFixed(0)} m²` };
-  return { sqM: area, display: `${area.toFixed(1)} m²` };
-}
-
-function gpsToSvgAll(allPoints: (GeoPoint[] | undefined | null)[], w: number, h: number, pad = 20): { x: number; y: number }[][] {
-  const valid = allPoints.filter((p): p is GeoPoint[] => !!p);
-  if (valid.length === 0 || valid.every(p => p.length === 0)) return [];
-  const flat = valid.filter(p => p.length > 0).flat();
-  const lats = flat.map(p => p.lat);
-  const lngs = flat.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = (maxLat - minLat) || 0.0001;
-  const lngRange = (maxLng - minLng) || 0.0001;
-  const uw = w - pad * 2;
-  const uh = h - pad * 2;
-  return valid.map(pts =>
-    pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
-      x: pad + ((p.lng - minLng) / lngRange) * uw,
-      y: pad + ((maxLat - p.lat) / latRange) * uh,
-    }))
-  );
-}
-
-function formatAreaShort(sqm: number): string {
-  if (sqm >= 10000) return `${(sqm / 10000).toFixed(2)} ha`;
-  if (sqm >= 1) return `${sqm.toFixed(1)} m²`;
-  return `${(sqm * 10000).toFixed(0)} cm²`;
-}
 
 function AreaSvgThumb({ points, w = 120, h = 80 }: { points: GeoPoint[] | undefined | null; w?: number; h?: number }) {
   const svg = points && points.length >= 3 ? gpsToSvgAll([points], w, h, 8)[0] : [];
@@ -98,7 +47,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const lands = useLiveQuery(() => db.farmLands.toArray(), []);
   const [selectedLand, setSelectedLand] = useState<FarmLand | null>(null);
   const plots = useLiveQuery(() => selectedLand ? db.farmAreas.where('landId').equals(selectedLand.id).toArray() : [], [selectedLand]);
-  const [mode, setMode] = useState<'lands' | 'land-gps' | 'plots' | 'gps' | 'manual' | 'details' | 'land-edit'>('lands');
+  const [mode, setMode] = useState<'lands' | 'land-gps' | 'plots' | 'gps' | 'manual' | 'details' | 'land-edit' | 'map'>('lands');
   const [currentPoints, setCurrentPoints] = useState<GeoPoint[]>([]);
   const [plotTag, setPlotTag] = useState('');
   const [plotName, setPlotName] = useState('');
@@ -109,9 +58,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [status, setStatus] = useState<'unmapped' | 'mapped' | 'cultivated'>('unmapped');
-  const [rowCount, setRowCount] = useState(1);
-  const [rowSpacing, setRowSpacing] = useState(30);
-  const [rowDetails, setRowDetails] = useState<RowDetail[]>([{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+  const [rowSpacing, setRowSpacing] = useState(12);
+  const [cropAssignments, setCropAssignments] = useState<CropAssignment[]>([{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
   const [plantingMethod, setPlantingMethod] = useState('Direct Ground');
   const [farmNotes, setFarmNotes] = useState('');
   const manualCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -119,6 +67,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [obstacleStartPos, setObstacleStartPos] = useState<GeoPoint | null>(null);
   const [obstacleCurrentPos, setObstacleCurrentPos] = useState<GeoPoint | null>(null);
   const obstacleActiveRef = useRef(false);
+  const [linkModalPlot, setLinkModalPlot] = useState<string | null>(null);
+  const [editingPoints, setEditingPoints] = useState(false);
+  const [editingLandPoints, setEditingLandPoints] = useState(false);
+  const allCrops = useLiveQuery(() => db.crops.where('status').equals('Active').toArray(), []) ?? [];
 
   function interpolatePoints(start: GeoPoint, end: GeoPoint): GeoPoint[] {
     const dist = haversineMeters(start, end);
@@ -274,9 +226,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setPlotName('');
     setEditId(null);
     setStatus('unmapped');
-    setRowCount(1);
-    setRowSpacing(30);
-    setRowDetails([{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+    setRowSpacing(12);
+    setCropAssignments([{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
     setPlantingMethod('Direct Ground');
     setFarmNotes('');
     setGpsAccuracy(null);
@@ -357,9 +308,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         areaDisplay: display,
         color: COLORS[(plots?.length || 0) % COLORS.length],
         status: status === 'unmapped' ? 'mapped' : status,
-        rowCount,
+        rowCount: cropAssignments.reduce((sum, ca) => sum + ca.rowCount, 0),
         rowSpacing,
-        rowDetails: rowDetails.filter(r => r.rowNumber <= rowCount),
+        rowDetails: [],
+        cropAssignments,
         plantingMethod,
         notes: farmNotes,
         createdAt: editId ? (plots?.find(p => p.id === editId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
@@ -379,9 +331,10 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     try {
       await db.farmAreas.update(editId, {
         name: plotName.trim(),
-        rowCount,
+        rowCount: cropAssignments.reduce((sum, ca) => sum + ca.rowCount, 0),
         rowSpacing,
-        rowDetails: rowDetails.filter(r => r.rowNumber <= rowCount),
+        rowDetails: [],
+        cropAssignments,
         plantingMethod,
         notes: farmNotes,
         status: 'cultivated',
@@ -405,9 +358,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setPlotName(plot.name);
     setEditId(plot.id);
     setStatus(plot.status);
-    setRowCount(plot.rowCount || 1);
-    setRowSpacing(plot.rowSpacing || 30);
-    setRowDetails(plot.rowDetails?.length ? plot.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+    setRowSpacing(plot.rowSpacing || 12);
+    setCropAssignments(plot.cropAssignments?.length ? plot.cropAssignments : [{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
     setPlantingMethod(plot.plantingMethod || 'Direct Ground');
     setFarmNotes(plot.notes || '');
     setMode('gps');
@@ -417,22 +369,11 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setEditId(plot.id);
     setPlotTag(plot.tag);
     setPlotName(plot.name);
-    setRowCount(plot.rowCount || 1);
-    setRowSpacing(plot.rowSpacing || 30);
-    setRowDetails(plot.rowDetails?.length ? plot.rowDetails : [{ rowNumber: 1, cropName: '', spacingInRow: 20, notes: '' }]);
+    setRowSpacing(plot.rowSpacing || 12);
+    setCropAssignments(plot.cropAssignments?.length ? plot.cropAssignments : [{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
     setPlantingMethod(plot.plantingMethod || 'Direct Ground');
     setFarmNotes(plot.notes || '');
     setMode('details');
-  }
-
-  function updateRow(index: number, field: keyof RowDetail, value: string | number) {
-    setRowDetails(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
-  }
-
-  function handleRowCountChange(val: number) {
-    const count = Math.max(1, Math.min(100, val));
-    setRowCount(count);
-    setRowDetails(prev => Array.from({ length: count }, (_, i) => prev[i] || { rowNumber: i + 1, cropName: '', spacingInRow: 20, notes: '' }));
   }
 
   function renderLiveSvg(pts: GeoPoint[]) {
@@ -473,23 +414,51 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       <div className="space-y-3">
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Plot Details</p>
         <input type="text" placeholder="Plot name (e.g. North Bed)" value={plotName} onChange={e => setPlotName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-        <div className="grid grid-cols-2 gap-2">
-          <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-          <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-500 shrink-0">Row Spacing:</label>
+          <div className="flex items-center gap-1">
+            <input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-20 border rounded-lg px-2 py-1.5 text-sm" />
+            <span className="text-xs text-gray-400">inches</span>
+          </div>
         </div>
         <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
           {PLANTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
         </select>
-        {rowDetails.slice(0, rowCount).map((row, i) => (
+
+        {/* Crop assignments (batch rows) */}
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Crops in this Plot</p>
+        <p className="text-[10px] text-gray-400">Add each crop grown in this plot and how many rows it occupies.</p>
+        {cropAssignments.map((ca, i) => (
           <div key={i} className="border rounded-lg p-3 space-y-2 bg-gray-50">
-            <p className="text-xs font-semibold text-gray-500 uppercase">Row {i + 1}</p>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="text" placeholder="Crop name" value={row.cropName} onChange={e => updateRow(i, 'cropName', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              <input type="number" placeholder="Spacing (cm)" value={row.spacingInRow} onChange={e => updateRow(i, 'spacingInRow', Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" min={1} />
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-500 uppercase">Crop {i + 1}</span>
+              {cropAssignments.length > 1 && (
+                <button onClick={() => setCropAssignments(prev => prev.filter((_, j) => j !== i))} className="text-red-400 text-xs">Remove</button>
+              )}
             </div>
-            <input type="text" placeholder="Row notes" value={row.notes || ''} onChange={e => updateRow(i, 'notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-1">
+                <label className="text-[10px] text-gray-400">Crop</label>
+                <input type="text" placeholder="e.g. Tomato" value={ca.cropName} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, cropName: e.target.value } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400">Rows</label>
+                <input type="number" min={1} value={ca.rowCount} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, rowCount: Math.max(1, Number(e.target.value)) } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-400">Spacing</label>
+                <div className="flex items-center gap-1">
+                  <input type="number" min={1} value={ca.spacingInRow} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, spacingInRow: Number(e.target.value) } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                  <span className="text-[10px] text-gray-400">in</span>
+                </div>
+              </div>
+            </div>
           </div>
         ))}
+        <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 12 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
+          + Add Another Crop
+        </button>
+
         <textarea placeholder="General notes about this plot..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
         <div className="flex gap-2">
           <Button variant="outline" onClick={resetPlotForm} className="flex-1"><RotateCcw className="w-4 h-4" /> Reset</Button>
@@ -639,15 +608,27 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               <InteractiveMap
                 mapData={[{ land: selectedLand, plots: plots || [] }]}
                 onSelectPlot={plot => { if (plot) toast.info(`Selected: ${plot.tag} — ${plot.name || ''}`); }}
-                readOnly
+                editingLandId={editingLandPoints ? selectedLand.id : undefined}
+                onPointsChange={(id, points) => {
+                  if (id === selectedLand.id) {
+                    const now = Date.now();
+                    db.farmLands.where('id').equals(id).modify({ points, updatedAt: now });
+                    toast.success('Land perimeter updated');
+                    setEditingLandPoints(false);
+                  }
+                }}
+                readOnly={!editingLandPoints}
               />
             )}
             <div className="flex gap-2">
               <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
               <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
+              {selectedLand.points?.length >= 3 && (
+                <button onClick={() => setMode('map')} className="flex-1 bg-indigo-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><MapPin className="w-5 h-5" /> Map</button>
+              )}
             </div>
             {selectedLand.points?.length >= 3 && (
-              <button onClick={() => editLandPerimeter(selectedLand)} className="w-full text-xs text-gray-500 border border-dashed rounded-lg py-2 hover:bg-gray-50 flex items-center justify-center gap-1"><Pencil className="w-3 h-3" /> Edit land perimeter</button>
+              <button onClick={() => setEditingLandPoints(!editingLandPoints)} className={`w-full text-xs rounded-lg py-2 flex items-center justify-center gap-1 ${editingLandPoints ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'text-gray-500 border border-dashed hover:bg-gray-50'}`}><Pencil className="w-3 h-3" /> {editingLandPoints ? 'Done Editing' : 'Edit land perimeter'}</button>
             )}
             <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''}</p>
             {(!plots || plots.length === 0) && (
@@ -655,6 +636,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             )}
             {plots?.map(p => {
               const { sqM } = calcArea(p.points);
+              const linkedCrops = allCrops.filter(c => c.plotId === p.id);
               return (
                 <div key={p.id} className="bg-white rounded-xl border p-3 flex gap-3">
                   <AreaSvgThumb points={p.points} />
@@ -667,10 +649,17 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                     <p className="text-xs text-gray-500 mt-0.5">{formatAreaShort(sqM)} · {p.points?.length ?? 0} points</p>
                     {(p.rowCount || 0) > 0 && <p className="text-xs text-gray-500">{p.rowCount} row{(p.rowCount || 0) !== 1 ? 's' : ''}{p.rowSpacing ? ` · ${p.rowSpacing} cm` : ''}</p>}
                     {p.plantingMethod && <p className="text-xs text-gray-500">{p.plantingMethod}</p>}
-                    {(p.rowDetails || []).length > 0 && (
+                    {(p.cropAssignments || []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {[...new Set(p.rowDetails.map(r => r.cropName).filter(Boolean))].map(crop => (
-                          <span key={crop} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{crop}</span>
+                        {p.cropAssignments.filter(ca => ca.cropName).map((ca, i) => (
+                          <span key={i} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ca.cropName} ({ca.rowCount} row{ca.rowCount > 1 ? 's' : ''})</span>
+                        ))}
+                      </div>
+                    )}
+                    {linkedCrops.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {linkedCrops.map(c => (
+                          <span key={c.id} className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1"><Link className="w-2.5 h-2.5" />{c.cropName}</span>
                         ))}
                       </div>
                     )}
@@ -678,12 +667,74 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                   <div className="flex flex-col gap-1">
                     <button onClick={() => editPlotPerimeter(p)} className="p-1.5 hover:bg-green-50 rounded-lg" title="Re-walk"><Navigation className="w-4 h-4 text-green-600" /></button>
                     <button onClick={() => openPlotDetails(p)} className="p-1.5 hover:bg-blue-50 rounded-lg" title="Edit details"><Pencil className="w-4 h-4 text-blue-500" /></button>
+                    <button onClick={() => setLinkModalPlot(p.id)} className="p-1.5 hover:bg-purple-50 rounded-lg" title="Link to crop"><Link className="w-4 h-4 text-purple-500" /></button>
                     <button onClick={() => deletePlot(p.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4 text-red-400" /></button>
                   </div>
                 </div>
               );
             })}
           </>
+        )}
+
+        {/* ─── MAP VIEW (Leaflet tiles) ─── */}
+        {mode === 'map' && selectedLand && (
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <button onClick={() => setMode('plots')} className="text-sm text-indigo-600 font-semibold">← Back to Plots</button>
+              <div className="flex gap-1 ml-auto">
+                <button onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.geojson';
+                  input.onchange = async () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+                    try {
+                      const { parseGeoJsonFile, geoJsonToPlots } = await import('../../lib/geoJson');
+                      const fc = await parseGeoJsonFile(file);
+                      const now = Date.now();
+                      for (const plot of geoJsonToPlots(fc, selectedLand.id)) {
+                        const { sqM, display } = calcArea(plot.points);
+                        const tag = await getNextPlotTag();
+                        await db.farmAreas.put({
+                          ...plot,
+                          id: generateId('FA'),
+                          tag: plot.tag || tag,
+                          areaSqM: sqM,
+                          areaDisplay: display,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: now,
+                        });
+                      }
+                      toast.success('GeoJSON plots imported');
+                    } catch (e) {
+                      toast.error('Import failed: ' + (e instanceof Error ? e.message : 'unknown error'));
+                    }
+                  };
+                  input.click();
+                }} className="text-xs bg-white border rounded-lg px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-50">
+                  Import GeoJSON
+                </button>
+              </div>
+            </div>
+            <LeafletMapView
+              mapData={[{ land: selectedLand, plots: plots || [] }]}
+              showGps
+              onSelectPlot={plot => { if (plot) toast.info(`${plot.tag} — ${plot.name || ''}`); }}
+            />
+            <div className="text-xs text-gray-400 text-center">
+              Tap a plot on the map to see details. GPS marker shows your location.
+            </div>
+          </div>
+        )}
+
+        {/* ─── LINK CROP MODAL ─── */}
+        {linkModalPlot && (
+          <LinkCropModal
+            plotId={linkModalPlot}
+            crops={allCrops}
+            onClose={() => setLinkModalPlot(null)}
+          />
         )}
 
         {/* ─── GPS MODE (Plot creation) ─── */}
@@ -754,26 +805,69 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
         {/* ─── PLOT DETAILS EDIT ─── */}
         {mode === 'details' && (
           <div className="space-y-4">
+            {selectedLand && selectedLand.points?.length >= 3 && (
+              <InteractiveMap
+                mapData={[{ land: selectedLand, plots: (plots || []).filter(p => p.id === editId) }]}
+                selectedPlotId={editId ?? undefined}
+                editingPlotId={editingPoints ? (editId ?? undefined) : undefined}
+                onPointsChange={(plotId, points) => {
+                  const now = Date.now();
+                  db.farmAreas.where('id').equals(plotId).modify({ points, updatedAt: now });
+                  toast.success('Points updated');
+                  setEditingPoints(false);
+                }}
+                height={280}
+              />
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setEditingPoints(!editingPoints)} className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1 ${editingPoints ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'bg-gray-50 text-gray-600 border'}`}>
+                <Edit3 className="w-4 h-4" /> {editingPoints ? 'Done Editing' : 'Edit Points'}
+              </button>
+            </div>
             <div className="bg-white rounded-xl border p-4 space-y-3">
               <h2 className="font-semibold flex items-center gap-2"><Edit3 className="w-5 h-5 text-blue-600" /> Edit Details — {plotTag}</h2>
               <input type="text" placeholder="Plot name" value={plotName} onChange={e => setPlotName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-              <div className="grid grid-cols-2 gap-2">
-                <div><label className="text-xs text-gray-500">Rows</label><input type="number" min={1} value={rowCount} onChange={e => handleRowCountChange(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
-                <div><label className="text-xs text-gray-500">Row Spacing (cm)</label><input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" /></div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-500 shrink-0">Row Spacing:</label>
+                <div className="flex items-center gap-1">
+                  <input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-20 border rounded-lg px-2 py-1.5 text-sm" />
+                  <span className="text-xs text-gray-400">inches</span>
+                </div>
               </div>
               <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
                 {PLANTING_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
-              {rowDetails.slice(0, rowCount).map((row, i) => (
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Crops in this Plot</p>
+              {cropAssignments.map((ca, i) => (
                 <div key={i} className="border rounded-lg p-3 space-y-2 bg-gray-50">
-                  <p className="text-xs font-semibold text-gray-500 uppercase">Row {i + 1}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input type="text" placeholder="Crop name" value={row.cropName} onChange={e => updateRow(i, 'cropName', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                    <input type="number" placeholder="Spacing (cm)" value={row.spacingInRow} onChange={e => updateRow(i, 'spacingInRow', Number(e.target.value))} className="w-full border rounded-lg px-3 py-2 text-sm" min={1} />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Crop {i + 1}</span>
+                    {cropAssignments.length > 1 && (
+                      <button onClick={() => setCropAssignments(prev => prev.filter((_, j) => j !== i))} className="text-red-400 text-xs">Remove</button>
+                    )}
                   </div>
-                  <input type="text" placeholder="Row notes" value={row.notes || ''} onChange={e => updateRow(i, 'notes', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-1">
+                      <label className="text-[10px] text-gray-400">Crop</label>
+                      <input type="text" placeholder="e.g. Tomato" value={ca.cropName} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, cropName: e.target.value } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400">Rows</label>
+                      <input type="number" min={1} value={ca.rowCount} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, rowCount: Math.max(1, Number(e.target.value)) } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-400">Spacing</label>
+                      <div className="flex items-center gap-1">
+                        <input type="number" min={1} value={ca.spacingInRow} onChange={e => setCropAssignments(prev => prev.map((r, j) => j === i ? { ...r, spacingInRow: Number(e.target.value) } : r))} className="w-full border rounded-lg px-2 py-1.5 text-sm" />
+                        <span className="text-[10px] text-gray-400">in</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ))}
+              <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 12 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
+                + Add Another Crop
+              </button>
               <textarea placeholder="General notes..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
               <div className="flex gap-2">
                 <Button variant="outline" onClick={() => { resetPlotForm(); setMode('plots'); }} className="flex-1">Cancel</Button>

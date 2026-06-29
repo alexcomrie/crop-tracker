@@ -3,7 +3,7 @@ import db from '../db/db';
 export async function exportJsonBackup(): Promise<string> {
   const [crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
-    successionGaps, activities, ledgerEntries, farmLands, farmAreas] = await Promise.all([
+    successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries] = await Promise.all([
     db.crops.toArray(),
     db.propagations.toArray(),
     db.reminders.toArray(),
@@ -19,13 +19,14 @@ export async function exportJsonBackup(): Promise<string> {
     db.ledgerEntries.toArray(),
     db.farmLands.toArray(),
     db.farmAreas.toArray(),
+    db.diaryEntries.toArray(),
   ]);
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
-    version: 5,
+    version: 6,
     crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
-    successionGaps, activities, ledgerEntries, farmLands, farmAreas,
+    successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
   }, null, 2);
 }
 
@@ -47,6 +48,7 @@ type BackupPayload = {
   ledgerEntries?: any[];
   farmLands?: any[];
   farmAreas?: any[];
+  diaryEntries?: any[];
 };
 
 const TABLES: { key: keyof BackupPayload; name: string; clear: () => Promise<void>; add: (items: any[]) => Promise<void> }[] = [
@@ -65,10 +67,16 @@ const TABLES: { key: keyof BackupPayload; name: string; clear: () => Promise<voi
   { key: 'ledgerEntries', name: 'ledgerEntries', clear: () => db.ledgerEntries.clear(), add: items => db.ledgerEntries.bulkAdd(items) },
   { key: 'farmLands', name: 'farmLands', clear: () => db.farmLands.clear(), add: items => db.farmLands.bulkAdd(items) },
   { key: 'farmAreas', name: 'farmAreas', clear: () => db.farmAreas.clear(), add: items => db.farmAreas.bulkAdd(items) },
+  { key: 'diaryEntries', name: 'diaryEntries', clear: () => db.diaryEntries.clear(), add: items => db.diaryEntries.bulkAdd(items) },
 ];
 
 export async function importJsonBackupFromString(json: string): Promise<{ counts: Record<string, number> }> {
-  const data: BackupPayload = JSON.parse(json);
+  let data: BackupPayload;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    throw new Error('Invalid JSON in backup file');
+  }
   const counts: Record<string, number> = {};
   for (const table of TABLES) {
     const items = data[table.key];

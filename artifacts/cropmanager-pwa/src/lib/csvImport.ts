@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
-import { db } from '../db/db';
+import db from '../db/db';
+import { generateId } from './ids';
 import type { Crop, Propagation, Reminder } from '../types';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface ImportResult {
   success: boolean;
@@ -24,23 +24,23 @@ export async function importCSVData(file: File): Promise<ImportResult> {
             // For now, let's assume we are importing 'crops' if 'cropName' exists
             if (row.cropName) {
               const crop: Crop = {
-                id: row.id || uuidv4(),
+                ...row,
+                id: row.id || generateId('CROP'),
                 cropName: row.cropName,
                 variety: row.variety || '',
                 status: row.status || 'active',
-                plantStage: row.plantStage || 'nursery',
+                plantStage: row.plantStage || 'Seed',
                 updatedAt: Date.now(),
-                ...row
               };
               await db.crops.put(crop);
               count++;
             } else if (row.plantName) {
               const prop: Propagation = {
-                id: row.id || uuidv4(),
+                ...row,
+                id: row.id || generateId('PROP'),
                 plantName: row.plantName,
                 status: row.status || 'active',
                 updatedAt: Date.now(),
-                ...row
               };
               await db.propagations.put(prop);
               count++;

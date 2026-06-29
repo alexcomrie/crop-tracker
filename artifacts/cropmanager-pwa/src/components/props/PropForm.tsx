@@ -8,6 +8,7 @@ import { generateId } from '../../lib/ids';
 import { formatDateShort, addDays, today } from '../../lib/dates';
 import { getRootingDays } from '../../lib/propagation';
 import { generatePropReminders } from '../../lib/reminders';
+import { addDiaryEntry } from '../../lib/diary';
 import db from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Propagation } from '../../types';
@@ -69,6 +70,14 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
         await db.reminders.where('trackingId').equals(id).delete();
       } else {
         await db.propagations.add(prop);
+        await addDiaryEntry({
+          entryType: 'propagation_created',
+          cropId: id,
+          cropName: prop.plantName,
+          variety: '',
+          description: `New propagation: ${prop.plantName}`,
+          details: `Method: ${prop.propagationMethod}`,
+        });
       }
 
       const reminders = generatePropReminders(prop, propAdjustments, settings.telegramChatId);

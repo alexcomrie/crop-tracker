@@ -109,6 +109,7 @@ export interface Crop {
   numPlots?: number;         // Calculated number of plots
   batchOffset?: number;      // Days between plantings
   parentCropId?: string;     // Link to the original crop for C-H promotion
+  plotId: string;
   nextConsistentPlanting: string;
   batchNumber: number;
   fungusSprayDates: string;
@@ -243,16 +244,6 @@ export interface CropSearchLog {
 }
 
 export interface AppSettings {
-  cropsSheetUrl: string;
-  propagationsSheetUrl: string;
-  remindersSheetUrl: string;
-  stageLogsSheetUrl: string;
-  harvestLogsSheetUrl: string;
-  treatmentLogsSheetUrl: string;
-  cropDbAdjustmentSheetUrl: string;
-  propDbAdjustmentSheetUrl: string;
-  batchPlantingLogSheetUrl: string;
-  cropSearchLogSheetUrl: string;
   telegramToken: string;
   telegramChatId: string;
   weatherLat: number;
@@ -324,6 +315,12 @@ export interface GeoPoint {
   lng: number;
 }
 
+export interface CropAssignment {
+  cropName: string;
+  rowCount: number;
+  spacingInRow: number;
+}
+
 export interface RowDetail {
   rowNumber: number;
   cropName: string;
@@ -355,8 +352,137 @@ export interface FarmArea {
   rowCount: number;
   rowSpacing: number;
   rowDetails: RowDetail[];
+  cropAssignments: CropAssignment[];
   plantingMethod: string;
   notes: string;
   createdAt: string;
   updatedAt: number;
+}
+
+export type DiaryEntryType = 'crop_created' | 'stage_change' | 'treatment' | 'harvest' | 'note' | 'propagation_created' | 'propagation_stage' | 'activity_log' | 'ledger' | 'pos_sale';
+
+export interface DiaryEntry {
+  id: string;
+  date: string;
+  entryType: DiaryEntryType;
+  cropId: string;
+  cropName: string;
+  variety: string;
+  description: string;
+  details: string;
+  updatedAt: number;
+}
+
+// ─── POS (Point of Sale) ────────────────────────────────────────────────────────
+
+export interface PosSaleItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+}
+
+export interface PosSale {
+  id: string;
+  date: string;
+  items: PosSaleItem[];
+  subtotal: number;
+  tax: number;
+  taxRate: number;
+  discount: number;
+  discountType: 'percentage' | 'fixed';
+  total: number;
+  amountPaid: number;
+  change: number;
+  paymentMethod: 'cash' | 'card' | 'transfer' | 'other';
+  customerId: string | null;
+  customerName: string;
+  notes: string;
+  receiptNumber: number;
+  createdAt: number;
+}
+
+export interface PosInventoryItem {
+  id: string;
+  name: string;
+  category: string;
+  unit: string;
+  unitPrice: number;
+  isActive: boolean;
+  sourceCropId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PosCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  totalPurchases: number;
+  pointsBalance: number;
+  pointsLifetime: number;
+  lastPurchaseDate: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PosSettings {
+  id: string;
+  businessName: string;
+  businessAddress: string;
+  businessPhone: string;
+  businessEmail: string;
+  logoDataUrl: string;
+  taxLabel: string;
+  taxRate: number;
+  currency: string;
+  receiptFooter: string;
+  printWidth: number;
+  printCharPerLine: number;
+  showLogo: boolean;
+  showTax: boolean;
+  showCustomer: boolean;
+  defaultPaymentMethod: string;
+  pointsRate: number;
+  pointsRedemptionRate: number;
+  testMode: boolean;
+}
+
+export interface PosHeldReceipt {
+  id: string;
+  name: string;
+  cart: { item: PosSaleItem; inventoryId: string }[];
+  customerId: string | null;
+  customerName: string;
+  subtotal: number;
+  total: number;
+  discount: number;
+  discountType: 'percentage' | 'fixed';
+  createdAt: number;
+}
+
+export interface PosOrderItem {
+  productName: string;
+  quantity: number;
+  unit: string;
+  unitPrice: number;
+  total: number;
+}
+
+export interface PosOrder {
+  id: string;
+  customerName: string;
+  customerId: string | null;
+  items: PosOrderItem[];
+  total: number;
+  notes: string;
+  status: 'pending' | 'delivered' | 'canceled';
+  createdAt: number;
+  updatedAt: number;
+  deliveredAt?: number;
+  canceledAt?: number;
 }

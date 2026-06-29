@@ -10,6 +10,7 @@ import { resolveCropData } from '../../lib/cropDb';
 import { calculateHarvestDate, calculateTransplantDate } from '../../lib/harvest';
 import { generateCropReminders, calculateBatchPlantingDates } from '../../lib/reminders';
 import { calcSprayDates, formatSprayDates } from '../../lib/sprays';
+import { addDiaryEntry } from '../../lib/diary';
 import db from '../../db/db';
 import type { Crop } from '../../types';
 
@@ -137,6 +138,7 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
         daysGermTransplant: editCrop?.daysGermTransplant || 0, 
         daysTransplantHarvest: editCrop?.daysTransplantHarvest || 0,
         telegramChatId: settings.telegramChatId,
+        plotId: editCrop?.plotId || '',
         updatedAt: now,
       };
 
@@ -151,13 +153,19 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
 
       if (editCrop) {
         await db.crops.put(baseCrop);
-        // Clear existing reminders if re-calculating
         await db.reminders.where('trackingId').equals(id).delete();
       } else {
         await db.crops.add(baseCrop);
+        await addDiaryEntry({
+          entryType: 'crop_created',
+          cropId: baseCrop.id,
+          cropName: baseCrop.cropName,
+          variety: baseCrop.variety,
+          description: `New crop: ${baseCrop.cropName}${baseCrop.variety ? ` (${baseCrop.variety})` : ''}`,
+          details: `Method: ${baseCrop.plantingMethod}, Stage: ${baseCrop.plantStage}`,
+        });
       }
 
-      // Generate reminders
       if (cropData) {
         const reminders = generateCropReminders(baseCrop, cropData, [], settings.telegramChatId);
         if (reminders.length > 0) {
@@ -168,6 +176,9 @@ export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {
       reset();
       onClose();
       toast.success(editCrop ? 'Crop updated' : 'Crop added');
+    } catch (err) {
+      toast.error('Failed to save crop');
+      console.error(err);
     } finally {
       setSaving(false);
     }

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, TrendingUp, BarChart3, Pencil } from 'lucide-react';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today } from '../../lib/dates';
+import { addDiaryEntry } from '../../lib/diary';
 import type { LedgerEntry, LedgerEntryType } from '../../types';
 
 const EXPENSE_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Insecticide', 'Pesticide', 'Fertilizer', 'Tools', 'Equipment', 'Labor', 'Irrigation', 'Soil/Media', 'Transport', 'Packaging', 'Other'];
@@ -96,6 +97,16 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
       updatedAt: Date.now(),
     };
     await db.ledgerEntries.put(entryData);
+    await addDiaryEntry({
+      entryType: 'ledger',
+      cropId: entryData.type,
+      cropName: entryData.category,
+      variety: entryData.cropName,
+      description: `${entryData.type.charAt(0).toUpperCase() + entryData.type.slice(1)}: ${entryData.category}${entryData.description ? ` — ${entryData.description}` : ''}`,
+      details: `$${entryData.amount.toFixed(2)}${entryData.quantity ? ` · ${entryData.quantity} ${entryData.unit}` : ''}`,
+      date: entryData.date,
+    });
+
     // Auto-log inventory for expense categories Seeds, Fungicide, Herbicide, Pesticide
     if (form.type === 'expense' && AUTO_INVENTORY_CATEGORIES.includes(form.category)) {
       const invEntry: LedgerEntry = {
@@ -126,6 +137,15 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         invEntry.id = existing[0].id;
       }
       await db.ledgerEntries.put(invEntry);
+      await addDiaryEntry({
+        entryType: 'ledger',
+        cropId: 'inventory',
+        cropName: 'Auto-inventory',
+        variety: '',
+        description: `Auto-inventory: ${form.category}${invEntry.quantity ? ` (${invEntry.quantity} ${invEntry.unit})` : ''}`,
+        details: invEntry.description || '',
+        date: invEntry.date,
+      });
     }
     setSaving(false);
     setShowForm(false);

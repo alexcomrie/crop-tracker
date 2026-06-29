@@ -5,9 +5,7 @@ import { PropForm } from '../components/props/PropForm';
 import { PropDetail } from '../components/props/PropDetail';
 import type { Propagation } from '../types';
 import { formatDateShort, today, parseDate, daysBetween } from '../lib/dates';
-import { BottomSheet } from '../components/shared/BottomSheet';
 import db from '../db/db';
-import { generateId } from '../lib/ids';
 
 const FILTERS = ['All', 'Propagating', 'Callusing', 'Rooted', 'Potted / Transplanted', 'Failed'];
 

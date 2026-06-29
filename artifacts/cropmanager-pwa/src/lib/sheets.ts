@@ -56,6 +56,7 @@ export const mappers = {
     daysGermTransplant: Number(r[25] || 0), 
     daysTransplantHarvest: Number(r[26] || 0), 
     telegramChatId: r[27] ?? '', 
+    plotId: r[28] ?? '',
     updatedAt: Date.now()
   }),
   

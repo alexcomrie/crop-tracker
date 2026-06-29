@@ -1,7 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ChevronLeft, History, Star, FlaskConical, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, History, Star, FlaskConical, Plus, Trash2, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
+import { generateId } from '../../lib/ids';
+import { formatDateShort, today } from '../../lib/dates';
+import db from '../../db/db';
+import { addDiaryEntry } from '../../lib/diary';
 import { ALL_PRODUCTS, type TreatmentProduct, type TreatmentRate } from './treatment-data';
 
 type WaterUnit = 'gal' | 'L' | 'mL' | 'oz' | 'ha' | 'ac';
@@ -30,16 +35,20 @@ function convertValue(v: number, fromUnit: string, toUnit: TreatUnit): number {
   return v;
 }
 
-function isAreaBased(p: TreatmentProduct | null): boolean {
-  return p?.rates[0]?.perVolumeUnit === 'ha';
+function isAreaBased(p: TreatmentProduct | null, idx = 0): boolean {
+  return p?.rates[idx]?.perVolumeUnit === 'ha';
 }
-function getUnits(p: TreatmentProduct | null): TreatUnit[] {
+const ALL_VOLUME_UNITS: TreatUnit[] = ['mL', 'L', 'gal', 'fl_oz', 'tsp', 'Tbsp', 'cup', 'quarter_cup', 'half_cup'];
+const ALL_WEIGHT_UNITS: TreatUnit[] = ['g', 'kg', 'oz', 'lb'];
+
+function getUnits(p: TreatmentProduct | null, idx = 0): TreatUnit[] {
   if (!p) return ['mL'];
-  if (isAreaBased(p)) {
-    const u = p.rates[0]?.unit;
-    return u === 'L' ? ['L', 'mL'] : ['mL', 'L'];
+  const baseUnit = p.rates[idx]?.unit || 'mL';
+  const isVol = baseUnit === 'mL' || baseUnit === 'L';
+  if (isAreaBased(p, idx)) {
+    return isVol ? ['L', 'mL'] : ['g'];
   }
-  return ['mL', 'L', 'gal', 'fl_oz', 'tsp', 'Tbsp', 'cup', 'quarter_cup', 'half_cup', 'g', 'kg', 'oz', 'lb'];
+  return isVol ? ALL_VOLUME_UNITS : ALL_WEIGHT_UNITS;
 }
 function perVolumeToML(r: TreatmentRate): number {
   if (r.perVolumeUnit === 'L') return r.perVolume * 1000;
@@ -132,6 +141,8 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
   const [showPres, setShowPres] = useState(false);
   const [batchIds, setBatchIds] = useState<string[]>([]);
   const [batchMode, setBatchMode] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [activityNotes, setActivityNotes] = useState('');
 
   // Custom product state
   const [customs, setCustoms] = useState<CustomProduct[]>([]);
@@ -150,11 +161,11 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
 
   const product = useMemo(() => allProducts.find(p => p.id === selectedId) || null, [allProducts, selectedId]);
   const rate = useMemo(() => product?.rates[rateIdx] ?? null, [product, rateIdx]);
-  const availUnits = useMemo(() => getUnits(product), [product]);
+  const availUnits = useMemo(() => getUnits(product, rateIdx), [product, rateIdx]);
 
   useEffect(() => {
-    if (product && isAreaBased(product)) { setWaterUnit('ha'); }
-  }, [product]);
+    if (product && isAreaBased(product, rateIdx)) { setWaterUnit('ha'); }
+  }, [product, rateIdx]);
 
   useEffect(() => {
     if (availUnits.length > 0 && !availUnits.includes(treatUnit)) setTreatUnit(availUnits[0]);
@@ -389,6 +400,9 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
                   <Button className="flex-1 h-8 text-xs" onClick={cbAddHistory}>Save to History</Button>
                   <Button variant="outline" className="h-8 text-xs" onClick={() => setSavingP(true)}>Save as Mix</Button>
                 </div>
+                <button onClick={() => { setShowActivityModal(true); setActivityNotes(''); }} className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-green-300 rounded-lg text-xs text-green-700 font-semibold hover:bg-green-50">
+                  <ClipboardList className="w-3.5 h-3.5" /> Add to Activity Log
+                </button>
               </div>
             )}
 
@@ -427,6 +441,45 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
                   <div className="flex gap-2">
                     <Button className="flex-1" onClick={cbSavePreset} disabled={!pName.trim()}>Save</Button>
                     <Button variant="outline" onClick={() => { setSavingP(false); setPName(''); }}>Cancel</Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showActivityModal && product && rate && res && (
+              <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-[70] p-4" onClick={() => setShowActivityModal(false)}>
+                <div className="bg-white rounded-xl p-4 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()}>
+                  <h3 className="font-semibold text-sm flex items-center gap-2"><ClipboardList className="w-4 h-4 text-green-600" /> Add to Activity Log</h3>
+                  <p className="text-xs text-gray-500">
+                    {product.name} — {rate.label}: {fmt(res.min)}{rate.min !== rate.max ? `–${fmt(res.max)}` : ''} {UNIT_LABELS[treatUnit]}
+                  </p>
+                  <Input type="text" placeholder="Notes (optional)" value={activityNotes} onChange={e => setActivityNotes(e.target.value)} />
+                  <div className="flex gap-2">
+                    <Button className="flex-1" onClick={async () => {
+                      const resultStr = `${fmt(res.min)}${rate.min !== rate.max ? `–${fmt(res.max)}` : ''} ${UNIT_LABELS[treatUnit]}`;
+                      const activity = {
+                        id: generateId('ACT'),
+                        date: formatDateShort(today()),
+                        type: product.category === 'Fungicide' ? 'fungicide' : product.category === 'Insecticide' ? 'pesticide' : 'other',
+                        product: `${product.name} (${rate.label})`,
+                        notes: [resultStr, activityNotes].filter(Boolean).join(' · '),
+                        reminderDays: null,
+                        reminderDate: null,
+                        cropIds: [],
+                        updatedAt: Date.now(),
+                      };
+                      await db.activities.add(activity);
+                      await addDiaryEntry({
+                        entryType: 'activity_log',
+                        cropId: 'treatment',
+                        cropName: activity.type.charAt(0).toUpperCase() + activity.type.slice(1),
+                        description: `Treatment applied: ${product.name}`,
+                        details: `${resultStr}${activityNotes ? ` · ${activityNotes}` : ''}`,
+                      });
+                      setShowActivityModal(false);
+                      toast.success('Added to Activity Log');
+                    }}>Add</Button>
+                    <Button variant="outline" onClick={() => setShowActivityModal(false)}>Cancel</Button>
                   </div>
                 </div>
               </div>

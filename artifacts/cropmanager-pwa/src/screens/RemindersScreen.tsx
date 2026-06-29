@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Bell, CheckCircle2, Clock, Trash2, Plus, X, ChevronLeft } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Trash2, Plus, ChevronLeft } from 'lucide-react';
 import { markReminderDone } from '../hooks/useReminders';
 import { generateId } from '../lib/ids';
 import { formatDateShort, today } from '../lib/dates';
-import { useAppStore } from '../store/useAppStore';
+import { ROUTES } from '../lib/routes';
+
 
 const REM_TYPES = [
   { id: 'fungicide', label: 'Fungicide spray', icon: '🍄' },
@@ -22,7 +24,7 @@ const REM_TYPES = [
 ];
 
 export function RemindersScreen() {
-  const { setActiveTab } = useAppStore();
+  const navigate = useNavigate();
   const remindersData = useLiveQuery(() => 
     db.reminders.orderBy('sendDate').reverse().toArray()
   );
@@ -64,12 +66,9 @@ export function RemindersScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="pb-24">
       {/* Header */}
       <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center gap-2">
-        <button onClick={() => setActiveTab('more')} className="p-1.5 rounded-lg border bg-gray-50 text-gray-600">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
         <div className="flex-1">
           <h1 className="font-bold text-lg flex items-center gap-2">
             <Bell className="w-5 h-5 text-purple-600" />

@@ -10,10 +10,9 @@ import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
 import { autoAdjustTransplantSchedule } from '../lib/stages';
 import db from '../db/db';
-import { formatDateShort, today, daysBetween, parseDate } from '../lib/dates';
+import { formatDateShort } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
-import { generateId } from '../lib/ids';
-import { autoTransitionCrop, getStageSequence } from '../lib/stages';
+import { autoTransitionCrop } from '../lib/stages';
 
 const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Middle Vegetative', 'Final Vegetative', 'Harvested'];
 
@@ -33,27 +32,28 @@ export function CropsScreen() {
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // Auto-transition crops through all stages based on their timeframes
+  const runningRef = useRef(false);
   useEffect(() => {
+    if (runningRef.current) return;
+    runningRef.current = true;
     let cancelled = false;
     (async () => {
       for (const c of crops) {
-        if (cancelled || !mountedRef.current) return;
+        if (cancelled || !mountedRef.current) break;
         if (c.status === 'Harvested' || c.status === 'Deleted') continue;
         const cd = resolveCropData(cropDb, c.cropName);
         if (!cd) continue;
 
-        // Auto-adjust transplant schedule if overdue
         const adjusted = autoAdjustTransplantSchedule(c, cd);
         if (adjusted) await db.crops.put(adjusted);
 
-        // Auto-transition through stages
         const needsTransplant = (cd.transplant_days || 0) > 0;
         if (needsTransplant && c.plantStage === 'Seedling' && !c.transplantDateActual) continue;
 
         let didTransition = true;
         let currentCrop = c;
         while (didTransition) {
-          if (cancelled || !mountedRef.current) return;
+          if (cancelled || !mountedRef.current) break;
           const result = await autoTransitionCrop(currentCrop, cd, { stageLogs: db.stageLogs, crops: db.crops });
           didTransition = result;
           if (result) {
@@ -62,7 +62,7 @@ export function CropsScreen() {
           }
         }
       }
-    })();
+    })().finally(() => { runningRef.current = false; });
     return () => { cancelled = true; };
   }, [crops, cropDb]);
 
@@ -84,7 +84,8 @@ export function CropsScreen() {
 
   async function refreshTimings() {
     const adjustments = await db.cropDbAdjustments.toArray();
-    for (const c of crops.filter(x => x.status === 'Active')) {
+    const allActive = await db.crops.where('status').equals('Active').toArray();
+    for (const c of allActive) {
       const cd = resolveCropData(cropDb, c.cropName);
       if (!cd) continue;
       const planted = new Date(c.plantingDate);
@@ -127,7 +128,7 @@ export function CropsScreen() {
       await db.crops.update(c.id, patch);
 
       // Update existing batch planting logs with recalculated dates
-      if (c.isContinuous && patch.batchOffset) {
+      if (c.isContinuous && patch.batchOffset != null) {
         const existingBatches = await db.batchPlantingLogs.where('cropTrackingId').equals(c.id).toArray();
         const planted = new Date(c.plantingDate);
         for (const batch of existingBatches) {

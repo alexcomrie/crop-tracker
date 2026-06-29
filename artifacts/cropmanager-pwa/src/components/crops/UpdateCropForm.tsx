@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import { Plus } from 'lucide-react';
 import type { Crop } from '../../types';
 import { useAppStore } from '../../store/useAppStore';
 import { getValidNextStages, getStageSequence } from '../../lib/stages';
 import { resolveCropData } from '../../lib/cropDb';
 import { processStageChange, isVineFamily, promoteNextBatch } from '../../lib/stages';
-import { formatDateShort, today } from '../../lib/dates';
+import { formatDateShort, today, daysBetween } from '../../lib/dates';
+import { addDiaryEntry } from '../../lib/diary';
 import { logDeviation } from '../../lib/learning';
 import { sendTelegramMessage } from '../../lib/telegram';
 import db from '../../db/db';
@@ -20,7 +23,7 @@ interface UpdateCropFormProps {
   onClose: () => void;
 }
 
-type UpdateMode = 'stage' | 'treatment' | 'notes';
+type UpdateMode = 'stage' | 'treatment' | 'notes' | 'harvest';
 
 export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const { cropDb, fertDb, settings } = useAppStore();
@@ -34,6 +37,13 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
   const [fertProfile, setFertProfile] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [harvestDate, setHarvestDate] = useState(formatDateShort(today()));
+  const [harvestQty, setHarvestQty] = useState('');
+  const [harvestNotes, setHarvestNotes] = useState('');
+  const existingHarvestLogs = useLiveQuery(
+    () => db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray(),
+    [crop.id]
+  ) ?? [];
 
   const cropData = resolveCropData(cropDb, crop.cropName);
   const isVine = isVineFamily(crop.cropName, cropData?.plant_type);
@@ -77,7 +87,15 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     
     await db.crops.put(updatedCrop);
     await db.stageLogs.add(stageLog);
-    
+    await addDiaryEntry({
+      entryType: 'stage_change',
+      cropId: crop.id,
+      cropName: crop.cropName,
+      variety: crop.variety,
+      description: `Stage changed: ${crop.plantStage} → ${newStage}`,
+      details: newStage === 'Harvested' ? `Planted: ${crop.plantingDate}` : '',
+    });
+
     // Continuous Harvest Promotion Logic
     if (newStage === 'Harvested' && crop.isContinuous) {
       await promoteNextBatch(crop, db);
@@ -85,6 +103,14 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
     if (harvestLog) {
       await db.harvestLogs.add(harvestLog);
+      await addDiaryEntry({
+        entryType: 'harvest',
+        cropId: crop.id,
+        cropName: crop.cropName,
+        variety: crop.variety,
+        description: `Harvest #${harvestLog.harvestNumber}: ${crop.cropName}`,
+        details: `Days from planting: ${harvestLog.daysFromPlanting}d`,
+      });
       
       // Learning engine: update adjustments if this was a harvest
       if (newStage === 'Harvested') {
@@ -154,6 +180,22 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     }
 
     await db.crops.update(crop.id, update);
+
+    const stageChanges: string[] = [];
+    if (tickGerminated && !crop.germinationDate) stageChanges.push('Germinated');
+    if (tickTransplanted && !crop.transplantDateActual) stageChanges.push('Transplanted');
+    if (tickHarvested && !crop.harvestDateActual) stageChanges.push('Harvested');
+    for (const s of stageChanges) {
+      await addDiaryEntry({
+        entryType: 'stage_change',
+        cropId: crop.id,
+        cropName: crop.cropName,
+        variety: crop.variety,
+        description: `Stage changed: ${crop.plantStage} → ${s}`,
+        details: `Manual progress via checkboxes`,
+      });
+    }
+
     setSaving(false);
     setDone(true);
     toast.success('Manual progress applied');
@@ -178,6 +220,14 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
       updatedAt: Date.now(),
     };
     await db.treatmentLogs.add(treatmentLog);
+    await addDiaryEntry({
+      entryType: 'treatment',
+      cropId: crop.id,
+      cropName: crop.cropName,
+      variety: crop.variety,
+      description: `${treatmentType.charAt(0).toUpperCase() + treatmentType.slice(1)}: ${product}`,
+      details: treatmentNotes || '',
+    });
     // Update spray dates on crop
     const update: Partial<Crop> = { updatedAt: Date.now() };
     if (treatmentType === 'fungus') update.fungusSprayDates = [crop.fungusSprayDates, formatDateShort(now)].filter(Boolean).join(', ');
@@ -217,7 +267,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
     <BottomSheet open={open} onClose={onClose} title={`Update: ${crop.cropName}`}>
       <div className="pt-2 space-y-4">
         <div className="flex gap-2">
-          {(['stage', 'treatment', 'notes'] as UpdateMode[]).map(m => (
+          {(['stage', 'harvest', 'treatment', 'notes'] as UpdateMode[]).map(m => (
             <button key={m} onClick={() => setMode(m)}
               className={`flex-1 py-1.5 rounded-lg text-sm capitalize ${mode === m ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-700'}`}>
               {m}
@@ -272,6 +322,79 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
               >
                 Mark as Failed
               </button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'harvest' && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {crop.isContinuous ? 'Log individual harvests for this continuous crop.' : 'Log individual harvest events.'}
+            </p>
+            {existingHarvestLogs.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Past Harvests ({existingHarvestLogs.length})</p>
+                {existingHarvestLogs.sort((a, b) => b.harvestNumber - a.harvestNumber).map(h => (
+                  <div key={h.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                    <div>
+                      <span className="text-sm font-medium">Harvest #{h.harvestNumber}</span>
+                      <span className="text-xs text-gray-400 ml-2">{h.harvestDate}</span>
+                      {h.notes && <p className="text-xs text-gray-500 mt-0.5">{h.notes}</p>}
+                    </div>
+                    <span className="text-xs text-gray-400">{h.daysFromPlanting} days</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Log New Harvest</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-400">Date</label>
+                  <Input type="date" className="w-full" value={harvestDate} onChange={e => setHarvestDate(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400">Quantity</label>
+                  <Input type="text" placeholder="e.g. 2.5 kg" value={harvestQty} onChange={e => setHarvestQty(e.target.value)} />
+                </div>
+              </div>
+              <Input type="text" placeholder="Notes (optional)" value={harvestNotes} onChange={e => setHarvestNotes(e.target.value)} />
+              <Button className="w-full" onClick={async () => {
+                if (!harvestDate) return;
+                setSaving(true);
+                const nextNumber = existingHarvestLogs.length > 0
+                  ? Math.max(...existingHarvestLogs.map(h => h.harvestNumber)) + 1
+                  : 1;
+                const from = crop.plantingDate ? new Date(crop.plantingDate) : null;
+                const hDate = new Date(harvestDate);
+                const daysFromPlanting = from ? daysBetween(from, hDate) : 0;
+                const notesText = [harvestQty, harvestNotes].filter(Boolean).join(' · ');
+                await db.harvestLogs.add({
+                  id: generateId('HL'),
+                  cropTrackingId: crop.id,
+                  cropName: crop.cropName,
+                  harvestNumber: nextNumber,
+                  harvestDate,
+                  daysFromPlanting,
+                  deviationFromDb: 0,
+                  notes: notesText,
+                  updatedAt: Date.now(),
+                });
+                await addDiaryEntry({
+                  entryType: 'harvest',
+                  cropId: crop.id,
+                  cropName: crop.cropName,
+                  variety: crop.variety,
+                  description: `Harvest #${nextNumber}: ${crop.cropName}`,
+                  details: `Days from planting: ${daysFromPlanting}d${notesText ? ` · ${notesText}` : ''}`,
+                });
+                setHarvestQty('');
+                setHarvestNotes('');
+                setSaving(false);
+                toast.success(`Harvest #${nextNumber} logged`);
+              }} disabled={!harvestDate || saving}>
+                {saving ? 'Saving...' : <span className="flex items-center justify-center gap-1"><Plus className="w-4 h-4" /> Log Harvest</span>}
+              </Button>
             </div>
           </div>
         )}

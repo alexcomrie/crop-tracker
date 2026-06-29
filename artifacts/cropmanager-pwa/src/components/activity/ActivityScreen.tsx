@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ChevronLeft, Plus, X, Check, Clock, Trash2 } from 'lucide-react';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today } from '../../lib/dates';
+import { addDiaryEntry } from '../../lib/diary';
 import type { Crop } from '../../types';
 
 const ACTIVITY_TYPES = [
@@ -56,15 +57,13 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
   const [view, setView] = useState<'list' | 'form'>('list');
   const [form, setForm] = useState({
     date: formatDateShort(today()),
-    type: 'watering',
+    types: [] as string[],
     product: '',
     notes: '',
     reminderDays: null as number | null,
     cropIds: [] as string[],
   });
   const [saving, setSaving] = useState(false);
-
-  const selectedType = ACTIVITY_TYPES.find(t => t.id === form.type);
 
   async function handleSave() {
     setSaving(true);
@@ -75,7 +74,7 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
     const activity: Activity = {
       id: generateId('ACT'),
       date: form.date || formatDateShort(today()),
-      type: form.type,
+      type: form.types.join(','),
       product: form.product,
       notes: form.notes,
       reminderDays: form.reminderDays,
@@ -85,9 +84,18 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
     };
     
     await db.activities.add(activity);
-    
+    const typeLabels = form.types.map(t => ACTIVITY_TYPES.find(at => at.id === t)?.label || t).join(', ');
+    await addDiaryEntry({
+      entryType: 'activity_log',
+      cropId: 'activity',
+      cropName: typeLabels,
+      description: `Activity: ${typeLabels}${form.product ? ` — ${form.product}` : ''}`,
+      details: form.notes || '',
+      date: form.date || formatDateShort(today()),
+    });
+
     // Update crops with fertilizer tracking if applicable
-    if (form.type === 'fertilizer' && form.cropIds.length > 0 && form.reminderDays) {
+    if (form.types.includes('fertilizer') && form.cropIds.length > 0 && form.reminderDays) {
       const nextDate = new Date(today().getTime() + form.reminderDays * 86400000);
       for (const cropId of form.cropIds) {
         await db.crops.update(cropId, {
@@ -103,7 +111,7 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
     setView('list');
     setForm({
       date: formatDateShort(today()),
-      type: 'watering',
+      types: [],
       product: '',
       notes: '',
       reminderDays: null,
@@ -151,17 +159,20 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
               </div>
 
               <div>
-                <label className="text-[11px] font-semibold text-gray-500 uppercase">Activity Type</label>
+                <label className="text-[11px] font-semibold text-gray-500 uppercase">Activity Types (tap all that apply)</label>
                 <div className="grid grid-cols-3 gap-2 mt-2">
-                  {ACTIVITY_TYPES.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => setForm({...form, type: t.id})}
-                      className={`py-2 px-1 rounded-lg text-[11px] font-medium border ${form.type === t.id ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200'}`}
-                    >
-                      {t.icon} {t.label}
-                    </button>
-                  ))}
+                  {ACTIVITY_TYPES.map(t => {
+                    const active = form.types.includes(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setForm({...form, types: active ? form.types.filter(x => x !== t.id) : [...form.types, t.id]})}
+                        className={`py-2 px-1 rounded-lg text-[11px] font-medium border ${active ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200'}`}
+                      >
+                        {t.icon} {t.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -251,14 +262,17 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
           ) : (
             <div className="space-y-3">
               {activities.map(a => {
-                const actType = ACTIVITY_TYPES.find(t => t.id === a.type);
+                const typeIds = a.type.split(',').filter(Boolean);
+                const actTypes = typeIds.map(id => ACTIVITY_TYPES.find(t => t.id === id)).filter(Boolean);
                 return (
                   <div key={a.id} className="bg-white border border-[#e0e0e0] rounded-[12px] p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{actType?.icon || '📝'}</span>
+                        <span className="text-lg">{actTypes[0]?.icon || '📝'}</span>
                         <div>
-                          <div className="font-semibold text-[14px]">{actType?.label || a.type}</div>
+                          <div className="font-semibold text-[14px]">
+                            {actTypes.map(t => t?.label).filter(Boolean).join(', ') || a.type}
+                          </div>
                           <div className="text-[11px] text-gray-500 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             {formatActivityDate(a.date)}

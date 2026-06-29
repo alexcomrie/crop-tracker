@@ -1,62 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FarmArea, FarmLand, GeoPoint } from '../../types';
+import { haversineMeters, calcArea, gpsToSvgAll, projectPoints } from '../../lib/geo';
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FF5722', '#607D8B'];
-
-function haversineMeters(a: GeoPoint, b: GeoPoint): number {
-  const R = 6371000;
-  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
-  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
-  const sin2 = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(sin2), Math.sqrt(1 - sin2));
-}
-
-export function gpsToSvgAll(
-  allPoints: (GeoPoint[] | undefined | null)[],
-  w: number,
-  h: number,
-  pad = 20
-): { x: number; y: number }[][] {
-  const valid = allPoints.filter((p): p is GeoPoint[] => !!p);
-  if (valid.length === 0 || valid.every(p => p.length === 0)) return [];
-  const flat = valid.filter(p => p.length > 0).flat();
-  const lats = flat.map(p => p.lat);
-  const lngs = flat.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = (maxLat - minLat) || 0.0001;
-  const lngRange = (maxLng - minLng) || 0.0001;
-  const uw = w - pad * 2;
-  const uh = h - pad * 2;
-  return valid.map(pts =>
-    pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
-      x: pad + ((p.lng - minLng) / lngRange) * uw,
-      y: pad + ((maxLat - p.lat) / latRange) * uh,
-    }))
-  );
-}
-
-function calcArea(points: GeoPoint[] | undefined | null): { sqM: number; display: string } {
-  if (!points || points.length < 3) return { sqM: 0, display: '0 m²' };
-  const avgLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
-  const mPerDegLat = 111320;
-  const mPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
-  const pts = points.map(p => ({ x: p.lng * mPerDegLng, y: p.lat * mPerDegLat }));
-  let area = 0;
-  const n = pts.length;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
-  }
-  area = Math.abs(area / 2);
-  if (area >= 10000) return { sqM: area, display: `${(area / 10000).toFixed(2)} ha` };
-  if (area >= 100) return { sqM: area, display: `${area.toFixed(0)} m²` };
-  return { sqM: area, display: `${area.toFixed(1)} m²` };
-}
 
 interface MapEntry {
   land: FarmLand;
@@ -86,6 +34,9 @@ interface InteractiveMapProps {
   onSelectPlot?: (plot: FarmArea | null) => void;
   onSelectLand?: (land: FarmLand | null) => void;
   readOnly?: boolean;
+  editingPlotId?: string;
+  editingLandId?: string;
+  onPointsChange?: (id: string, points: GeoPoint[]) => void;
 }
 
 export function InteractiveMap({
@@ -95,6 +46,10 @@ export function InteractiveMap({
   selectedLandId,
   onSelectPlot,
   onSelectLand,
+  readOnly,
+  editingPlotId,
+  editingLandId,
+  onPointsChange,
 }: InteractiveMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -114,6 +69,8 @@ export function InteractiveMap({
   });
   const [distTool, setDistTool] = useState<DistMeasure>({ a: null, b: null });
   const [showDist, setShowDist] = useState(false);
+  const [selectedPointIndices, setSelectedPointIndices] = useState<Set<number>>(new Set());
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
 
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
@@ -126,6 +83,7 @@ export function InteractiveMap({
           plots: m.plots.filter(p =>
             p.tag.toLowerCase().includes(searchTerm.toLowerCase()) ||
             p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (p.cropAssignments || []).some(ca => ca.cropName.toLowerCase().includes(searchTerm.toLowerCase())) ||
             (p.rowDetails || []).some(r => r.cropName.toLowerCase().includes(searchTerm.toLowerCase()))
           ),
         }))
@@ -136,6 +94,40 @@ export function InteractiveMap({
     filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]),
     CANVAS_W, CANVAS_H, 15
   );
+
+  const allRefPoints = filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]);
+
+  const editingInfo = (() => {
+    if (editingPlotId) {
+      for (const m of filteredMapData) {
+        for (const p of m.plots) {
+          if (p.id === editingPlotId) {
+            return { type: 'plot' as const, points: p.points, id: p.id, landId: m.land.id };
+          }
+        }
+      }
+    }
+    if (editingLandId) {
+      for (const m of filteredMapData) {
+        if (m.land.id === editingLandId) {
+          return { type: 'land' as const, points: m.land.points, id: m.land.id, landId: m.land.id };
+        }
+      }
+    }
+    return null;
+  })();
+
+  const editingSvgPts = (() => {
+    if (!editingInfo) return null;
+    const pts = editingInfo.points;
+    if (!pts || pts.length < 3) return null;
+    return projectPoints(pts, allRefPoints, CANVAS_W, CANVAS_H, 15);
+  })();
+
+  useEffect(() => {
+    setSelectedPointIndices(new Set());
+    setToolbarPos(null);
+  }, [editingPlotId, editingLandId]);
 
   const svgToGps = useCallback((svgX: number, svgY: number): GeoPoint | null => {
     const valid = filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]).filter((p): p is GeoPoint[] => !!p && p.length > 0);
@@ -190,9 +182,10 @@ export function InteractiveMap({
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1 && dragging.current) {
-      const dx = e.touches[0].clientX - lastPos.current.x;
-      const dy = e.touches[0].clientY - lastPos.current.y;
-      lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      const t = e.touches[0];
+      const dx = t.clientX - lastPos.current.x;
+      const dy = t.clientY - lastPos.current.y;
+      lastPos.current = { x: t.clientX, y: t.clientY };
       setPan(p => ({ x: p.x + dx, y: p.y + dy }));
     } else if (e.touches.length === 2) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -210,8 +203,35 @@ export function InteractiveMap({
 
   function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); setDistTool({ a: null, b: null }); setShowDist(false); setSelectedId(null); }
 
+  function handleDeletePoint() {
+    if (selectedPointIndices.size === 0 || !editingInfo) return;
+    const pts = editingInfo.points;
+    if (!pts || pts.length <= 3) return;
+    const newPoints = pts.filter((_, i) => !selectedPointIndices.has(i));
+    if (newPoints.length < 3) return;
+    onPointsChange?.(editingInfo.id, newPoints);
+    setSelectedPointIndices(new Set());
+    setToolbarPos(null);
+  }
+
+  function handleAddPoint() {
+    if (selectedPointIndices.size === 0 || !editingInfo) return;
+    const pts = editingInfo.points;
+    if (!pts || pts.length < 3) return;
+    const primaryIdx = Math.min(...selectedPointIndices);
+    const nextIdx = (primaryIdx + 1) % pts.length;
+    const mid: GeoPoint = {
+      lat: (pts[primaryIdx].lat + pts[nextIdx].lat) / 2,
+      lng: (pts[primaryIdx].lng + pts[nextIdx].lng) / 2,
+    };
+    const newPoints = [...pts];
+    newPoints.splice(nextIdx, 0, mid);
+    onPointsChange?.(editingInfo.id, newPoints);
+    setSelectedPointIndices(new Set([nextIdx]));
+  }
+
   function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
-    if (dragging.current) return;
+    if (dragging.current || readOnly) return;
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -231,6 +251,57 @@ export function InteractiveMap({
           setDistTool({ a: { x: unX, y: unY, latlng: gps }, b: null });
         }
       }
+      return;
+    }
+
+    if ((editingPlotId || editingLandId) && editingSvgPts) {
+      for (let i = 0; i < editingSvgPts.length; i++) {
+        const dx = unX - editingSvgPts[i].x;
+        const dy = unY - editingSvgPts[i].y;
+        if (dx * dx + dy * dy <= 100) {
+          const newSet = e.shiftKey
+            ? (() => { const s = new Set(selectedPointIndices); if (s.has(i)) s.delete(i); else s.add(i); return s; })()
+            : new Set([i]);
+          setSelectedPointIndices(newSet);
+          const r = svg.getBoundingClientRect();
+          const scaleX = r.width / CANVAS_W;
+          const scaleY = r.height / CANVAS_H;
+          setToolbarPos({
+            x: (editingSvgPts[i].x * zoom + pan.x) * scaleX,
+            y: (editingSvgPts[i].y * zoom + pan.y) * scaleY,
+          });
+          return;
+        }
+      }
+      if (selectedPointIndices.size > 0) {
+        const gps = svgToGps(unX, unY);
+        if (gps && editingInfo) {
+          const newPoints = [...editingInfo.points];
+          const indices = [...selectedPointIndices];
+          if (indices.length === 1) {
+            newPoints[indices[0]] = gps;
+          } else {
+            const centerLat = indices.reduce((s, i) => s + newPoints[i].lat, 0) / indices.length;
+            const centerLng = indices.reduce((s, i) => s + newPoints[i].lng, 0) / indices.length;
+            const dLat = gps.lat - centerLat;
+            const dLng = gps.lng - centerLng;
+            for (const i of indices) {
+              newPoints[i] = { lat: newPoints[i].lat + dLat, lng: newPoints[i].lng + dLng };
+            }
+          }
+          onPointsChange?.(editingInfo.id, newPoints);
+          const r = svg.getBoundingClientRect();
+          const scaleX = r.width / CANVAS_W;
+          const scaleY = r.height / CANVAS_H;
+          setToolbarPos({
+            x: (unX * zoom + pan.x) * scaleX,
+            y: (unY * zoom + pan.y) * scaleY,
+          });
+        }
+        return;
+      }
+      setSelectedPointIndices(new Set());
+      setToolbarPos(null);
       return;
     }
 
@@ -393,6 +464,7 @@ export function InteractiveMap({
             const landCx = landSvg.reduce((a, p) => a + p.x, 0) / landSvg.length;
             const landCy = landSvg.reduce((a, p) => a + p.y, 0) / landSvg.length;
             const landHighlight = selectedId === m.land.id || selectedLandId === m.land.id;
+            const isEditingEntry = editingInfo?.landId === m.land.id && editingSvgPts;
 
             return (
               <g key={m.land.id}>
@@ -400,11 +472,11 @@ export function InteractiveMap({
                   <polygon
                     points={landPolyStr}
                     fill="rgba(0,0,0,0.04)"
-                    stroke={landHighlight ? '#2d6a2d' : '#333'}
-                    strokeWidth={landHighlight ? 3 : 2}
-                    strokeDasharray="6,3"
-                    onMouseMove={e => handlePolyHover(e, m, 'land')}
-                    onMouseLeave={clearTooltip}
+                    stroke={isEditingEntry ? '#3b82f6' : (landHighlight ? '#2d6a2d' : '#333')}
+                    strokeWidth={isEditingEntry ? 2.5 : (landHighlight ? 3 : 2)}
+                    strokeDasharray={isEditingEntry ? '5,3' : '6,3'}
+                    onMouseMove={isEditingEntry ? undefined : (e => handlePolyHover(e, m, 'land'))}
+                    onMouseLeave={isEditingEntry ? undefined : clearTooltip}
                   />
                 )}
                 <text x={landCx} y={landCy - 8} textAnchor="middle" fontSize="10" fill="#666" fontStyle="italic">
@@ -412,12 +484,14 @@ export function InteractiveMap({
                 </text>
                 {plotSvgs.map((svgPts, i) => {
                   if (!svgPts.length) return null;
-                  const polyStr = svgPts.map(p => `${p.x},${p.y}`).join(' ');
-                  const centroid = svgPts.reduce(
-                    (a, p) => ({ x: a.x + p.x / svgPts.length, y: a.y + p.y / svgPts.length }),
+                  const plot = m.plots[i];
+                  const isEditing = editingInfo?.type === 'plot' && editingInfo.id === plot?.id && editingSvgPts;
+                  const displayPts = isEditing ? editingSvgPts! : svgPts;
+                  const polyStr = displayPts.map(p => `${p.x},${p.y}`).join(' ');
+                  const centroid = displayPts.reduce(
+                    (a, p) => ({ x: a.x + p.x / displayPts.length, y: a.y + p.y / displayPts.length }),
                     { x: 0, y: 0 }
                   );
-                  const plot = m.plots[i];
                   const color = plot?.color || COLORS[i % COLORS.length];
                   const highlight = selectedId === plot?.id || selectedPlotId === plot?.id;
                   return (
@@ -426,10 +500,11 @@ export function InteractiveMap({
                         <polygon
                           points={polyStr}
                           fill={color + (highlight ? '70' : '40')}
-                          stroke={highlight ? '#2d6a2d' : color}
-                          strokeWidth={highlight ? 3 : 1.5}
-                          onMouseMove={e => handlePolyHover(e, m, 'plot', i)}
-                          onMouseLeave={clearTooltip}
+                          stroke={isEditing ? '#3b82f6' : (highlight ? '#2d6a2d' : color)}
+                          strokeWidth={isEditing ? 2.5 : (highlight ? 3 : 1.5)}
+                          strokeDasharray={isEditing ? '5,3' : undefined}
+                          onMouseMove={isEditing ? undefined : (e => handlePolyHover(e, m, 'plot', i))}
+                          onMouseLeave={isEditing ? undefined : clearTooltip}
                         />
                       )}
                       {layers.plotLabels && (
@@ -447,6 +522,18 @@ export function InteractiveMap({
                     </g>
                   );
                 })}
+                {isEditingEntry && editingSvgPts.map((pt, vi) => (
+                  <circle
+                    key={`vtx-${vi}`}
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={selectedPointIndices.has(vi) ? 6 : 4}
+                    fill={selectedPointIndices.has(vi) ? '#3b82f6' : '#ef4444'}
+                    stroke={selectedPointIndices.has(vi) ? '#1d4ed8' : 'white'}
+                    strokeWidth={selectedPointIndices.has(vi) ? 2.5 : 1.5}
+                    style={{ cursor: 'pointer' }}
+                  />
+                ))}
               </g>
             );
           });
@@ -552,9 +639,38 @@ export function InteractiveMap({
       {/* Map area */}
       <div
         className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden select-none"
-        style={{ touchAction: 'none' }}
+        style={{ position: 'relative', touchAction: 'none' }}
       >
         {mapSvg}
+
+        {/* Editing toolbar */}
+        {toolbarPos && selectedPointIndices.size > 0 && (
+          <div
+            className="absolute z-50 flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-2 py-1 shadow-lg"
+            style={{
+              left: toolbarPos.x,
+              top: toolbarPos.y,
+              transform: 'translate(-50%, -100%)',
+              pointerEvents: 'auto',
+              fontSize: 11,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <button
+              onClick={handleDeletePoint}
+              disabled={editingInfo?.points ? editingInfo.points.length <= 3 : true}
+              className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Delete Point
+            </button>
+            <button
+              onClick={handleAddPoint}
+              className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 hover:bg-blue-100"
+            >
+              Add Point
+            </button>
+          </div>
+        )}
 
         {/* Footer with zoom slider */}
         <div className="px-3 py-2 text-[10px] text-gray-400 border-t border-gray-100 flex items-center gap-3">

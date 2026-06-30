@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Search, Sprout, ArrowRight, BugPlay, Beaker, Leaf, FlaskConical, CalendarDays, ClipboardList, DollarSign, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import db from '../../db/db';
+import { parseDate } from '../../lib/dates';
 import type { DiaryEntry, DiaryEntryType } from '../../types';
 
 const ENTRY_ICONS: Record<DiaryEntryType, React.ReactNode> = {
@@ -26,6 +27,16 @@ export default function DiaryScreen() {
     () => db.diaryEntries.orderBy('updatedAt').toArray(),
     []
   ) ?? [];
+
+  const crops = useLiveQuery(() => db.crops.toArray(), []) ?? [];
+
+  const cropMap = useMemo(() => {
+    const map = new Map<string, { plantingDate: string; plantingMethod: string }>();
+    for (const c of crops) {
+      map.set(c.id, { plantingDate: c.plantingDate, plantingMethod: c.plantingMethod });
+    }
+    return map;
+  }, [crops]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, { cropName: string; cropId: string; entries: DiaryEntry[] }>();
@@ -66,12 +77,9 @@ export default function DiaryScreen() {
   }
 
   const formatDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr + 'T00:00:00');
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
+    const d = parseDate(dateStr);
+    if (!d) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
@@ -106,6 +114,7 @@ export default function DiaryScreen() {
         )}
         {grouped.map(group => {
           const isExpanded = expanded.has(group.cropId);
+          const cropInfo = cropMap.get(group.cropId);
           return (
             <div key={group.cropId} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
               <button
@@ -113,10 +122,17 @@ export default function DiaryScreen() {
                 className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm font-bold text-gray-800 truncate">
-                    {group.cropName}
-                    {group.cropId && <span className="text-[10px] text-gray-400 font-mono ml-1">(id #{group.cropId})</span>}
-                  </span>
+                  <div className="min-w-0">
+                    <span className="text-sm font-bold text-gray-800 truncate block">
+                      {group.cropName}
+                      {group.cropId && <span className="text-[10px] text-gray-400 font-mono ml-1">(id #{group.cropId})</span>}
+                    </span>
+                    {cropInfo && (
+                      <span className="text-[10px] text-gray-400">
+                        Planted: {cropInfo.plantingDate}{cropInfo.plantingMethod ? ` \u00b7 ${cropInfo.plantingMethod}` : ''}
+                      </span>
+                    )}
+                  </div>
                   <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-semibold">
                     {group.entries.length}
                   </span>

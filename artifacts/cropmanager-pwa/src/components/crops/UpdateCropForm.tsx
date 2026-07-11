@@ -54,7 +54,6 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
   const [tickGerminated, setTickGerminated] = useState(!!crop.germinationDate);
   const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
-  const [tickHarvested, setTickHarvested] = useState(!!crop.harvestDateActual);
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   
   const fertProfiles = fertDb?.crops ? Object.entries(fertDb.crops).map(([key, val]) => ({
@@ -169,26 +168,13 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
       update.daysGermTransplant = 0;
     }
 
-    if (tickHarvested) {
-      update.harvestDateActual = dateNowStr;
-      update.status = 'Harvested';
-      update.plantStage = 'Harvested';
-      if (crop.isContinuous) {
-        await promoteNextBatch(crop, db);
-      }
-    } else {
-      update.harvestDateActual = '';
-      update.daysTransplantHarvest = 0;
-      // derive stage from toggles
-      update.plantStage = tickTransplanted ? 'Transplanted' : (tickGerminated ? 'Germinated' : 'Seed');
-    }
+    update.plantStage = tickTransplanted ? 'Transplanted' : (tickGerminated ? 'Germinated' : 'Seed');
 
     await db.crops.update(crop.id, update);
 
     const stageChanges: string[] = [];
     if (tickGerminated && !crop.germinationDate) stageChanges.push('Germinated');
     if (tickTransplanted && !crop.transplantDateActual) stageChanges.push('Transplanted');
-    if (tickHarvested && !crop.harvestDateActual) stageChanges.push('Harvested');
     for (const s of stageChanges) {
       await addDiaryEntry({
         entryType: 'stage_change',
@@ -309,11 +295,7 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
                 </div>
                 <div className="flex items-center justify-between py-1.5">
                   <label className="text-sm">Transplanted</label>
-                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => { setTickTransplanted(e.target.checked); if (e.target.checked) setTickGerminated(true); if (e.target.checked && tickHarvested) setTickHarvested(false); }} />
-                </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <label className="text-sm">Harvested</label>
-                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickHarvested} onChange={e => { setTickHarvested(e.target.checked); if (e.target.checked) { setTickGerminated(true); setTickTransplanted(true); } }} />
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => { setTickTransplanted(e.target.checked); if (e.target.checked) setTickGerminated(true); }} />
                 </div>
                 <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
                   {saving ? 'Saving...' : 'Apply Manual Progress'}

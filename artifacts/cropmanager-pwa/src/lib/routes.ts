@@ -28,7 +28,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.MORE]: 'More',
   [ROUTES.MORE_CROP_DB]: 'Crop Database',
   [ROUTES.MORE_FERT_DB]: 'Fertilizer Database',
-  [ROUTES.MORE_HISTORY]: 'History & Averages',
+  [ROUTES.MORE_HISTORY]: 'Crop Analysis',
   [ROUTES.MORE_CH_CALC]: 'C-H Calculator',
   [ROUTES.MORE_ACTIVITY]: 'Activity Log',
   [ROUTES.MORE_LEDGER]: 'Farm Ledger',

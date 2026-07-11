@@ -51,8 +51,8 @@ export function MoreScreen() {
             path={ROUTES.MORE_FERT_DB}
           />
           <MoreItem
-            title="History & Averages"
-            subtitle="Stage timing averages by crop"
+            title="Crop Analysis"
+            subtitle="Stage durations, yield, seasons, learning"
             icon={<BarChart2 className="w-6 h-6 text-blue-600" />}
             iconColor="bg-blue-50"
             path={ROUTES.MORE_HISTORY}

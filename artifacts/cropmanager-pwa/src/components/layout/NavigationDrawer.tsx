@@ -29,7 +29,7 @@ const SECTIONS: DrawerSection[] = [
     title: 'Planning',
     items: [
       { label: 'Calculator', icon: <Calculator className="w-5 h-5" />, path: ROUTES.MORE_CALCULATOR },
-      { label: 'History & Averages', icon: <BarChart2 className="w-5 h-5" />, path: ROUTES.MORE_HISTORY },
+      { label: 'Crop Analysis', icon: <BarChart2 className="w-5 h-5" />, path: ROUTES.MORE_HISTORY },
       { label: 'C-H Calculator', icon: <BarChart2 className="w-5 h-5" />, path: ROUTES.MORE_CH_CALC },
       { label: 'Treatment App Rates', icon: <FlaskConical className="w-5 h-5" />, path: ROUTES.MORE_TREATMENT_RATES },
     ],

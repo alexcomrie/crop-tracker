@@ -17,6 +17,10 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
     db.batchPlantingLogs.where('cropTrackingId').equals(crop.id).toArray()
   , [crop.id]);
 
+  const harvestLogs = useLiveQuery(() =>
+    db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray()
+  , [crop.id]);
+
   const planted = parseDate(crop.plantingDate);
   const harvestEst = parseDate(crop.harvestDateEstimated);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
@@ -58,7 +62,9 @@ export function CropCard({ crop, cropData, onClick, onAction }: CropCardProps) {
           className="text-xs font-bold uppercase px-2 py-0.5 rounded-full text-white ml-2 shrink-0"
           style={{ backgroundColor: stageColor }}
         >
-          {crop.plantStage}
+          {crop.plantStage === 'Harvested' && harvestLogs && harvestLogs.length > 0
+            ? `Harvested X ${harvestLogs.length}`
+            : crop.plantStage}
         </span>
       </div>
 

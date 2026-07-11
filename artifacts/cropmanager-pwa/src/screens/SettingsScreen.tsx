@@ -5,7 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info } from 'lucide-react';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
@@ -79,6 +79,16 @@ export function SettingsScreen() {
             Install CropManager
           </Button>
         )}
+      </div>
+
+      {/* About */}
+      <div className="bg-white rounded-xl border p-4 space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <Info className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">About</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">CropManager — Farm Management Suite</p>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Alexandre Comrie. All rights reserved.</p>
       </div>
 
       <Button 

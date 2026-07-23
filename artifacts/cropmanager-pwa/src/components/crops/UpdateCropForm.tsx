@@ -47,12 +47,13 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
   const cropData = resolveCropData(cropDb, crop.cropName);
   const isVine = isVineFamily(crop.cropName, cropData?.plant_type);
-  const validStages = getValidNextStages(crop.plantStage, cropData).filter(s => {
+  const validStages = getValidNextStages(crop.plantStage, cropData, crop.plantingMethod).filter(s => {
     if ((s === 'Grafting' || s === 'Healing') && !isVine) return false;
     return true;
   });
 
   const [tickGerminated, setTickGerminated] = useState(!!crop.germinationDate);
+  const [tickUpPlanted, setTickUpPlanted] = useState(false);
   const [tickTransplanted, setTickTransplanted] = useState(!!crop.transplantDateActual);
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   
@@ -153,9 +154,6 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
 
     if (tickGerminated) {
       update.germinationDate = dateNowStr;
-      if (crop.plantingDate) {
-        // days since planting is not critical here; keep existing if any
-      }
     } else {
       update.germinationDate = '';
       update.daysSeedGerm = 0;
@@ -168,12 +166,16 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
       update.daysGermTransplant = 0;
     }
 
-    update.plantStage = tickTransplanted ? 'Transplanted' : (tickGerminated ? 'Germinated' : 'Seed');
+    if (tickUpPlanted) update.plantStage = 'Up-planted';
+    else if (tickTransplanted) update.plantStage = 'Transplanted';
+    else if (tickGerminated) update.plantStage = 'Germinated';
+    else update.plantStage = 'Seed';
 
     await db.crops.update(crop.id, update);
 
     const stageChanges: string[] = [];
     if (tickGerminated && !crop.germinationDate) stageChanges.push('Germinated');
+    if (tickUpPlanted) stageChanges.push('Up-planted');
     if (tickTransplanted && !crop.transplantDateActual) stageChanges.push('Transplanted');
     for (const s of stageChanges) {
       await addDiaryEntry({
@@ -291,11 +293,15 @@ export function UpdateCropForm({ crop, open, onClose }: UpdateCropFormProps) {
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Manual Progression</p>
                 <div className="flex items-center justify-between py-1.5">
                   <label className="text-sm">Germinated</label>
-                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickGerminated} onChange={e => { setTickGerminated(e.target.checked); if (!e.target.checked && tickTransplanted) setTickTransplanted(false); }} />
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickGerminated} onChange={e => { setTickGerminated(e.target.checked); if (!e.target.checked && tickTransplanted) setTickTransplanted(false); if (!e.target.checked) setTickUpPlanted(false); }} />
+                </div>
+                <div className="flex items-center justify-between py-1.5">
+                  <label className="text-sm">Up-planted</label>
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickUpPlanted} onChange={e => { setTickUpPlanted(e.target.checked); if (e.target.checked) setTickGerminated(true); }} />
                 </div>
                 <div className="flex items-center justify-between py-1.5">
                   <label className="text-sm">Transplanted</label>
-                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => { setTickTransplanted(e.target.checked); if (e.target.checked) setTickGerminated(true); }} />
+                  <input type="checkbox" className="w-5 h-5 accent-green-600" checked={tickTransplanted} onChange={e => { setTickTransplanted(e.target.checked); if (e.target.checked) { setTickGerminated(true); setTickUpPlanted(false); } }} />
                 </div>
                 <Button variant="outline" className="w-full mt-2" onClick={handleManualProgress} disabled={saving}>
                   {saving ? 'Saving...' : 'Apply Manual Progress'}

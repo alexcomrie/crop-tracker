@@ -21,7 +21,7 @@ interface CropFormProps {
   editCrop?: Crop;
 }
 
-const PLANTING_METHODS = ['Seed Tray', 'Direct Ground', 'Direct Bed', 'Cutting', 'Division', 'Grafted'];
+const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Pot / Container', 'Hydroponic'];
 const TRAY_COLORS = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'White'];
 
 export function CropForm({ open, onClose, date, editCrop }: CropFormProps) {

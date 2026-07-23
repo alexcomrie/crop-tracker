@@ -32,10 +32,7 @@ export function CropsScreen() {
   useEffect(() => { return () => { mountedRef.current = false; }; }, []);
 
   // Auto-transition crops through all stages based on their timeframes
-  const runningRef = useRef(false);
   useEffect(() => {
-    if (runningRef.current) return;
-    runningRef.current = true;
     let cancelled = false;
     (async () => {
       for (const c of crops) {
@@ -47,13 +44,14 @@ export function CropsScreen() {
         const adjusted = autoAdjustTransplantSchedule(c, cd);
         if (adjusted) await db.crops.put(adjusted);
 
-        const needsTransplant = (cd.transplant_days || 0) > 0;
-        if (needsTransplant && c.plantStage === 'Seedling' && !c.transplantDateActual) continue;
+        const isTrayOrBed = c.plantingMethod === 'Seed Tray' || c.plantingMethod === 'Seed Bed';
+        const isPot = c.plantingMethod === 'Pot';
+        const needsManual = isTrayOrBed || isPot || (cd.transplant_days || 0) > 0;
+        if (needsManual && c.plantStage === 'Seedling' && !c.transplantDateActual) continue;
 
         let didTransition = true;
         let currentCrop = c;
-        while (didTransition) {
-          if (cancelled || !mountedRef.current) break;
+        while (didTransition && !cancelled && mountedRef.current) {
           const result = await autoTransitionCrop(currentCrop, cd, { stageLogs: db.stageLogs, crops: db.crops });
           didTransition = result;
           if (result) {
@@ -62,7 +60,7 @@ export function CropsScreen() {
           }
         }
       }
-    })().finally(() => { runningRef.current = false; });
+    })().catch(() => {});
     return () => { cancelled = true; };
   }, [crops, cropDb]);
 

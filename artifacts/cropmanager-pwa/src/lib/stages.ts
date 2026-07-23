@@ -102,7 +102,7 @@ export function getStageSequence(cropData: CropData | null): string[] {
   return ['Seed', 'Germinated', 'Seedling', 'Vegetative', 'Harvested'];
 }
 
-export function getValidNextStages(currentStage: string, cropData: CropData | null): string[] {
+export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string): string[] {
   const seq = getStageSequence(cropData);
   const result = seq.filter(s => s !== currentStage);
 
@@ -114,10 +114,19 @@ export function getValidNextStages(currentStage: string, cropData: CropData | nu
     if (!result.includes('Transplanted')) result.push('Transplanted');
   }
   if (currentStage === 'Seedling') {
+    const isTrayOrBed = plantingMethod === 'Seed Tray' || plantingMethod === 'Seed Bed';
+    const isPot = plantingMethod === 'Pot';
     const hasTransplant = cropData && cropData.transplant_days != null && cropData.transplant_days > 0;
-    if (hasTransplant) result.push('Transplanted');
+    if (isTrayOrBed) {
+      result.push('Up-planted');
+    } else if (isPot || hasTransplant) {
+      result.push('Transplanted');
+    }
   }
-  if (!seq.includes(currentStage) && !['Grafting', 'Healing', 'Transplanted'].includes(currentStage)) {
+  if (currentStage === 'Up-planted') {
+    if (!result.includes('Transplanted')) result.push('Transplanted');
+  }
+  if (!seq.includes(currentStage) && !['Grafting', 'Healing', 'Transplanted', 'Up-planted'].includes(currentStage)) {
     if (!result.includes('Harvested')) result.push('Harvested');
   }
   if (currentStage !== 'Deleted') result.push('Deleted');
@@ -138,33 +147,41 @@ export function getStageIndex(stage: string, seq: string[]): number {
   return seq.indexOf(stage);
 }
 
-/** Calculate which stage the crop should be in based on days since planting */
+/** Calculate which stage the crop should be in based on time since germination */
 export function calcExpectedStage(crop: Crop, cropData: CropData | null): string | null {
   if (!cropData) return null;
-  const planted = parseDate(crop.plantingDate);
-  if (!planted) return null;
-  const seq = getStageSequence(cropData);
-  const daysElapsed = daysBetween(planted, today());
+
+  // If germination hasn't been confirmed yet, stay at Seed (must be manual)
+  if (!crop.germinationDate) return 'Seed';
+
+  const germDate = parseDate(crop.germinationDate);
+  if (!germDate) return 'Seed';
+
+  const daysSinceGerm = daysBetween(germDate, today());
   const totalDays = cropData.growing_time_days || 60;
 
-  if (daysElapsed <= 0) return 'Seed';
-  if (daysElapsed >= totalDays) return 'Harvested';
-
-  // For transplant-based crops, check if transplant has happened
-  const transplantDays = cropData.transplant_days || 0;
-  const needsTransplant = transplantDays > 0;
-  const isTransplanted = !!crop.transplantDateActual;
-
-  const germMax = cropData.germination_days_max || 7;
-  if (daysElapsed <= germMax) return 'Germinated';
-
-  if (needsTransplant && !isTransplanted) {
-    if (daysElapsed <= transplantDays) return 'Seedling';
-    return null; // waiting for manual transplant
+  // At Germinated stage: wait 7 days before auto-transitioning to Seedling
+  if (crop.plantStage === 'Germinated') {
+    if (daysSinceGerm < 7) return 'Germinated';
+    return 'Seedling';
   }
 
+  if (daysSinceGerm >= totalDays) return 'Harvested';
+
+  // For tray/bed/pot/transplant crops waiting at Seedling
+  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
+  const isPot = crop.plantingMethod === 'Pot';
+  const needsManual = isTrayOrBed || isPot || (cropData.transplant_days || 0) > 0;
+  if (needsManual && !crop.transplantDateActual && crop.plantStage === 'Seedling') {
+    return 'Seedling';
+  }
+
+  // Calculate proportion based on days since germination (minus 7-day germ period)
+  const adjustedDays = Math.max(0, daysSinceGerm - 7);
+  const remainingDays = Math.max(1, totalDays - 7);
+  const pct = adjustedDays / remainingDays;
+
   const type = getPlantType(cropData);
-  const pct = daysElapsed / totalDays;
 
   if (type === 'fruit') {
     if (pct <= 0.3) return 'Seedling';
@@ -191,6 +208,7 @@ export const STAGE_COLORS: Record<string, string> = {
   Vegetative: '#66bb6a',
   Flowering: '#ffb300',
   Fruiting: '#f57c00',
+  'Up-planted': '#78909c',
   Transplanted: '#26a69a',
   Grafting: '#7e57c2',
   Healing: '#ba68c8',
@@ -213,12 +231,24 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
   if (crop.plantStage === 'Harvested' || crop.plantStage === 'Deleted') return false;
   if (crop.status === 'Harvested' || crop.status === 'Deleted') return false;
 
-  // For transplant-based crops: wait at Seedling until manually transplanted
-  const needsTransplant = (cropData.transplant_days || 0) > 0;
+  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
+  const isPot = crop.plantingMethod === 'Pot';
+  const needsTransplant = isPot || (cropData.transplant_days || 0) > 0;
+
+  // Seed tray/bed: wait at Seedling until manually up-planted
+  if (isTrayOrBed && crop.plantStage === 'Seedling' && !crop.transplantDateActual) return false;
+  // Pot or transplant-needed crops: wait at Seedling until manually transplanted
   if (needsTransplant && crop.plantStage === 'Seedling' && !crop.transplantDateActual) return false;
 
   const seq = getStageSequence(cropData);
-  const currentIdx = getStageIndex(crop.plantStage, seq);
+
+  // Map special manual stages to their position in the base sequence
+  const manualStageMapping: Record<string, string> = {
+    'Up-planted': 'Seedling',
+    'Transplanted': 'Seedling',
+  };
+  const mapped = manualStageMapping[crop.plantStage] || crop.plantStage;
+  const currentIdx = getStageIndex(mapped, seq);
   const expectedIdx = getStageIndex(expectedStage, seq);
   if (currentIdx < 0 || expectedIdx < 0) return false;
   if (expectedIdx <= currentIdx) return false;
@@ -227,8 +257,9 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
   const nextStage = seq[currentIdx + 1];
   if (!nextStage) return false;
 
-  // Germinated and Harvested must be set manually
-  if (nextStage === 'Germinated' || nextStage === 'Harvested') return false;
+  // Manual-only stages (must be set by user)
+  const MANUAL_STAGES = ['Germinated', 'Up-planted', 'Transplanted', 'Harvested'];
+  if (MANUAL_STAGES.includes(nextStage)) return false;
 
   const { updatedCrop, stageLog } = processStageChange(
     crop, nextStage, today(), cropData, [], []
@@ -240,9 +271,7 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
     cropId: crop.id,
     cropName: crop.cropName,
     variety: crop.variety,
-    description: crop.plantStage === 'Seed'
-      ? `Planted in '${crop.plantingMethod || 'direct'}' · germinated (auto)`
-      : `${crop.plantStage} → ${nextStage} (auto)`,
+    description: `${crop.plantStage} → ${nextStage} (auto)`,
     details: crop.plantingMethod ? `Method: ${crop.plantingMethod}` : '',
   });
   await db.crops.put(updatedCrop);

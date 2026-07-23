@@ -12,7 +12,7 @@ import { haversineMeters, calcArea, gpsToSvgAll, formatAreaShort } from '../../l
 import type { GeoPoint, FarmArea, FarmLand, RowDetail, CropAssignment } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
-const PLANTING_METHODS = ['Direct Ground', 'Seed Bed', 'Seed Tray', 'Pot / Container', 'Hydroponic'];
+const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Pot / Container', 'Hydroponic'];
 const CANVAS_W = 340;
 const CANVAS_H = 280;
 const MIN_POINT_DISTANCE = 1.5;

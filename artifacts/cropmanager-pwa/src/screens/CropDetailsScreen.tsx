@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
-import { getEffectiveCropData } from '../lib/personalCropDb';
+import { getEffectiveCropData, getPersonalCropData, foundationFruitDefault, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { parseDate, formatDateShort, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
 import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, getValidNextStages, processStageChange } from '../lib/stages';
 import { generateId } from '../lib/ids';
@@ -36,12 +36,12 @@ export function CropDetailsScreen() {
   const [trackTag, setTrackTag] = useState('');
   const [trackDate, setTrackDate] = useState(formatDateShort(today()));
   const [trackNotes, setTrackNotes] = useState('');
-  // Learned fruit-maturity average for this crop (built from finished trackings)
-  const fruitLearn = useLiveQuery(async () => {
-    if (!crop) return null;
-    const all = await db.cropDbAdjustments.where('cropKey').equals(crop.cropName.toLowerCase()).toArray().catch(() => []);
-    return all.find(a => a.field === 'fruit_maturity_days') ?? null;
-  }, [crop?.cropName]) ?? null;
+  // Personal fruit-maturity record for this crop (auto-filled from finished trackings)
+  const personalFruit = useLiveQuery(
+    () => (crop ? getPersonalCropData(crop.cropName) : Promise.resolve(null)),
+    [crop?.cropName]
+  ) ?? null;
+  const fruitDefault = crop ? foundationFruitDefault(crop.cropName) : null;
   const [harvestQty, setHarvestQty] = useState('');
   const [harvestNotes, setHarvestNotes] = useState('');
   const [harvestDate, setHarvestDate] = useState(formatDateShort(today()));
@@ -195,6 +195,7 @@ export function CropDetailsScreen() {
       const dbDefault = (cropData as unknown as { growing_time_days?: number } | null)?.growing_time_days ?? 60;
       const newAdj = logDeviation(crop.cropName, 'fruit_maturity_days', dbDefault, elapsed, crop.variety, adjustments, settings.learningThreshold);
       await db.cropDbAdjustments.put(newAdj as never);
+      await upsertPersonalFruitMaturity(crop.cropName, elapsed);
       await addDiaryEntry({
         entryType: 'note',
         cropId: crop.id,
@@ -498,9 +499,11 @@ export function CropDetailsScreen() {
             <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Growth Tracking</p>
               <p className="text-[10px] text-muted-foreground">Track fruit maturation from an event date (e.g. pollination). Tag the physical fruit to match. Expected maturity is learnt from finished trackings — nothing to guess up front.</p>
-              {fruitLearn && fruitLearn.sampleCount >= 2 && (
-                <p className="text-[11px] bg-[#e8f5e8] text-[#2d6a2d] rounded-lg px-2 py-1.5 font-semibold">🧠 Learned maturity: ~{Math.round(fruitLearn.yourAverage)}d from {fruitLearn.sampleCount} tracked fruits</p>
-              )}
+              {personalFruit && (personalFruit.fruitSampleCount ?? 0) >= 2 && personalFruit.fruitGrowthDays != null ? (
+                <p className="text-[11px] bg-[#e8f5e8] text-[#2d6a2d] rounded-lg px-2 py-1.5 font-semibold">🧠 Learned maturity: ~{personalFruit.fruitGrowthDays}d from {personalFruit.fruitSampleCount} tracked fruits</p>
+              ) : fruitDefault != null ? (
+                <p className="text-[11px] bg-gray-50 text-gray-600 rounded-lg px-2 py-1.5">Typical maturity: ~{fruitDefault}d (research default — your finishes will override it)</p>
+              ) : null}
               <div className="grid grid-cols-2 gap-2">
                 <input value={trackLabel} onChange={e=>setTrackLabel(e.target.value)} placeholder="Label (e.g. Watermelon)" className="border rounded-lg p-2 text-sm" />
                 <input value={trackTag} onChange={e=>setTrackTag(e.target.value)} placeholder="Tag # (optional)" className="border rounded-lg p-2 text-sm" />

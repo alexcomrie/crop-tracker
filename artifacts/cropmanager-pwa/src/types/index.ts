@@ -133,6 +133,9 @@ export interface PersonalCropData {
   germinationMin: number;
   germinationMax: number;
   sampleCount: number;
+  /** Fruit maturation days (event e.g. pollination → ripe), learnt from finished trackings. */
+  fruitGrowthDays: number | null;
+  fruitSampleCount: number;
   updatedAt: number;
 }
 

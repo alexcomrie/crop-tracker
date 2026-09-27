@@ -55,6 +55,95 @@ export async function upsertPersonalFromCrop(crop: Crop, harvestDays?: number) {
     germinationMin: foundation?.germination_days_min ?? 5,
     germinationMax: foundation?.germination_days_max ?? 10,
     sampleCount: growingTime ? 1 : 0,
+    fruitGrowthDays: null,
+    fruitSampleCount: 0,
+    updatedAt: now,
+  };
+  await db.personalCropDb.put(data as never);
+}
+
+/**
+ * Approximate event-to-maturity days (pollination/flower → ripe) from
+ * horticultural extension publications. Seed defaults only — every finished
+ * field tracking overrides these with real farm data via
+ * upsertPersonalFruitMaturity. Keys are lowercase crop names/display names.
+ */
+export const FRUIT_MATURITY_DEFAULTS: Record<string, number> = {
+  watermelon: 40,
+  melon: 40,
+  cantaloupe: 40,
+  tomato: 50,
+  tomatoes: 50,
+  tomatillo: 55,
+  'sweet pepper': 60,
+  'bell pepper': 60,
+  pepper: 60,
+  'hot pepper': 60,
+  chili: 60,
+  eggplant: 30,
+  okra: 5,
+  cucumber: 16,
+  cucumbers: 16,
+  pumpkin: 50,
+  squash: 30,
+  zucchini: 8,
+  corn: 22,
+  'string beans': 12,
+  'green beans': 12,
+  'kidney beans': 12,
+  peas: 20,
+  'red peas': 25,
+  'gungo peas': 25,
+  'pigeon peas': 25,
+};
+
+/** Research seed default for a crop's fruit maturation, if known. */
+export function foundationFruitDefault(cropName: string): number | null {
+  return FRUIT_MATURITY_DEFAULTS[cropName.toLowerCase().trim()] ?? null;
+}
+
+/**
+ * Feed a finished fruit tracking into the personal database: running average
+ * of actual event-to-ripe days plus sample count. Creates the personal record
+ * (from foundation baseline) when none exists yet.
+ */
+export async function upsertPersonalFruitMaturity(cropName: string, elapsedDays: number) {
+  const key = cropName.toLowerCase().trim();
+  if (!key) return;
+  const now = Date.now();
+  const elapsed = Math.max(0, Math.round(elapsedDays));
+  const existing = await db.personalCropDb.get(key).catch(() => null) as unknown as PersonalCropData | undefined;
+  if (existing) {
+    const count = (existing.fruitSampleCount ?? 0) + 1;
+    const prev = existing.fruitGrowthDays ?? elapsed;
+    const avg = Math.round(((prev * (existing.fruitSampleCount ?? 0)) + elapsed) / count);
+    await db.personalCropDb.put({ ...existing, fruitGrowthDays: avg, fruitSampleCount: count, updatedAt: now } as never);
+    return;
+  }
+  let foundation: CropData | null = null;
+  try {
+    const raw = localStorage.getItem('cropmanager_settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      foundation = resolveCropData(parsed?.state?.cropDb ?? {}, cropName) as CropData | null;
+    }
+  } catch (e) {
+    console.warn('[personalCropDb] settings parse failed, using defaults', e);
+  }
+  const data: PersonalCropData = {
+    key,
+    displayName: cropName.trim(),
+    plantType: foundation?.plant_type ?? 'other',
+    growingTimeDays: foundation?.growing_time_days ?? 60,
+    transplantDays: foundation?.transplant_days ?? null,
+    growingFromTransplant: foundation?.growing_from_transplant ?? null,
+    harvestInterval: foundation?.harvest_interval ?? 7,
+    batchOffsetDays: foundation?.batch_offset_days ?? 7,
+    germinationMin: foundation?.germination_days_min ?? 5,
+    germinationMax: foundation?.germination_days_max ?? 10,
+    sampleCount: 0,
+    fruitGrowthDays: elapsed,
+    fruitSampleCount: 1,
     updatedAt: now,
   };
   await db.personalCropDb.put(data as never);

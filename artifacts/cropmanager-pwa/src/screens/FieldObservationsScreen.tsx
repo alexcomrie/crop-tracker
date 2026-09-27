@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
-import { useCrops } from '../hooks/useCrops';
-import type { Crop } from '../types';
+import { getNonAliasCrops } from '../lib/cropDb';
 import { generateId } from '../lib/ids';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { addDiaryEntry } from '../lib/diary';
 import { logDeviation } from '../lib/learning';
+import { foundationFruitDefault, getPersonalCropData, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { formatDateShort, parseDate, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
 import { toast } from 'sonner';
 
@@ -17,17 +17,19 @@ import { toast } from 'sonner';
  * empty cropId so crop detail views never mix them in.
  */
 export function FieldObservationsScreen() {
-  const { settings } = useAppStore();
+  const { settings, cropDb } = useAppStore();
 
-  // Optional link to a tracked crop: entries attach to its record so they
-  // feed the same learning keys as in-crop logging. Empty = custom plant.
-  const [linkedCropId, setLinkedCropId] = useState('');
-  const [cropSearch, setCropSearch] = useState('');
-  const trackerCrops = useCrops('All') ?? [];
-  const linkedCrop: Crop | null = trackerCrops.find(c => c.id === linkedCropId) ?? null;
-  const cropMatches = cropSearch.trim()
-    ? trackerCrops
-        .filter(c => `${c.cropName} ${c.variety}`.toLowerCase().includes(cropSearch.trim().toLowerCase()))
+  // Optional foundation crop name: entries are stored under it so they feed
+  // the personal database even when the plant was never entered in the tracker.
+  // Empty = free-text custom plant.
+  const [foundationKey, setFoundationKey] = useState('');
+  const [foundationSearch, setFoundationSearch] = useState('');
+  const foundationCrops = useMemo(() => getNonAliasCrops(cropDb), [cropDb]);
+  const foundationEntry = foundationKey ? foundationCrops.find(c => c.key === foundationKey) ?? null : null;
+  const foundationName = foundationEntry ? foundationEntry.entry.display_name : '';
+  const foundationMatches = foundationSearch.trim()
+    ? foundationCrops
+        .filter(c => c.key.includes(foundationSearch.trim().toLowerCase()) || c.entry.display_name.toLowerCase().includes(foundationSearch.trim().toLowerCase()))
         .slice(0, 6)
     : [];
 
@@ -60,32 +62,33 @@ export function FieldObservationsScreen() {
       });
   }, []) ?? [];
 
-  // Learned maturity for the linked crop, else whatever plant name is typed
-  const learnedKey = linkedCrop ? linkedCrop.cropName.toLowerCase() : trackPlant.trim().toLowerCase();
-  const fruitLearn = useLiveQuery(async () => {
-    if (!learnedKey) return null;
-    const all = await db.cropDbAdjustments.where('cropKey').equals(learnedKey).toArray().catch(() => []);
-    return all.find(a => a.field === 'fruit_maturity_days') ?? null;
-  }, [learnedKey]) ?? null;
+  // Identity for learning: foundation name when picked, else typed plant
+  const identityName = foundationName || trackPlant.trim();
+  const learnedKey = identityName.toLowerCase();
+  const personalFruit = useLiveQuery(
+    () => (learnedKey ? getPersonalCropData(learnedKey) : Promise.resolve(null)),
+    [learnedKey]
+  ) ?? null;
+  const fruitDefault = learnedKey ? foundationFruitDefault(learnedKey) : null;
 
   async function handleAddObservation() {
     if (!obsText.trim()) { toast.error('Write the observation first'); return; }
     const date = parseDate(obsDate) ?? today();
-    const plant = linkedCrop ? linkedCrop.cropName : obsPlant.trim();
+    const plant = foundationName || obsPlant.trim();
     try {
       await db.observationLogs.add({
         id: generateId('DE' as never) as string,
-        cropId: linkedCrop?.id ?? '',
+        cropId: '',
         date: formatDateShort(date),
         text: obsText.trim(),
-        plantName: linkedCrop ? '' : plant,
+        plantName: plant,
         updatedAt: Date.now(),
       } as never);
       await addDiaryEntry({
         entryType: 'note',
-        cropId: linkedCrop?.id ?? '',
+        cropId: '',
         cropName: plant || 'Field note',
-        variety: linkedCrop?.variety ?? '',
+        variety: '',
         description: `Field observation: ${obsText.trim().slice(0, 40)}`,
         details: obsText.trim(),
         date: formatDateShort(date),
@@ -111,13 +114,12 @@ export function FieldObservationsScreen() {
 
   async function handleAddTracking() {
     const start = parseDate(trackDate) ?? today();
-    // Linked crop: entries attach to its record + learning keys; else free-text plant
-    const plant = linkedCrop ? linkedCrop.cropName : trackPlant.trim();
-    const cropId = linkedCrop?.id ?? '';
+    // Foundation name when picked (feeds personal DB), else free-text plant
+    const plant = foundationName || trackPlant.trim();
     try {
       await db.trackings.add({
         id: generateId('TR'),
-        cropId,
+        cropId: '',
         cropName: plant,
         tagNumber: trackTag.trim(),
         label: trackLabel.trim() || plant || 'Fruit',
@@ -130,9 +132,9 @@ export function FieldObservationsScreen() {
       } as never);
       await addDiaryEntry({
         entryType: 'note',
-        cropId,
+        cropId: '',
         cropName: plant || 'Field tracking',
-        variety: linkedCrop?.variety ?? '',
+        variety: '',
         description: `Tracking started${trackTag.trim() ? ` #${trackTag.trim()}` : ''}: ${trackLabel.trim() || plant || 'Fruit'}`,
         details: '',
         date: formatDateShort(start),
@@ -153,13 +155,14 @@ export function FieldObservationsScreen() {
       const elapsed = Math.max(0, daysBetween(start, end));
       const endStr = formatDateShort(end);
       await db.trackings.update(tid, { status: 'done', endDate: endStr, updatedAt: Date.now() } as never);
-      // Learn the pattern: keyed by crop name so linked trackings merge with
-      // that crop's own history; first sample sets the baseline
+      // Learn the pattern two ways: scalar adjustment trail + personal DB
+      // fruit fields (auto-filled from real finishes, seeded from research)
       const rec = trackings.find(t => t.id === tid);
       const key = (rec?.cropName || '').toLowerCase() || 'field';
       const adjustments = await db.cropDbAdjustments.toArray();
       const newAdj = logDeviation(key, 'fruit_maturity_days', elapsed, elapsed, '', adjustments, settings.learningThreshold);
       await db.cropDbAdjustments.put(newAdj as never);
+      await upsertPersonalFruitMaturity(rec?.cropName || 'field', elapsed);
       await addDiaryEntry({
         entryType: 'note',
         cropId: rec?.cropId ?? '',
@@ -195,21 +198,22 @@ export function FieldObservationsScreen() {
         </p>
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Linked Crop (optional)</p>
-          {linkedCrop ? (
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Crop (optional)</p>
+          <p className="text-[10px] text-muted-foreground">Pick a foundation crop so finishes update its personal database — or leave empty for a custom plant.</p>
+          {foundationEntry ? (
             <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-              <p className="text-sm font-semibold text-green-800 truncate">📎 {linkedCrop.cropName}{linkedCrop.variety ? ` (${linkedCrop.variety})` : ''}</p>
-              <button onClick={() => { setLinkedCropId(''); setCropSearch(''); }} className="text-xs text-muted-foreground font-semibold shrink-0">Unlink</button>
+              <p className="text-sm font-semibold text-green-800 truncate">📎 {foundationEntry.entry.display_name}</p>
+              <button onClick={() => { setFoundationKey(''); setFoundationSearch(''); }} className="text-xs text-muted-foreground font-semibold shrink-0">Clear</button>
             </div>
           ) : (
             <>
-              <input value={cropSearch} onChange={e => setCropSearch(e.target.value)} placeholder="Search tracker crops…" className="w-full border rounded-lg p-2 text-sm" />
-              {cropSearch.trim() && (
+              <input value={foundationSearch} onChange={e => setFoundationSearch(e.target.value)} placeholder="Search crop names…" className="w-full border rounded-lg p-2 text-sm" />
+              {foundationSearch.trim() && (
                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {cropMatches.length === 0 && <p className="text-xs text-muted-foreground">No matches — leave unlinked for a custom plant.</p>}
-                  {cropMatches.map(c => (
-                    <button key={c.id} onClick={() => { setLinkedCropId(c.id); setCropSearch(''); }} className="w-full text-left px-3 py-2 rounded-lg text-sm bg-gray-50 hover:bg-green-50 border border-gray-100 truncate">
-                      {c.cropName}{c.variety ? ` (${c.variety})` : ''} · {c.plantStage}
+                  {foundationMatches.length === 0 && <p className="text-xs text-muted-foreground">No matches — leave empty for a custom plant.</p>}
+                  {foundationMatches.map(c => (
+                    <button key={c.key} onClick={() => { setFoundationKey(c.key); setFoundationSearch(''); }} className="w-full text-left px-3 py-2 rounded-lg text-sm bg-gray-50 hover:bg-green-50 border border-gray-100 truncate">
+                      {c.entry.display_name}
                     </button>
                   ))}
                 </div>
@@ -220,7 +224,7 @@ export function FieldObservationsScreen() {
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Observation Log</p>
-          {!linkedCrop && (
+          {!foundationEntry && (
             <input value={obsPlant} onChange={e => setObsPlant(e.target.value)} placeholder="Plant name (optional)" className="w-full border rounded-lg p-2 text-sm" />
           )}
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
@@ -248,10 +252,12 @@ export function FieldObservationsScreen() {
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Growth Tracking</p>
           <p className="text-[10px] text-muted-foreground">Track fruit maturation from an event date (e.g. pollination). Tag the physical fruit to match. Expected maturity is learnt from finished trackings.</p>
-          {fruitLearn && fruitLearn.sampleCount >= 2 && (
-            <p className="text-[11px] bg-[#e8f5e8] text-[#2d6a2d] rounded-lg px-2 py-1.5 font-semibold">🧠 Learned maturity: ~{Math.round(fruitLearn.yourAverage)}d from {fruitLearn.sampleCount} tracked fruits</p>
-          )}
-          {!linkedCrop && (
+          {personalFruit && (personalFruit.fruitSampleCount ?? 0) >= 2 && personalFruit.fruitGrowthDays != null ? (
+            <p className="text-[11px] bg-[#e8f5e8] text-[#2d6a2d] rounded-lg px-2 py-1.5 font-semibold">🧠 Learned maturity: ~{personalFruit.fruitGrowthDays}d from {personalFruit.fruitSampleCount} tracked fruits</p>
+          ) : fruitDefault != null ? (
+            <p className="text-[11px] bg-gray-50 text-gray-600 rounded-lg px-2 py-1.5">Typical maturity: ~{fruitDefault}d (research default — your finishes will override it)</p>
+          ) : null}
+          {!foundationEntry && (
             <input value={trackPlant} onChange={e => setTrackPlant(e.target.value)} placeholder="Plant (e.g. Mango tree)" className="w-full border rounded-lg p-2 text-sm" />
           )}
           <div className="grid grid-cols-2 gap-2">

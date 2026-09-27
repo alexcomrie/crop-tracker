@@ -2,7 +2,17 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store/useAppStore';
 import { CloudOff, Menu, ChevronLeft } from 'lucide-react';
-import { ROUTE_TITLES, isSubRoute, getParentRoute } from '../../lib/routes';
+import { ROUTES, ROUTE_TITLES, isSubRoute, getParentRoute } from '../../lib/routes';
+
+function titleFor(pathname: string): string {
+  const exact = ROUTE_TITLES[pathname];
+  if (exact) return exact;
+  // Dynamic routes never match the literal '/crops/:id' key — resolve by prefix
+  if (pathname === ROUTES.CROPS_ARCHIVE) return 'Archive';
+  if (pathname === ROUTES.CROP_CREATE) return 'New Crop';
+  if (pathname.startsWith('/crops/')) return 'Crop Details';
+  return 'CropManager';
+}
 
 export function TopBar() {
   const location = useLocation();
@@ -10,7 +20,7 @@ export function TopBar() {
   const { setDrawerOpen } = useAppStore();
   const isOnline = navigator.onLine;
 
-  const title = ROUTE_TITLES[location.pathname] ?? 'CropManager';
+  const title = titleFor(location.pathname);
   const showBack = isSubRoute(location.pathname);
   const showMenu = !showBack;
 
@@ -20,6 +30,7 @@ export function TopBar() {
         {showMenu ? (
           <button
             onClick={() => setDrawerOpen(true)}
+            aria-label="Open menu"
             className="p-1.5 -ml-1.5 rounded-lg hover:bg-green-600 transition-colors"
           >
             <Menu className="w-5 h-5" />
@@ -27,6 +38,7 @@ export function TopBar() {
         ) : (
           <button
             onClick={() => navigate(getParentRoute(location.pathname))}
+            aria-label="Go back"
             className="p-1.5 -ml-1.5 rounded-lg hover:bg-green-600 transition-colors"
           >
             <ChevronLeft className="w-5 h-5" />

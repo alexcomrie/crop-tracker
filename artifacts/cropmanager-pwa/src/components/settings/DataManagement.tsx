@@ -1,22 +1,24 @@
 import React, { useState, useRef } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { useAppStore } from '../../store/useAppStore';
 import { exportJsonBackup, importJsonBackupFromFile } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
+import { parseDate } from '../../lib/dates';
 import { ShieldAlert, Trash2, ScanEye } from 'lucide-react';
 
 export function DataManagement() {
-  const { settings } = useAppStore();
-  const [pulling, setPulling] = useState(false);
   const [pullMsg, setPullMsg] = useState('');
   const [clearInput, setClearInput] = useState('');
   const [showClear, setShowClear] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+  const dbEntriesCount = useLiveQuery(() =>
+    Promise.all([db.crops.count(), db.propagations.count(), db.reminders.count(), db.activities.count(), db.ledgerEntries.count()]).then(([c, p, r, a, l]) => c + p + r + a + l)
+  ) ?? 0;
 
   async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -63,6 +65,8 @@ export function DataManagement() {
 
   async function handleClear() {
     if (clearInput !== 'CLEAR') return;
+    // Clear EVERYTHING including learned state (microModels, personalCropDb)
+    // so stale predictions can't resurrect after a wipe.
     await Promise.all([
       db.crops.clear(),
       db.propagations.clear(),
@@ -74,6 +78,21 @@ export function DataManagement() {
       db.propDbAdjustments.clear(),
       db.batchPlantingLogs.clear(),
       db.cropSearchLogs.clear(),
+      db.successionGaps.clear(),
+      db.activities.clear(),
+      db.ledgerEntries.clear(),
+      db.farmLands.clear(),
+      db.farmAreas.clear(),
+      db.diaryEntries.clear(),
+      db.posSales.clear(),
+      db.posCustomers.clear(),
+      db.posSettings.clear(),
+      db.posInventory.clear(),
+      db.posOrders.clear(),
+      db.posHeldReceipts.clear(),
+      db.microModels.clear(),
+      db.observationLogs.clear(),
+      db.personalCropDb.clear(),
     ]);
     setClearInput('');
     setShowClear(false);
@@ -83,7 +102,10 @@ export function DataManagement() {
   return (
     <div className="space-y-3">
       <div className="bg-white rounded-xl border p-4 space-y-3">
-        <h3 className="font-semibold">Data Management</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Data Management</h3>
+          <span className="text-[11px] text-muted-foreground">{dbEntriesCount} DB entries</span>
+        </div>
 
         {pullMsg && <p className="text-sm text-center text-muted-foreground">{pullMsg}</p>}
 
@@ -166,6 +188,7 @@ export function DataManagement() {
 
         <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
           if (!window.confirm('Remove all duplicate records across the entire app?')) return;
+          try {
           let total = 0;
 
           // Diary entries: same cropId + date + entryType + description
@@ -232,12 +255,17 @@ export function DataManagement() {
           }
 
           toast.success(`Removed ${total} duplicate records across all tables`);
+          } catch (e) {
+            console.error('[data] dedupe failed', { e });
+            toast.error('Dedupe failed: ' + (e instanceof Error ? e.message : String(e)));
+          }
         }}>
           <Trash2 className="w-4 h-4" /> Remove All Duplicate Records
         </Button>
 
         <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
           if (!window.confirm('Remove all orphaned records (data referencing crops or propagations that no longer exist)?')) return;
+          try {
           const cropIds = new Set((await db.crops.toArray()).map(c => c.id));
           const propIds = new Set((await db.propagations.toArray()).map(p => p.id));
           let total = 0;
@@ -263,24 +291,35 @@ export function DataManagement() {
           }
 
           toast.success(`Removed ${total} orphaned records`);
+          } catch (e) {
+            console.error('[data] orphan sweep failed', { e });
+            toast.error('Orphan sweep failed: ' + (e instanceof Error ? e.message : String(e)));
+          }
         }}>
           <ScanEye className="w-4 h-4" /> Remove All Orphaned Records
         </Button>
 
         <Button variant="outline" className="w-full text-orange-700 border-orange-300 hover:bg-orange-50 gap-2" onClick={async () => {
           if (!window.confirm('Delete all diary entries older than 1 year?')) return;
+          try {
           const yearAgo = new Date();
           yearAgo.setFullYear(yearAgo.getFullYear() - 1);
-          const cutoff = yearAgo.toISOString().split('T')[0];
+          const cutoffTs = yearAgo.getTime();
           const all = await db.diaryEntries.toArray();
           let deleted = 0;
           for (const e of all) {
-            if (e.date && e.date < cutoff) {
+            // Stored dates are dd-MMM-yyyy; compare timestamps, never raw strings
+            const d = e.date ? parseDate(e.date) : null;
+            if (d && d.getTime() < cutoffTs) {
               await db.diaryEntries.delete(e.id);
               deleted++;
             }
           }
           toast.success(`Deleted ${deleted} old diary entries`);
+          } catch (e) {
+            console.error('[data] diary prune failed', { e });
+            toast.error('Prune failed: ' + (e instanceof Error ? e.message : String(e)));
+          }
         }}>
           <Trash2 className="w-4 h-4" /> Delete Diary Entries Older Than 1 Year
         </Button>

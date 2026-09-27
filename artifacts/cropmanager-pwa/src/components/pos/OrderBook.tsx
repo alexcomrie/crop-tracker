@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ClipboardList, Plus, Pencil, Trash2, X, Search, Save, User, Package, FileText, ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
+import { ClipboardList, Plus, Pencil, Trash2, Search, Save, User, FileText, ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
 import type { PosOrder, PosOrderItem, PosCustomer } from '../../types';
 import { formatDateShort, formatDateTime, today } from '../../lib/dates';
 import { toPng } from 'html-to-image';
@@ -94,7 +94,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
     capture();
   }, [quoteTarget]);
 
-  const orders = useLiveQuery(() => db.posOrders.toArray(), []) ?? [];
+  const orders = useLiveQuery(() => db.posOrders.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? [];
   const inventoryItems = useLiveQuery(() => db.posInventory.filter(i => i.isActive).toArray(), []) ?? [];
   const customers = useLiveQuery(() => db.posCustomers.toArray(), []) ?? [];
 
@@ -164,22 +164,33 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
     const now = Date.now();
     const items: PosOrderItem[] = orderItems.map(i => ({ productName: i.name, quantity: i.qty, unit: i.unit, unitPrice: i.price, total: i.total }));
     const total = orderTotal;
-    if (editOrderId) {
-      await db.posOrders.update(editOrderId, { customerName: customerName || selectedCustomer!.name, customerId: customerId, items, total, notes, updatedAt: now });
-      toast.success('Order updated');
-    } else {
-      await db.posOrders.add({ id: generateId('INV'), customerName: customerName || selectedCustomer!.name, customerId, items, total, notes, status: 'pending', createdAt: now, updatedAt: now });
-      await addDiaryEntry({ entryType: 'pos_sale', description: `Order created: ${customerName || selectedCustomer!.name}`, details: `${items.length} item(s), $${total.toFixed(2)}`, date: formatDateShort(today()) });
-      toast.success('Order saved');
+    try {
+      if (editOrderId) {
+        await db.posOrders.update(editOrderId, { customerName: customerName || selectedCustomer!.name, customerId: customerId, items, total, notes, updatedAt: now });
+        toast.success('Order updated');
+      } else {
+        await db.posOrders.add({ id: generateId('INV'), customerName: customerName || selectedCustomer!.name, customerId, items, total, notes, status: 'pending', createdAt: now, updatedAt: now });
+        await addDiaryEntry({ entryType: 'pos_sale', description: `Order created: ${customerName || selectedCustomer!.name}`, details: `${items.length} item(s), $${total.toFixed(2)}`, date: formatDateShort(today()) });
+        toast.success('Order saved');
+      }
+    } catch (e) {
+      console.error('[pos] order save failed', { e });
+      toast.error('Could not save order: ' + (e instanceof Error ? e.message : String(e)));
+      return;
     }
     resetForm();
   }
 
   async function handleCancelOrder(order: PosOrder) {
     if (!window.confirm(`Cancel order for ${order.customerName}?`)) return;
-    await db.posOrders.update(order.id, { status: 'canceled', canceledAt: Date.now(), updatedAt: Date.now() });
-    await addDiaryEntry({ entryType: 'pos_sale', description: `Order CANCELED: ${order.customerName}`, details: `$${order.total.toFixed(2)}`, date: formatDateShort(today()) });
-    toast.success('Order canceled');
+    try {
+      await db.posOrders.update(order.id, { status: 'canceled', canceledAt: Date.now(), updatedAt: Date.now() });
+      await addDiaryEntry({ entryType: 'pos_sale', description: `Order CANCELED: ${order.customerName}`, details: `$${order.total.toFixed(2)}`, date: formatDateShort(today()) });
+      toast.success('Order canceled');
+    } catch (e) {
+      console.error('[pos] order cancel failed', { id: order.id, e });
+      toast.error('Cancel failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   function openEditOrder(order: PosOrder) {
@@ -196,10 +207,6 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
   }
 
   function handleQuoteImage(order: PosOrder) {
-    setQuoteTarget(order);
-  }
-
-  async function handleDownloadQuote(order: PosOrder) {
     setQuoteTarget(order);
   }
 

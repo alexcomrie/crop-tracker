@@ -6,11 +6,12 @@ export function useCrops(filter?: string) {
   return useLiveQuery(async () => {
     let query = db.crops.toCollection();
     const all = await query.toArray();
-    if (!filter || filter === 'All') return all.filter(c => c.status !== 'Deleted');
+    if (!filter || filter === 'All') return all.filter(c => c.status !== 'Deleted' && c.status !== 'Archived');
     if (filter === 'Deleted') return all.filter(c => c.status === 'Deleted');
     if (filter === 'Active') return all.filter(c => c.status === 'Active');
     if (filter === 'Harvested') return all.filter(c => c.status === 'Harvested');
-    return all.filter(c => c.plantStage === filter && c.status !== 'Deleted');
+    if (filter === 'Archived') return all.filter(c => c.status === 'Archived');
+    return all.filter(c => c.plantStage === filter && c.status !== 'Deleted' && c.status !== 'Archived');
   }, [filter]);
 }
 

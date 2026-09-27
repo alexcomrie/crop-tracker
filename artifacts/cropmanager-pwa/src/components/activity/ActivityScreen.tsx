@@ -1,13 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Plus, X, Check, Clock, Trash2 } from 'lucide-react';
+import { ChevronLeft, Clock, Trash2 } from 'lucide-react';
 import { generateId } from '../../lib/ids';
-import { formatDateShort, today } from '../../lib/dates';
+import { formatDateShort, today, addDays, parseDate } from '../../lib/dates';
 import { addDiaryEntry } from '../../lib/diary';
-import type { Crop } from '../../types';
+import { toast } from 'sonner';
 
 const ACTIVITY_TYPES = [
   { id: 'watering', label: 'Watering', icon: '💧' },
@@ -44,9 +44,10 @@ interface Activity {
 }
 
 export function ActivityScreen({ onClose }: { onClose: () => void }) {
-  const activitiesData = useLiveQuery(() => 
-    db.activities.orderBy('date').reverse().toArray()
-  );
+  const activitiesData = useLiveQuery(async () => {
+    const all = await db.activities.orderBy('updatedAt').reverse().limit(200).toArray();
+    return all.sort((a,b)=> (parseDate(b.date)?.getTime()||0) - (parseDate(a.date)?.getTime()||0));
+  });
   const activities = activitiesData ?? [];
   const isLoadingActivities = activitiesData === undefined;
 
@@ -66,70 +67,81 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
+    if (form.types.length===0) { toast.error('Select at least one type'); return; }
     setSaving(true);
-    const reminderDate = form.reminderDays 
-      ? formatDateShort(new Date(today().getTime() + form.reminderDays * 86400000))
-      : null;
-    
-    const activity: Activity = {
-      id: generateId('ACT'),
-      date: form.date || formatDateShort(today()),
-      type: form.types.join(','),
-      product: form.product,
-      notes: form.notes,
-      reminderDays: form.reminderDays,
-      reminderDate,
-      cropIds: form.cropIds,
-      updatedAt: Date.now(),
-    };
-    
-    await db.activities.add(activity);
-    const typeLabels = form.types.map(t => ACTIVITY_TYPES.find(at => at.id === t)?.label || t).join(', ');
-    await addDiaryEntry({
-      entryType: 'activity_log',
-      cropId: 'activity',
-      cropName: typeLabels,
-      description: `Activity: ${typeLabels}${form.product ? ` — ${form.product}` : ''}`,
-      details: form.notes || '',
-      date: form.date || formatDateShort(today()),
-    });
+    try {
+      const reminderDate = form.reminderDays
+        ? formatDateShort(addDays(today(), form.reminderDays))
+        : null;
 
-    // Update crops with fertilizer tracking if applicable
-    if (form.types.includes('fertilizer') && form.cropIds.length > 0 && form.reminderDays) {
-      const nextDate = new Date(today().getTime() + form.reminderDays * 86400000);
-      for (const cropId of form.cropIds) {
-        await db.crops.update(cropId, {
+      const activity: Activity = {
+        id: generateId('ACT'),
+        date: form.date || formatDateShort(today()),
+        type: form.types.join(','),
+        product: form.product,
+        notes: form.notes,
+        reminderDays: form.reminderDays,
+        reminderDate,
+        cropIds: form.cropIds,
+        updatedAt: Date.now(),
+      };
+
+      await db.activities.add(activity);
+      const typeLabels = form.types.map(t => ACTIVITY_TYPES.find(at => at.id === t)?.label || t).join(', ');
+      await addDiaryEntry({
+        entryType: 'activity_log',
+        cropId: 'activity',
+        cropName: typeLabels,
+        description: `Activity: ${typeLabels}${form.product ? ` — ${form.product}` : ''}`,
+        details: form.notes || '',
+        date: form.date || formatDateShort(today()),
+      });
+
+      // Update crops with fertilizer tracking if applicable (single bulk op)
+      if (form.types.includes('fertilizer') && form.cropIds.length > 0 && form.reminderDays) {
+        const nextDate = addDays(today(), form.reminderDays);
+        await db.crops.where('id').anyOf(form.cropIds).modify({
           fertilizerType: form.product || 'Activity Log',
           fertilizerDays: form.reminderDays,
           nextFertilizerDate: formatDateShort(nextDate),
           updatedAt: Date.now(),
         });
       }
+
+      setView('list');
+      setForm({
+        date: formatDateShort(today()),
+        types: [],
+        product: '',
+        notes: '',
+        reminderDays: null,
+        cropIds: [],
+      });
+      toast.success('Activity saved');
+    } catch (e) {
+      console.error('[activity] save failed', { e });
+      toast.error('Could not save activity: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
     }
-    
-    setSaving(false);
-    setView('list');
-    setForm({
-      date: formatDateShort(today()),
-      types: [],
-      product: '',
-      notes: '',
-      reminderDays: null,
-      cropIds: [],
-    });
   }
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this activity?')) {
-      await db.activities.delete(id);
+      try {
+        await db.activities.delete(id);
+      } catch (e) {
+        console.error('[activity] delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 
-  const formatActivityDate = (iso: string) => {
-    if (!iso) return '';
-    const [y, m, d] = iso.split('-').map(Number);
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${d} ${months[m-1]} ${y}`;
+  const formatActivityDate = (val: string) => {
+    if (!val) return '';
+    const d = parseDate(val);
+    if (!d) return val;
+    return formatDateShort(d);
   };
 
   return (

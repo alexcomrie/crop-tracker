@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Bell, CheckCircle2, Clock, Trash2, Plus, ChevronLeft } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Trash2, Plus } from 'lucide-react';
 import { markReminderDone } from '../hooks/useReminders';
+import { EmptyState } from '../components/shared/EmptyState';
+import { toast } from 'sonner';
 import { generateId } from '../lib/ids';
-import { formatDateShort, today } from '../lib/dates';
-import { ROUTES } from '../lib/routes';
+import { formatDateShort, parseDate, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
 
 
 const REM_TYPES = [
@@ -24,10 +24,17 @@ const REM_TYPES = [
 ];
 
 export function RemindersScreen() {
-  const navigate = useNavigate();
-  const remindersData = useLiveQuery(() => 
-    db.reminders.orderBy('sendDate').reverse().toArray()
-  );
+  const remindersData = useLiveQuery(async () => {
+    const all = await db.reminders.toArray();
+    return all.sort((a, b) => {
+      // Stored dates are dd-MMM-yyyy: parse chronologically, never `new Date(str)`
+      const ta = a.sendDate ? parseDate(a.sendDate)?.getTime() ?? 0 : 0;
+      const tb = b.sendDate ? parseDate(b.sendDate)?.getTime() ?? 0 : 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return tb - ta;
+    });
+  });
   const reminders = remindersData ?? [];
   const isLoading = remindersData === undefined;
 
@@ -39,7 +46,7 @@ export function RemindersScreen() {
   const [notes, setNotes] = useState('');
 
   const handleSave = async () => {
-    if (!plant || !date) return;
+    if (!plant.trim() || !date) { toast.error('Enter a plant and date first'); return; }
     const rem = {
       id: generateId('REM'),
       type,
@@ -52,7 +59,13 @@ export function RemindersScreen() {
       chatId: '', // Will be filled by system if needed
       updatedAt: Date.now(),
     };
-    await db.reminders.add(rem);
+    try {
+      await db.reminders.add(rem);
+    } catch (e) {
+      console.error('[reminders] add failed', { rem, e });
+      toast.error('Could not save reminder: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     setShowForm(false);
     setPlant('');
     setProduct('');
@@ -61,24 +74,23 @@ export function RemindersScreen() {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this reminder?')) {
-      await db.reminders.delete(id);
+      try {
+        await db.reminders.delete(id);
+      } catch (e) {
+        console.error('[reminders] delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   };
 
   return (
-    <div className="pb-24">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center gap-2">
-        <div className="flex-1">
-          <h1 className="font-bold text-lg flex items-center gap-2">
-            <Bell className="w-5 h-5 text-purple-600" />
-            Reminders Queue
-          </h1>
-          <p className="text-[10px] text-gray-500 font-semibold uppercase mt-1">Manual & System Alerts</p>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+    <div className="min-h-screen bg-gray-50 pb-24 pt-2">
+      {/* Header actions (title lives in TopBar) */}
+      <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center justify-end gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={showForm ? 'Close reminder form' : 'New reminder'}
           onClick={() => setShowForm(!showForm)}
           className={`h-9 w-9 rounded-lg border border-gray-100 shadow-sm transition-transform ${showForm ? 'rotate-45 text-red-500 bg-red-50' : 'text-purple-600 bg-purple-50'}`}
         >
@@ -111,7 +123,7 @@ export function RemindersScreen() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Due Date</label>
-                  <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                  <Input type="date" value={toInputDateStr(date)} onChange={e => setDate(fromInputDateStr(e.target.value))} />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -136,10 +148,7 @@ export function RemindersScreen() {
               <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : reminders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center opacity-40">
-              <Bell className="w-12 h-12 mb-3" />
-              <p className="font-semibold">No reminders found</p>
-            </div>
+            <EmptyState icon={<Bell className="w-12 h-12" />} title="No reminders found" />
           ) : (
             reminders.map(r => (
               <div 

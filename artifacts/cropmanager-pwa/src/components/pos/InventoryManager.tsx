@@ -50,25 +50,41 @@ export function InventoryManager({ onClose }: Props) {
   async function handleSave() {
     if (!name) { toast.error('Item name is required'); return; }
     const now = Date.now();
-    if (editItem) {
-      await db.posInventory.update(editItem.id, { name, category, unit, unitPrice, updatedAt: now });
-      toast.success(`"${name}" updated`);
-    } else {
-      await db.posInventory.add({ id: generateId('INV'), name, category, unit, unitPrice, isActive: true, createdAt: now, updatedAt: now });
-      toast.success(`"${name}" added to inventory`);
+    try {
+      if (editItem) {
+        await db.posInventory.update(editItem.id, { name, category, unit, unitPrice, updatedAt: now });
+        toast.success(`"${name}" updated`);
+      } else {
+        await db.posInventory.add({ id: generateId('INV'), name, category, unit, unitPrice, isActive: true, createdAt: now, updatedAt: now });
+        toast.success(`"${name}" added to inventory`);
+      }
+    } catch (e) {
+      console.error('[pos] inventory save failed', { name, e });
+      toast.error('Could not save item: ' + (e instanceof Error ? e.message : String(e)));
+      return;
     }
     resetForm();
   }
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this item?')) {
-      await db.posInventory.delete(id);
-      toast.success('Item deleted');
+      try {
+        await db.posInventory.delete(id);
+        toast.success('Item deleted');
+      } catch (e) {
+        console.error('[pos] inventory delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 
   async function handleToggleActive(item: PosInventoryItem) {
-    await db.posInventory.update(item.id, { isActive: !item.isActive, updatedAt: Date.now() });
+    try {
+      await db.posInventory.update(item.id, { isActive: !item.isActive, updatedAt: Date.now() });
+    } catch (e) {
+      console.error('[pos] inventory toggle failed', { id: item.id, e });
+      toast.error('Update failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   async function importFromCrop(crop: typeof crops[0]) {
@@ -79,17 +95,23 @@ export function InventoryManager({ onClose }: Props) {
       return;
     }
     const now = Date.now();
-    await db.posInventory.add({
-      id: generateId('INV'),
-      name,
-      category: crop.plantStage || 'General',
-      unit: 'each',
-      unitPrice: 0,
-      isActive: true,
-      sourceCropId: crop.id,
-      createdAt: now,
-      updatedAt: now,
-    });
+    try {
+      await db.posInventory.add({
+        id: generateId('INV'),
+        name,
+        category: crop.plantStage || 'General',
+        unit: 'each',
+        unitPrice: 0,
+        isActive: true,
+        sourceCropId: crop.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    } catch (e) {
+      console.error('[pos] import from crop failed', { name, e });
+      toast.error('Import failed: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     toast.success(`"${name}" imported from crops`);
   }
 

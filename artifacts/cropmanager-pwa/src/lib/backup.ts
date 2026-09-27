@@ -1,9 +1,15 @@
 import db from '../db/db';
 
+const BACKUP_VERSION = 7;
+
 export async function exportJsonBackup(): Promise<string> {
-  const [crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
+  const [
+    crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
-    successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries] = await Promise.all([
+    successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
+    posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
+    microModels, observationLogs, personalCropDb,
+  ] = await Promise.all([
     db.crops.toArray(),
     db.propagations.toArray(),
     db.reminders.toArray(),
@@ -20,55 +26,51 @@ export async function exportJsonBackup(): Promise<string> {
     db.farmLands.toArray(),
     db.farmAreas.toArray(),
     db.diaryEntries.toArray(),
+    db.posSales.toArray(),
+    db.posCustomers.toArray(),
+    db.posSettings.toArray(),
+    db.posInventory.toArray(),
+    db.posOrders.toArray(),
+    db.posHeldReceipts.toArray(),
+    db.microModels.toArray(),
+    db.observationLogs.toArray(),
+    db.personalCropDb.toArray(),
   ]);
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
-    version: 6,
+    version: BACKUP_VERSION,
     crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
+    posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
+    microModels, observationLogs, personalCropDb,
   }, null, 2);
 }
 
 type BackupPayload = {
   exportedAt?: string;
   version?: number;
-  crops?: any[];
-  propagations?: any[];
-  reminders?: any[];
-  stageLogs?: any[];
-  harvestLogs?: any[];
-  treatmentLogs?: any[];
-  cropDbAdjustments?: any[];
-  propDbAdjustments?: any[];
-  batchPlantingLogs?: any[];
-  cropSearchLogs?: any[];
-  successionGaps?: any[];
-  activities?: any[];
-  ledgerEntries?: any[];
-  farmLands?: any[];
-  farmAreas?: any[];
-  diaryEntries?: any[];
+  [key: string]: unknown;
 };
 
-const TABLES: { key: keyof BackupPayload; name: string; clear: () => Promise<void>; add: (items: any[]) => Promise<void> }[] = [
-  { key: 'crops', name: 'crops', clear: () => db.crops.clear(), add: items => db.crops.bulkAdd(items) },
-  { key: 'propagations', name: 'propagations', clear: () => db.propagations.clear(), add: items => db.propagations.bulkAdd(items) },
-  { key: 'reminders', name: 'reminders', clear: () => db.reminders.clear(), add: items => db.reminders.bulkAdd(items) },
-  { key: 'stageLogs', name: 'stageLogs', clear: () => db.stageLogs.clear(), add: items => db.stageLogs.bulkAdd(items) },
-  { key: 'harvestLogs', name: 'harvestLogs', clear: () => db.harvestLogs.clear(), add: items => db.harvestLogs.bulkAdd(items) },
-  { key: 'treatmentLogs', name: 'treatmentLogs', clear: () => db.treatmentLogs.clear(), add: items => db.treatmentLogs.bulkAdd(items) },
-  { key: 'cropDbAdjustments', name: 'cropDbAdjustments', clear: () => db.cropDbAdjustments.clear(), add: items => db.cropDbAdjustments.bulkAdd(items) },
-  { key: 'propDbAdjustments', name: 'propDbAdjustments', clear: () => db.propDbAdjustments.clear(), add: items => db.propDbAdjustments.bulkAdd(items) },
-  { key: 'batchPlantingLogs', name: 'batchPlantingLogs', clear: () => db.batchPlantingLogs.clear(), add: items => db.batchPlantingLogs.bulkAdd(items) },
-  { key: 'cropSearchLogs', name: 'cropSearchLogs', clear: () => db.cropSearchLogs.clear(), add: items => db.cropSearchLogs.bulkAdd(items) },
-  { key: 'successionGaps', name: 'successionGaps', clear: () => db.successionGaps.clear(), add: items => db.successionGaps.bulkAdd(items) },
-  { key: 'activities', name: 'activities', clear: () => db.activities.clear(), add: items => db.activities.bulkAdd(items) },
-  { key: 'ledgerEntries', name: 'ledgerEntries', clear: () => db.ledgerEntries.clear(), add: items => db.ledgerEntries.bulkAdd(items) },
-  { key: 'farmLands', name: 'farmLands', clear: () => db.farmLands.clear(), add: items => db.farmLands.bulkAdd(items) },
-  { key: 'farmAreas', name: 'farmAreas', clear: () => db.farmAreas.clear(), add: items => db.farmAreas.bulkAdd(items) },
-  { key: 'diaryEntries', name: 'diaryEntries', clear: () => db.diaryEntries.clear(), add: items => db.diaryEntries.bulkAdd(items) },
-];
+const TABLE_NAMES = [
+  'crops', 'propagations', 'reminders', 'stageLogs', 'harvestLogs', 'treatmentLogs',
+  'cropDbAdjustments', 'propDbAdjustments', 'batchPlantingLogs', 'cropSearchLogs',
+  'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
+  'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
+  'microModels', 'observationLogs', 'personalCropDb',
+] as const;
+
+function getTable(name: (typeof TABLE_NAMES)[number]) {
+  return (db as unknown as Record<string, { clear: () => Promise<void>; bulkPut: (items: unknown[]) => Promise<unknown> } | undefined>)[name];
+}
+
+function rowKey(row: unknown): string | number | null {
+  if (typeof row !== 'object' || row === null) return null;
+  const r = row as Record<string, unknown>;
+  const id = r['id'] ?? r['key'];
+  return typeof id === 'string' || typeof id === 'number' ? id : null;
+}
 
 export async function importJsonBackupFromString(json: string): Promise<{ counts: Record<string, number> }> {
   let data: BackupPayload;
@@ -77,15 +79,33 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
   } catch {
     throw new Error('Invalid JSON in backup file');
   }
-  const counts: Record<string, number> = {};
-  for (const table of TABLES) {
-    const items = data[table.key];
-    if (Array.isArray(items) && items.length > 0) {
-      await table.clear();
-      await table.add(items);
-      counts[table.name] = items.length;
-    }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw new Error('Invalid backup payload');
   }
+  if (data.version !== undefined && data.version !== 6 && data.version !== BACKUP_VERSION) {
+    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6 or ${BACKUP_VERSION})`);
+  }
+  const counts: Record<string, number> = {};
+  const tables = TABLE_NAMES.map(name => getTable(name)).filter((t): t is NonNullable<typeof t> => !!t);
+  // Single transaction: all-or-nothing restore. Tables present in the backup
+  // are mirrored (cleared then re-added, so empty arrays clear stale rows);
+  // tables absent from the backup are left untouched. bulkPut (upsert) is used
+  // so duplicate ids merge instead of throwing BulkError.
+  await db.transaction('rw', tables as never, async () => {
+    for (const name of TABLE_NAMES) {
+      const table = getTable(name);
+      if (!table) continue;
+      const raw = data[name];
+      if (!Array.isArray(raw)) continue; // table absent from backup → leave local rows alone
+      const items = raw.filter(r => rowKey(r) !== null);
+      await table.clear();
+      if (items.length > 0) {
+        // bulkPut (upsert) inside the transaction: duplicate ids merge instead of throwing BulkError
+        await table.bulkPut(items);
+      }
+      counts[name] = items.length;
+    }
+  });
   return { counts };
 }
 

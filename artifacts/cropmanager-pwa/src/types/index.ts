@@ -92,6 +92,48 @@ export type FertProfile = FertCropEntry | {
   _meta?: Partial<FertMeta>;
 };
 
+export interface ObservationLog {
+  id: string;
+  cropId: string;
+  date: string;
+  text: string;
+  photos?: string[];
+  updatedAt: number;
+}
+
+/**
+ * Fruit/crop growth tracking (e.g. days since a watermelon was pollinated).
+ * A crop can have multiple active trackings, each identified by a physical tag number.
+ */
+export interface Tracking {
+  id: string;
+  cropId: string;
+  cropName: string;
+  tagNumber: string;
+  label: string;
+  startDate: string;
+  targetDays: number;
+  notes: string;
+  status: 'active' | 'done';
+  endDate: string;
+  updatedAt: number;
+}
+
+export interface PersonalCropData {
+  key: string;
+  displayName: string;
+  plantType: string;
+  growingTimeDays: number;
+  transplantDays: number | null;
+  growingFromTransplant: number | null;
+  harvestInterval: number;
+  batchOffsetDays: number;
+  germinationMin: number;
+  germinationMax: number;
+  sampleCount: number;
+  updatedAt: number;
+}
+
 export interface Crop {
   id: string;
   cropName: string;
@@ -101,10 +143,12 @@ export interface Crop {
   plantingDate: string;
   transplantDateScheduled: string;
   transplantDateActual: string;
+  upPottedDate?: string;
   germinationDate: string;
   harvestDateEstimated: string;
   harvestDateActual: string;
   isContinuous: boolean;
+  autoHold?: boolean;
   harvestFrequency?: number; // Days between harvests
   numPlots?: number;         // Calculated number of plots
   batchOffset?: number;      // Days between plantings
@@ -118,6 +162,7 @@ export interface Crop {
   fertilizerDays: number;    // Days between fertilizer applications
   nextFertilizerDate: string;
   status: string;
+  archivedFrom?: string;
   notes: string;
   daysSeedGerm: number;
   daysGermTransplant: number;
@@ -137,6 +182,7 @@ export interface Propagation {
   actualRootingDate: string;
   daysToRootActual: number;
   status: string;
+  archivedFrom?: string;
   telegramChatId: string;
   updatedAt: number;
 }

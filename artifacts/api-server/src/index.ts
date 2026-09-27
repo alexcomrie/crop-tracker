@@ -1,12 +1,10 @@
 import "dotenv/config";
 import app from "./app";
 
-const rawPort = process.env["PORT"];
+const rawPort = process.env["PORT"] ?? "5001";
 
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+if (!process.env["PORT"]) {
+  console.warn("PORT environment variable not provided, defaulting to 5001.");
 }
 
 const port = Number(rawPort);

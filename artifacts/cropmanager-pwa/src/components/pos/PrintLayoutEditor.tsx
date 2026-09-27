@@ -76,8 +76,13 @@ export function PrintLayoutEditor({ onBack }: Props) {
       pointsRedemptionRate,
       testMode,
     };
-    await db.posSettings.put(data);
-    toast.success('Print settings saved');
+    try {
+      await db.posSettings.put(data);
+      toast.success('Print settings saved');
+    } catch (e) {
+      console.error('[pos] print settings save failed', { e });
+      toast.error('Could not save settings: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {

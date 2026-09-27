@@ -1,5 +1,5 @@
 import React from 'react';
-import { MapContainer, TileLayer, Polygon, GeoJSON, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { FarmLand, FarmArea } from '../../types';
@@ -42,7 +42,7 @@ function getPlotColor(index: number): string {
 }
 
 function GpsMarker() {
-  const map = useMap();
+  useMap();
   const [position, setPosition] = React.useState<[number, number] | null>(null);
 
   React.useEffect(() => {

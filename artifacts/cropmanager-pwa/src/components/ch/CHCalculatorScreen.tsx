@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import db from '../../db/db';
 import { useAppStore } from '../../store/useAppStore';
-import { resolveCropData, getNonAliasCrops } from '../../lib/cropDb';
+import { getNonAliasCrops } from '../../lib/cropDb';
+import { MICRO_MODEL_ID } from '../../lib/micro-crop/index';
+import { loadModel, predictBatchOffsetDays } from '../../lib/micro-crop/inference';
 
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
@@ -24,6 +28,18 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
   const [freqDays, setFreqDays] = useState(7);
   const [plotArea, setPlotArea] = useState(400);
   const [startDate, setStartDate] = useState(todayISO());
+
+  // Tinygpt autonomous rebuild: learned data gathered from logged crops.
+  // Foundation values stay as the base; personal + micro data adjust the plan over time.
+  const personalEntry = useLiveQuery(
+    () => selectedKey ? db.personalCropDb.get(selectedKey.toLowerCase()).catch(() => null) : undefined,
+    [selectedKey]
+  ) ?? null;
+  const cropAdjustments = useLiveQuery(
+    () => selectedKey ? db.cropDbAdjustments.where('cropKey').equals(selectedKey.toLowerCase()).toArray().catch(() => []) : [],
+    [selectedKey]
+  ) ?? [];
+  const microRow = useLiveQuery(() => db.microModels.get(MICRO_MODEL_ID).catch(() => null), []) ?? null;
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -56,31 +72,54 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
     if (!selectedKey) return null;
     const val = cropDb[selectedKey];
     if (!val || 'alias' in val) return null;
+    // Foundation info (unchanged base)
     const growDays    = val.growing_time_days || 60;
     const harvestWks  = val.number_of_weeks_harvest || 1;
     const harvestDays = harvestWks * 7;
     const harvestIntv = val.harvest_interval || 7;
     const isMulti     = harvestWks > 1;
+    // Learned adjustments from gathered crop data (personal DB + scalar adjustments + micro model)
+    const personal = (personalEntry as unknown as { growingTimeDays?: number; sampleCount?: number } | null);
+    const learnedSamples = personal?.sampleCount ?? 0;
+    const learnedGrowDays = learnedSamples >= 2 && (personal?.growingTimeDays ?? 0) > 0
+      ? Math.round(personal!.growingTimeDays!)
+      : growDays;
+    const growAdj = (cropAdjustments as unknown as { field?: string; yourAverage?: number; sampleCount?: number; useCustom?: string }[])
+      .find(a => (a.field === 'growing_time_days' || a.field === 'growing_from_transplant') && (a.sampleCount ?? 0) > 0) ?? null;
+    let microBatch: number | null = null;
+    try {
+      const micro = microRow as unknown as { serialized?: Record<string, number[][]>; config?: unknown; itos?: string[] } | null;
+      if (micro?.serialized && micro?.config && micro?.itos) {
+        const model = loadModel(micro.serialized, micro.config as never, micro.itos ?? []);
+        const predicted = predictBatchOffsetDays(model, selectedKey.toLowerCase(), '');
+        if (predicted && predicted > 3 && predicted < 60) microBatch = predicted;
+      }
+    } catch { microBatch = null; }
+    // Effective plan: foundation stays, learned data overrides when available
+    const effGrowDays = learnedGrowDays;
     let batchOffset: number;
-    if (!isMulti) {
-      batchOffset = freqDays;
-    } else {
+    let batchSource: 'micro' | 'db' | 'calc';
+    if (microBatch) { batchOffset = microBatch; batchSource = 'micro'; }
+    else if (val.batch_offset_days && val.batch_offset_days > 0) { batchOffset = val.batch_offset_days; batchSource = 'db'; }
+    else if (!isMulti) { batchOffset = freqDays; batchSource = 'calc'; }
+    else {
       const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
       batchOffset = Math.max(naturalOffset, freqDays);
+      batchSource = 'calc';
     }
     let numBatches: number;
-    if (!isMulti) numBatches = Math.ceil(growDays / batchOffset);
+    if (!isMulti) numBatches = Math.ceil(effGrowDays / batchOffset);
     else numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
     const subplotArea  = Math.round((plotArea / numBatches) * 10) / 10;
-    const cycleDays    = isMulti ? growDays + harvestDays : growDays;
+    const cycleDays    = isMulti ? effGrowDays + harvestDays : effGrowDays;
     const startDateObj = new Date(startDate + 'T00:00:00');
-    const firstHarvestDate = new Date(startDateObj.getTime() + growDays * 86400000);
-    const waitWeeks    = Math.ceil(growDays / 7);
-    const GRID_WEEKS = Math.min(40, Math.ceil((growDays + harvestDays + batchOffset * numBatches) / 7) + 2);
+    const firstHarvestDate = new Date(startDateObj.getTime() + effGrowDays * 86400000);
+    const waitWeeks    = Math.ceil(effGrowDays / 7);
+    const GRID_WEEKS = Math.min(40, Math.ceil((effGrowDays + harvestDays + batchOffset * numBatches) / 7) + 2);
     const gridData: string[][] = [];
     for (let b = 0; b < numBatches; b++) {
       const plantWeek   = Math.floor((b * batchOffset) / 7);
-      const harvestWeek = Math.floor((b * batchOffset + growDays) / 7);
+      const harvestWeek = Math.floor((b * batchOffset + effGrowDays) / 7);
       const endWeek     = isMulti ? Math.floor((b * batchOffset + cycleDays) / 7) : harvestWeek + 1;
       const row: string[] = [];
       for (let w = 0; w < GRID_WEEKS; w++) {
@@ -92,8 +131,8 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
       }
       gridData.push(row);
     }
-    return { val, isMulti, growDays, harvestWks, harvestDays, harvestIntv, batchOffset, numBatches, subplotArea, waitWeeks, startDateObj, firstHarvestDate, GRID_WEEKS, gridData };
-  }, [selectedKey, cropDb, freqDays, plotArea, startDate]);
+    return { val, isMulti, growDays, effGrowDays, harvestWks, harvestDays, harvestIntv, batchOffset, batchSource, numBatches, subplotArea, waitWeeks, startDateObj, firstHarvestDate, GRID_WEEKS, gridData, learnedSamples, microBatch, growAdj };
+  }, [selectedKey, cropDb, freqDays, plotArea, startDate, personalEntry, cropAdjustments, microRow]);
 
   return (
     <div className="absolute inset-0 bg-[#f5f5f0] flex flex-col z-[60] animate-in slide-in-from-right duration-300 overflow-y-auto min-h-0">
@@ -140,6 +179,9 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
           <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2">
             <button onClick={() => setStep('select')} className="w-7 h-7 rounded-lg border bg-[#f9f9f6] text-gray-600 flex items-center justify-center">‹</button>
             <div className="text-[14px] font-semibold flex-1">{result.val.display_name}</div>
+            {result.learnedSamples >= 2 && (
+              <span className="text-[11px] font-semibold px-2 py-1 rounded-[6px] bg-[#e8f5e8] text-[#2d6a2d]">🧠 Learned ×{result.learnedSamples}</span>
+            )}
             <span className={`text-[11px] font-semibold px-2 py-1 rounded-[6px] ${result.isMulti ? 'bg-[#e8f5e8] text-[#2d6a2d]' : 'bg-[#fef3c7] text-[#d97706]'}`}>{result.isMulti ? 'Multi harvest' : 'Single harvest'}</span>
           </div>
 
@@ -197,7 +239,11 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Planting method</span><span className="text-[13px] font-semibold">{result.val.planting_method || '—'}</span></div>
                 {result.val.transplant_days != null && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Transplant at</span><span className="text-[13px] font-semibold">{result.val.transplant_days} days</span></div>}
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Batch offset (DB)</span><span className="text-[13px] font-semibold">{result.val.batch_offset_days}</span></div>
-                <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Batch offset (used)</span><span className="text-[13px] font-semibold text-[#2d6a2d]">{result.batchOffset}</span></div>
+                <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Batch offset (used)</span><span className="text-[13px] font-semibold text-[#2d6a2d]">{result.batchOffset}{result.batchSource === 'micro' ? ' 🧠' : ''}</span></div>
+                <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Growing time (learned)</span><span className="text-[13px] font-semibold">{result.learnedSamples >= 2 ? `${result.effGrowDays} days ×${result.learnedSamples}` : `— (${result.learnedSamples}/2 grows)`}</span></div>
+                {result.microBatch != null && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Tinygpt offset</span><span className="text-[13px] font-semibold">{result.microBatch}d</span></div>}
+                {result.growAdj && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Your average</span><span className="text-[13px] font-semibold">{result.growAdj.yourAverage}d ×{result.growAdj.sampleCount}</span></div>}
+                <p className="text-[11px] text-[#888]">Foundation data stays as the base — the plan auto-adjusts as you log harvests.</p>
               </div>
             </div>
 

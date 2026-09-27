@@ -23,7 +23,7 @@ function getMonthDays(year: number, month: number): Date[] {
 
 export function CalendarScreen() {
   const [view, setView] = useState<ViewMode>('week');
-  const [todayDate] = useState(() => new Date());
+  const todayDate = today();
   const todayStr = formatDateShort(todayDate);
 
   // Week state
@@ -37,13 +37,24 @@ export function CalendarScreen() {
   const loading = allActivities === undefined;
   const activities = allActivities ?? [];
 
-  // Build a Set of date strings that have activities
+  // Build a Set of date strings that have activities + a date→activities
+  // lookup so day cells are O(1) instead of O(N) filter scans
   const activityDates = useMemo(() => {
     const set = new Set<string>();
     for (const a of activities) {
       if (a.date) set.add(a.date);
     }
     return set;
+  }, [activities]);
+  const activitiesByDate = useMemo(() => {
+    const map = new Map<string, typeof activities>();
+    for (const a of activities) {
+      if (!a.date) continue;
+      const arr = map.get(a.date) ?? [];
+      arr.push(a);
+      map.set(a.date, arr);
+    }
+    return map;
   }, [activities]);
 
   // Week view data
@@ -56,7 +67,6 @@ export function CalendarScreen() {
 
   // Month view data
   const monthDays = useMemo(() => getMonthDays(viewYear, viewMonth), [viewYear, viewMonth]);
-  const firstMonthDay = new Date(viewYear, viewMonth, 1);
 
   // Navigation
   const goNext = () => {
@@ -81,13 +91,13 @@ export function CalendarScreen() {
     : `${viewYear}`;
 
   return (
-    <div className="pb-24">
+    <div className="min-h-screen bg-gray-50 pb-24 pt-2">
       {/* View Toggle + Navigation */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-2">
-          <button onClick={goPrev} className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+          <button onClick={goPrev} aria-label="Previous period" className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
           <button onClick={() => { setWeekOffset(0); setViewYear(todayDate.getFullYear()); setViewMonth(todayDate.getMonth()); }} className="text-sm font-semibold text-gray-800 hover:text-green-700">{viewTitle}</button>
-          <button onClick={goNext} className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
+          <button onClick={goNext} aria-label="Next period" className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronRight className="w-5 h-5 text-gray-600" /></button>
         </div>
         <div className="flex px-4 pb-2 gap-1">
           {(['week', 'month', 'year'] as const).map((v) => (
@@ -125,7 +135,7 @@ export function CalendarScreen() {
                 </div>
                 {hasActivity ? (
                   <div className="space-y-1">
-                    {activities.filter(a => a.date === dayStr).map(a => (
+                    {(activitiesByDate.get(dayStr) ?? []).map(a => (
                       <div key={a.id} className="flex items-center gap-2 text-xs">
                         <span className="text-gray-700">{a.type}: {a.product || a.notes}</span>
                       </div>
@@ -181,7 +191,6 @@ export function CalendarScreen() {
           <div className="grid grid-cols-3 gap-4">
             {Array.from({ length: 12 }, (_, m) => {
               const days = getMonthDays(viewYear, m);
-              const first = days.find(d => d.getMonth() === m)!;
               const daysInMonth = days.filter(d => d.getMonth() === m);
               const activityCount = daysInMonth.filter(d => activityDates.has(formatDateShort(d))).length;
               return (

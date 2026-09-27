@@ -1,5 +1,4 @@
 import React from 'react';
-import { STAGE_COLORS } from '../../lib/stages';
 
 interface Stage {
   label: string;

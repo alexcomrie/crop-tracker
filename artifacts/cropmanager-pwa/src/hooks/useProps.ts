@@ -5,7 +5,8 @@ import type { Propagation } from '../types';
 export function useProps(filter?: string) {
   return useLiveQuery(async () => {
     const all = await db.propagations.toArray();
-    if (!filter || filter === 'All') return all;
+    if (!filter || filter === 'All') return all.filter(p => p.status !== 'Archived');
+    if (filter === 'Archived') return all.filter(p => p.status === 'Archived');
     return all.filter(p => p.status === filter);
   }, [filter]);
 }

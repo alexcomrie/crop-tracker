@@ -10,11 +10,8 @@ export function useTelegramReminders() {
   const todayStr = formatDateShort(today());
 
   const dueReminders = useLiveQuery(async () => {
-    return await db.reminders
-      .where('sendDate')
-      .equals(todayStr)
-      .and(r => !r.telegramSent)
-      .toArray();
+    const all = await db.reminders.where('sendDate').above('').toArray();
+    return all.filter(r => r.sendDate === todayStr && !r.telegramSent);
   }, [todayStr]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { format, parse, addDays as dfAddDays, differenceInDays, parseISO, isValid } from 'date-fns';
+import { format, addDays as dfAddDays, differenceInDays, parseISO, isValid } from 'date-fns';
 
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
@@ -54,6 +54,17 @@ export function formatDateShort(date: Date): string {
   return format(date, 'dd-MMM-yyyy');
 }
 
+/**
+ * Storage-safe variant of formatDateShort: never returns the 'N/A' sentinel.
+ * Use this for every IndexedDB write so invalid dates persist as `fallback`
+ * (default '') instead of the string 'N/A', which re-parses to null and
+ * silently corrupts downstream date math.
+ */
+export function formatDateStored(date: Date | null | undefined, fallback = ''): string {
+  if (!date || !isValid(date)) return fallback;
+  return format(date, 'dd-MMM-yyyy');
+}
+
 export function formatDateDisplay(date: Date): string {
   if (!date || !isValid(date)) return 'N/A';
   return format(date, 'EEE dd MMM yyyy');
@@ -69,6 +80,21 @@ export function daysBetween(a: Date, b: Date): number {
 
 export function toIsoDateStr(date: Date): string {
   return format(date, 'yyyy-MM-dd');
+}
+
+/** Convert a stored dd-MMM-yyyy string to yyyy-MM-dd for <input type="date">. */
+export function toInputDateStr(dateStr: string): string {
+  const d = parseDate(dateStr);
+  if (!d) return '';
+  return toIsoDateStr(d);
+}
+
+/** Convert a yyyy-MM-dd <input type="date"> value to stored dd-MMM-yyyy. Never returns 'N/A'. */
+export function fromInputDateStr(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  return formatDateStored(new Date(y, m - 1, d));
 }
 
 export function formatDateTime(date: Date): string {

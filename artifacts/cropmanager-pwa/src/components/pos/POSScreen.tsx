@@ -47,10 +47,10 @@ export default function POSScreen() {
   
   const [deliveryMethod, setDeliveryMethod] = useState<'print' | 'whatsapp' | 'both' | 'none'>('print');
   const [whatsappPhone, setWhatsappPhone] = useState('');
-  const [showWhatsAppInput, setShowWhatsAppInput] = useState(false);
+  const [, setShowWhatsAppInput] = useState(false);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
-  const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [, setReceiptImage] = useState<string | null>(null);
   const [holdName, setHoldName] = useState('');
   const [fulfillOrder, setFulfillOrder] = useState<PosOrder | null>(null);
   const [showHoldDialog, setShowHoldDialog] = useState(false);
@@ -330,13 +330,14 @@ export default function POSScreen() {
         });
       }
 
-      // Print receipt
+      // Print receipt (sale + ledger already committed above; print failure must not roll back)
       if (usePrint && printerConnected && bluetoothDevice) {
         try {
           const receiptData = buildSaleReceipt({ ...sale, items: cartItems.map(({ item }) => item) }, printSettings);
           await printViaBluetooth(bluetoothDevice, receiptData);
         } catch (e) {
-          toast.error('Print failed: ' + (e instanceof Error ? e.message : ''));
+          console.error('[pos] print failed (sale already saved)', { receiptNumber: nextReceiptNumber, e });
+          toast.error('Print failed (sale was saved): ' + (e instanceof Error ? e.message : ''));
         }
       }
 
@@ -352,6 +353,7 @@ export default function POSScreen() {
       clearCart();
       setShowCheckout(false);
     } catch (e) {
+      console.error('[pos] checkout failed', { e });
       toast.error('Checkout failed: ' + (e instanceof Error ? e.message : ''));
     }
     setSaving(false);

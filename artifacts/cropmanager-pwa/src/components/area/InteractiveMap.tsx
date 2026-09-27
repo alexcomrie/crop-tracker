@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FarmArea, FarmLand, GeoPoint } from '../../types';
-import { haversineMeters, calcArea, gpsToSvgAll, projectPoints } from '../../lib/geo';
+import { haversineMeters, calcArea, gpsToSvgAll, projectPoints, projectionFrame, unprojectPoint } from '../../lib/geo';
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
@@ -75,6 +75,10 @@ export function InteractiveMap({
   const dragging = useRef(false);
   const lastPos = useRef({ x: 0, y: 0 });
   const lastTouchDist = useRef(0);
+  // Pixels moved since pointer-down: clicks after a pan/drag are ignored (M3)
+  const movedPx = useRef(0);
+  // Single-finger touch tracking for tap-to-select on phones (M4)
+  const touchTap = useRef<{ x: number; y: number } | null>(null);
 
   const filteredMapData = searchTerm
     ? mapData
@@ -130,22 +134,13 @@ export function InteractiveMap({
   }, [editingPlotId, editingLandId]);
 
   const svgToGps = useCallback((svgX: number, svgY: number): GeoPoint | null => {
-    const valid = filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]).filter((p): p is GeoPoint[] => !!p && p.length > 0);
-    if (valid.length === 0) return null;
-    const flat = valid.flat();
-    const lats = flat.map(p => p.lat);
-    const lngs = flat.map(p => p.lng);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const latRange = (maxLat - minLat) || 0.0001;
-    const lngRange = (maxLng - minLng) || 0.0001;
-    const uw = CANVAS_W - 30;
-    const uh = CANVAS_H - 30;
-    const lng = minLng + ((svgX - 15) / uw) * lngRange;
-    const lat = maxLat - ((svgY - 15) / uh) * latRange;
-    return { lat, lng };
+    // Exact inverse of the shared uniform projection (M2)
+    const frame = projectionFrame(
+      filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]),
+      CANVAS_W, CANVAS_H, 15
+    );
+    if (!frame) return null;
+    return unprojectPoint(svgX, svgY, frame);
   }, [filteredMapData]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -156,6 +151,7 @@ export function InteractiveMap({
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     dragging.current = true;
+    movedPx.current = 0;
     lastPos.current = { x: e.clientX, y: e.clientY };
   }, []);
 
@@ -163,6 +159,7 @@ export function InteractiveMap({
     if (!dragging.current) return;
     const dx = e.clientX - lastPos.current.x;
     const dy = e.clientY - lastPos.current.y;
+    movedPx.current += Math.abs(dx) + Math.abs(dy);
     lastPos.current = { x: e.clientX, y: e.clientY };
     setPan(p => ({ x: p.x + dx, y: p.y + dy }));
   }, []);
@@ -172,11 +169,16 @@ export function InteractiveMap({
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       dragging.current = true;
+      movedPx.current = 0;
       lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      touchTap.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     } else if (e.touches.length === 2) {
+      touchTap.current = null;
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       lastTouchDist.current = Math.sqrt(dx * dx + dy * dy);
+    } else {
+      touchTap.current = null;
     }
   }, []);
 
@@ -185,6 +187,7 @@ export function InteractiveMap({
       const t = e.touches[0];
       const dx = t.clientX - lastPos.current.x;
       const dy = t.clientY - lastPos.current.y;
+      movedPx.current += Math.abs(dx) + Math.abs(dy);
       lastPos.current = { x: t.clientX, y: t.clientY };
       setPan(p => ({ x: p.x + dx, y: p.y + dy }));
     } else if (e.touches.length === 2) {
@@ -199,7 +202,17 @@ export function InteractiveMap({
     }
   }, []);
 
-  const handleTouchEnd = useCallback(() => { dragging.current = false; lastTouchDist.current = 0; }, []);
+  function handleTouchEnd(e: React.TouchEvent) {
+    dragging.current = false;
+    lastTouchDist.current = 0;
+    // Single-finger tap (not a pan/pinch) acts like a click for vertex select (M4)
+    const tap = touchTap.current;
+    touchTap.current = null;
+    if (tap && movedPx.current <= 8 && e.touches.length === 0 && !readOnly) {
+      handleTapAt(tap.x, tap.y, false);
+    }
+    movedPx.current = 0;
+  }
 
   function resetView() { setZoom(1); setPan({ x: 0, y: 0 }); setDistTool({ a: null, b: null }); setShowDist(false); setSelectedId(null); }
 
@@ -231,12 +244,19 @@ export function InteractiveMap({
   }
 
   function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
-    if (dragging.current || readOnly) return;
+    // Pan-end clicks must not select/move (M3)
+    if (dragging.current || movedPx.current > 5 || readOnly) { movedPx.current = 0; return; }
+    movedPx.current = 0;
+    handleTapAt(e.clientX, e.clientY, e.shiftKey);
+  }
+
+  function handleTapAt(clientX: number, clientY: number, additive: boolean) {
+    if (readOnly) return;
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const svgX = ((e.clientX - rect.left) / rect.width) * CANVAS_W;
-    const svgY = ((e.clientY - rect.top) / rect.height) * CANVAS_H;
+    const svgX = ((clientX - rect.left) / rect.width) * CANVAS_W;
+    const svgY = ((clientY - rect.top) / rect.height) * CANVAS_H;
     const unX = (svgX - pan.x) / zoom;
     const unY = (svgY - pan.y) / zoom;
 
@@ -259,7 +279,7 @@ export function InteractiveMap({
         const dx = unX - editingSvgPts[i].x;
         const dy = unY - editingSvgPts[i].y;
         if (dx * dx + dy * dy <= 100) {
-          const newSet = e.shiftKey
+          const newSet = additive
             ? (() => { const s = new Set(selectedPointIndices); if (s.has(i)) s.delete(i); else s.add(i); return s; })()
             : new Set([i]);
           setSelectedPointIndices(newSet);
@@ -349,8 +369,6 @@ export function InteractiveMap({
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
-    const svgX = ((e.clientX - rect.left) / rect.width) * CANVAS_W;
-    const svgY = ((e.clientY - rect.top) / rect.height) * CANVAS_H;
     const info: TooltipInfo = {
       type,
       x: e.clientX - rect.left,

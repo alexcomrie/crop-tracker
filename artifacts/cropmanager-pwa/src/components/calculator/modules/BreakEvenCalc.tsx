@@ -20,7 +20,7 @@ const DEFAULT_COSTS: CostLine[] = [
 export default function BreakEvenCalc() {
   const [costs, setCosts] = useState<CostLine[]>(DEFAULT_COSTS);
   const [pricePerUnit, setPrice] = useState(100);
-  const [unit, setUnit] = useState('lb');
+  const [unit] = useState('lb');
   const [targetUnits, setTarget] = useState(200);
 
   const totalCost = costs.reduce((s, c) => s + (c.amount || 0), 0);

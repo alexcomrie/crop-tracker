@@ -28,15 +28,19 @@ export default defineConfig({
         theme_color: "#2d6a2d",
         background_color: "#f0f7f0",
         display: "standalone",
-        scope: "/",
-        start_url: "/",
+        scope: basePath,
+        start_url: basePath,
         icons: [
           { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,json}"],
+        cacheId: "cropmanager",
+        cleanupOutdatedCaches: true,
+        // NOTE: data/*.json is served via runtimeCaching below, not precached,
+        // so foundation DB updates are never stuck behind an old precache.
+        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.open-meteo\.com\/.*/i,
@@ -48,10 +52,11 @@ export default defineConfig({
           },
           {
             urlPattern: /\/data\/(crop_database|fertilizer_schedule)\.json$/,
-            handler: "CacheFirst",
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "data-cache",
-              expiration: { maxEntries: 5, maxAgeSeconds: 86400 * 30 },
+              expiration: { maxEntries: 5, maxAgeSeconds: 86400 * 2 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],

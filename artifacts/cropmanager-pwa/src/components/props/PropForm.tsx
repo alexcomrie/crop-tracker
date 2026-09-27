@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useAppStore } from '../../store/useAppStore';
 import { generateId } from '../../lib/ids';
-import { formatDateShort, addDays, today } from '../../lib/dates';
+import { formatDateShort, parseDate, addDays, today } from '../../lib/dates';
 import { getRootingDays } from '../../lib/propagation';
 import { generatePropReminders } from '../../lib/reminders';
 import { addDiaryEntry } from '../../lib/diary';
@@ -39,11 +39,12 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
   }, [editProp]);
 
   const propAdjustments = useLiveQuery(() => db.propDbAdjustments.toArray(), []) ?? [];
-  const plantDate = editProp ? new Date(editProp.propagationDate) : (date ?? today());
+  const plantDate = editProp ? (parseDate(editProp.propagationDate) ?? today()) : (date ?? today());
 
   function reset() { setStep(1); setPlantName(''); setMethod(''); setNotes(''); }
 
   async function handleSave() {
+    if (!plantName.trim() || !method) { toast.error('Enter a plant name and method first'); return; }
     setSaving(true);
     try {
       const rootingDays = getRootingDays(plantName, method, propAdjustments, cropDb);
@@ -85,6 +86,9 @@ export function PropForm({ open, onClose, date, editProp }: PropFormProps) {
       reset();
       onClose();
       toast.success(editProp ? 'Propagation updated' : 'Propagation added');
+    } catch (e) {
+      console.error('[props] save failed', { plantName, method, e });
+      toast.error('Could not save propagation: ' + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSaving(false);
     }

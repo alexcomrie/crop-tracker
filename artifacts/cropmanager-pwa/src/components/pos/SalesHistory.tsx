@@ -3,9 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronLeft, Search, Trash2, Printer, Receipt } from 'lucide-react';
+import { ChevronLeft, Search, Trash2, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDateShort } from '../../lib/dates';
 
 interface Props {
   onBack: () => void;
@@ -13,7 +12,7 @@ interface Props {
 
 export function SalesHistory({ onBack }: Props) {
   const [search, setSearch] = useState('');
-  const sales = useLiveQuery(() => db.posSales.orderBy('createdAt').reverse().toArray(), []) ?? [];
+  const sales = useLiveQuery(() => db.posSales.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? [];
 
   const filtered = search
     ? sales.filter(s =>
@@ -25,8 +24,13 @@ export function SalesHistory({ onBack }: Props) {
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this sale?')) {
-      await db.posSales.delete(id);
-      toast.success('Sale deleted');
+      try {
+        await db.posSales.delete(id);
+        toast.success('Sale deleted');
+      } catch (e) {
+        console.error('[pos] sale delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import type { Crop, Propagation, Reminder, CropData, CropDbAdjustment, PropDbAdjustment } from '../types';
 import { generateId } from './ids';
-import { parseDate, addDays, formatDateShort } from './dates';
+import { parseDate, addDays, formatDateShort, daysBetween } from './dates';
 import { getAdjustedValue, calculateHarvestDate, calculateTransplantDate } from './harvest';
 import { calcSprayDates } from './sprays';
 import { getRootingDays } from './propagation';
@@ -14,18 +14,31 @@ function makeReminder(
   body: string,
   chatId: string
 ): Reminder {
+  // Format the date safely - always return a valid string
+  let formattedDate: string
+  if (!sendDate || !(sendDate instanceof Date) || isNaN(sendDate.getTime())) {
+    // Invalid date - use empty string
+    formattedDate = ''
+  } else {
+    // Valid date - format it
+    formattedDate = formatDateShort(sendDate)
+    // If formatting returned 'N/A', use empty string
+    if (formattedDate === 'N/A') formattedDate = ''
+  }
+  // Extra type safety - ensure it's a non-empty string for Dexie schema
+  const sendDateValue: string = formattedDate !== '' ? formattedDate : ''
   return {
     id: generateId('REM'),
     type,
     cropPlantName,
     trackingId,
-    sendDate: formatDateShort(sendDate),
+    sendDate: sendDateValue,
     subject,
     body,
     sent: false,
     chatId,
     updatedAt: Date.now(),
-  };
+  }
 }
 
 export function generateCropReminders(
@@ -148,8 +161,7 @@ export function calculateBatchPlantingDates(
   if (!planted) return [];
 
   const numWeeks = cropData.number_of_weeks_harvest || 1;
-  const growingTime = cropData.growing_time_days || 60;
-  
+
   let batchOffsetDays = crop.batchOffset || 7; // Use the stored batchOffset if available
   
   if (!crop.batchOffset) {
@@ -229,10 +241,6 @@ export function generateFertilizerReminders(
   });
 
   return reminders;
-}
-
-function daysBetween(d1: Date, d2: Date): number {
-  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 }
 
 export function generatePropReminders(

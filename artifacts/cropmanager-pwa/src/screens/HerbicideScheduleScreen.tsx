@@ -4,9 +4,10 @@ import db from '../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ShieldAlert, Plus, Calendar, Droplets, Trash2, X } from 'lucide-react';
+import { ShieldAlert, Plus, Calendar, Droplets, Trash2 } from 'lucide-react';
 import { generateId } from '../lib/ids';
-import { formatDateShort, today } from '../lib/dates';
+import { formatDateShort, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
+import { toast } from 'sonner';
 
 export function HerbicideScheduleScreen() {
   const [showForm, setShowForm] = useState(false);
@@ -19,7 +20,7 @@ export function HerbicideScheduleScreen() {
   ) ?? [];
 
   const handleSave = async () => {
-    if (!product || !area) return;
+    if (!product.trim() || !area.trim()) { toast.error('Enter a product and target area first'); return; }
     const log = {
       id: generateId('TL'),
       cropId: 'HERB',
@@ -31,7 +32,13 @@ export function HerbicideScheduleScreen() {
       notes: `Applied to: ${area}`,
       updatedAt: Date.now(),
     };
-    await db.treatmentLogs.add(log);
+    try {
+      await db.treatmentLogs.add(log);
+    } catch (e) {
+      console.error('[herbicide] save failed', { e });
+      toast.error('Could not save entry: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     setShowForm(false);
     setProduct('');
     setArea('');
@@ -39,18 +46,19 @@ export function HerbicideScheduleScreen() {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this entry?')) {
-      await db.treatmentLogs.delete(id);
+      try {
+        await db.treatmentLogs.delete(id);
+      } catch (e) {
+        console.error('[herbicide] delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen bg-gray-50 pb-24 pt-2">
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center justify-between">
-        <h1 className="font-bold text-lg flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-red-600" />
-          Herbicide Schedule
-        </h1>
+      <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center justify-end">
         <Button 
           variant="ghost" 
           size="icon" 
@@ -76,7 +84,7 @@ export function HerbicideScheduleScreen() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date Applied</label>
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
+                <Input type="date" value={toInputDateStr(date)} onChange={e => setDate(fromInputDateStr(e.target.value))} />
               </div>
             </div>
             <div className="flex gap-2">

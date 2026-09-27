@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
-import { ChevronLeft, Clock, ShoppingCart, X, Trash2 } from 'lucide-react';
+import { ChevronLeft, Clock, ShoppingCart, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { PosHeldReceipt } from '../../types';
@@ -13,12 +13,17 @@ interface Props {
 }
 
 export function HeldReceipts({ onBack, onLoadReceipt }: Props) {
-  const heldReceipts = useLiveQuery(() => db.posHeldReceipts.orderBy('createdAt').reverse().toArray(), []) ?? [];
+  const heldReceipts = useLiveQuery(() => db.posHeldReceipts.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? [];
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this held receipt?')) {
-      await db.posHeldReceipts.delete(id);
-      toast.success('Receipt deleted');
+      try {
+        await db.posHeldReceipts.delete(id);
+        toast.success('Receipt deleted');
+      } catch (e) {
+        console.error('[pos] held receipt delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 

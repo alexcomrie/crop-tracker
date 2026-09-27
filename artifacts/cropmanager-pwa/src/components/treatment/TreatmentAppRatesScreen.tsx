@@ -456,28 +456,33 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
                   <Input type="text" placeholder="Notes (optional)" value={activityNotes} onChange={e => setActivityNotes(e.target.value)} />
                   <div className="flex gap-2">
                     <Button className="flex-1" onClick={async () => {
-                      const resultStr = `${fmt(res.min)}${rate.min !== rate.max ? `–${fmt(res.max)}` : ''} ${UNIT_LABELS[treatUnit]}`;
-                      const activity = {
-                        id: generateId('ACT'),
-                        date: formatDateShort(today()),
-                        type: product.category === 'Fungicide' ? 'fungicide' : product.category === 'Insecticide' ? 'pesticide' : 'other',
-                        product: `${product.name} (${rate.label})`,
-                        notes: [resultStr, activityNotes].filter(Boolean).join(' · '),
-                        reminderDays: null,
-                        reminderDate: null,
-                        cropIds: [],
-                        updatedAt: Date.now(),
-                      };
-                      await db.activities.add(activity);
-                      await addDiaryEntry({
-                        entryType: 'activity_log',
-                        cropId: 'treatment',
-                        cropName: activity.type.charAt(0).toUpperCase() + activity.type.slice(1),
-                        description: `Treatment applied: ${product.name}`,
-                        details: `${resultStr}${activityNotes ? ` · ${activityNotes}` : ''}`,
-                      });
-                      setShowActivityModal(false);
-                      toast.success('Added to Activity Log');
+                      try {
+                        const resultStr = `${fmt(res.min)}${rate.min !== rate.max ? `–${fmt(res.max)}` : ''} ${UNIT_LABELS[treatUnit]}`;
+                        const activity = {
+                          id: generateId('ACT'),
+                          date: formatDateShort(today()),
+                          type: product.category === 'Fungicide' ? 'fungicide' : product.category === 'Insecticide' ? 'pesticide' : 'other',
+                          product: `${product.name} (${rate.label})`,
+                          notes: [resultStr, activityNotes].filter(Boolean).join(' · '),
+                          reminderDays: null,
+                          reminderDate: null,
+                          cropIds: [],
+                          updatedAt: Date.now(),
+                        };
+                        await db.activities.add(activity);
+                        await addDiaryEntry({
+                          entryType: 'activity_log',
+                          cropId: 'treatment',
+                          cropName: activity.type.charAt(0).toUpperCase() + activity.type.slice(1),
+                          description: `Treatment applied: ${product.name}`,
+                          details: `${resultStr}${activityNotes ? ` · ${activityNotes}` : ''}`,
+                        });
+                        setShowActivityModal(false);
+                        toast.success('Added to Activity Log');
+                      } catch (e) {
+                        console.error('[treatment] activity log failed', { e });
+                        toast.error('Could not log activity: ' + (e instanceof Error ? e.message : String(e)));
+                      }
                     }}>Add</Button>
                     <Button variant="outline" onClick={() => setShowActivityModal(false)}>Cancel</Button>
                   </div>

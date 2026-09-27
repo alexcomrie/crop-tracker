@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, BarChart2, ChevronDown, ChevronUp, TrendingUp, Calendar, Layers, GitBranch, Beaker, Archive, GripHorizontal, LineChart as LineChartIcon, Activity, ArrowUpDown } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid } from 'recharts';
 import db from '../../db/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { Crop, StageLog, HarvestLog, CropDbAdjustment } from '../../types';
+import type { HarvestLog, CropDbAdjustment } from '../../types';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
@@ -463,8 +463,6 @@ function DeviationTrend({ data }: { data: GroupData }) {
     const harvestStage = c.stages.find(s => s.to === 'Harvested');
     const totalDays = harvestStage?.days ?? 0;
     const dbVal = data.dbDefaults.th ?? 0;
-    const seedToGerm = c.stages.find(s => s.to === 'Germinated');
-    const germDays = seedToGerm?.days ?? 0;
     const dev = dbVal ? totalDays - dbVal : 0;
     return { index: idx + 1, totalDays, deviation: dev, label: `#${idx + 1}` };
   });

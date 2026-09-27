@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Search, ChevronLeft, Download, Info, ArrowLeft, Leaf, Droplets, Flower2, Apple, Beaker, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { loadFertDatabase, getFertCrops, saveFertDatabaseOverride } from '../lib/fertDb';
-import type { FertDatabase, FertCropEntry, FertStage, FertMix } from '../types';
+import type { FertDatabase, FertCropEntry, FertMix } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 const TEA_COLORS: Record<string, string> = {
@@ -105,7 +104,13 @@ export function FertilizerDatabaseScreen({ onClose }: { onClose: () => void }) {
 
   const handleSaveDb = () => {
     if (!db) return;
-    saveFertDatabaseOverride(db);
+    try {
+      saveFertDatabaseOverride(db);
+    } catch (e) {
+      console.error('[fertdb] save override failed', { e });
+      toast.error('Could not save database: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     setFertDb(db);
     toast.success('Fertilizer Database saved locally on this device.');
   };

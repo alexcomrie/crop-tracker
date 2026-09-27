@@ -144,4 +144,63 @@ The Crop Manager application is a well-architected, modern web application. The 
 - **C-H Refresh Trigger**: The "Refresh Timings" button in the Crop Tracker now also recalculates the Continuous Harvest logic for existing crops, allowing legacy records to adopt the latest calculation improvements.
 
 ### Stability & Performance
-- **Dexie Schema Optimization**: Updated the [schema.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/db/schema.ts) to version 2, adding `isContinuous` and `parentCropId` to the `crops` table index. This resolved a critical "blank screen" issue caused by calling `.where()` on non-indexed fields, ensuring smooth performance and reliable data retrieval for continuous harvest tracking.
+-   **Dexie Schema Optimization**: Updated the [schema.ts](file:///c:/Users/ALEX/Desktop/Crop-Manager/artifacts/cropmanager-pwa/src/db/schema.ts) to version 2, adding `isContinuous` and `parentCropId` to the `crops` table index. This resolved a critical "blank screen" issue caused by calling `.where()` on non-indexed fields, ensuring smooth performance and reliable data retrieval for continuous harvest tracking.
+
+## Overhaul: IndexedDB Crash Fixes, Crop Management Upgrade & Full-App Audit
+
+### IndexedDB crash fixes (root cause: booleans/nullable fields in indexes)
+-   IndexedDB rejects booleans, null and undefined as index keys. Three indexed boolean fields caused `DataError: Data provided to an operation does not meet requirements` and `Failed to execute 'bound' on 'IDBKeyRange'` crashes: `reminders.sent`, `posInventory.isActive`, `crops.isContinuous`. All three were removed from their index strings; queries that used them (`where('sent')`, `where('isContinuous')`) were converted to in-memory filters. Boolean `sent`/`isActive`/`isContinuous` values are still stored on records — only the indexes changed.
+-   `parentCropId` was queried (`stages.ts promoteNextBatch`) but not indexed (`SchemaError` at runtime) — added to the `crops` index, and the `parentCropId: undefined` write was changed to `''`.
+-   Also removed nullable/optional fields from indexes: `activities.reminderDate`, `posSales.customerId`, `posOrders.deliveredAt`.
+-   Database renamed to `CropManagerDB_v4` (fresh start, no stale boolean-indexed schema lingers); new `trackings` table added via additive Dexie `version(2)` migration.
+-   Reminder `sendDate` queries guard against `undefined` via `.above('')` plus JS-side checks; `makeReminder` coerces invalid dates to `''` so `undefined` never reaches a key range.
+
+### API server hardening (`artifacts/api-server/src`)
+-   `routes/data.ts`: request body shape validation (400 on non-objects), `mkdir -p` for the data dir, atomic tmp-file + rename writes (no more interleaved/corrupt JSON on concurrent saves).
+-   `routes/sync.ts`: 15s abort timeout on GAS proxy calls; distinct timeout vs non-JSON vs push/pull failure messages; payload shape check on push.
+-   `app.ts`: exact-origin CORS matching (plus Netlify deploy-preview pattern) instead of prefix matching; JSON 404 + JSON error envelope middleware.
+-   `index.ts`: defaults to port 5001 with a warning instead of crashing when `PORT` is missing.
+
+### Crop details restructuring (`CropDetailsScreen.tsx`)
+-   Removed the standalone Notes tab; each of Observations, Treatments and Harvest now has its own Notes editor at the bottom (shared `crop.notes` field, no schema change).
+-   Treatments are multi-select (fertilizer/pest/fungus toggles, one log per selected type sharing date/product), with a date selector defaulting to today and a per-entry notes field (previously hardcoded `''`).
+-   New Growth Tracking section in Observations: per-fruit maturation trackings with label, physical tag number, start date (defaults today, backdatable) and notes. Cards show start date + elapsed days only — no guessed maturity. Finishing a tracking logs actual days into a `fruit_maturity_days` scalar adjustment; once 2+ fruits are tracked the UI shows the learnt average ("Learned maturity: ~Nd from N fruits").
+-   Milestone bar kept scrollable with a scroll-fade affordance; per-crop Manual Hold toggle pauses all automatic writes for hand-entered histories; catch-up hint appears for crops planted >30 days ago with no stage history.
+-   All write handlers wrapped in step-labeled try/catch with toasts.
+
+### C-H Calculator autonomy + Succession Gap Tinygpt wiring
+-   `CHCalculatorScreen.tsx` now consumes personal DB overrides (≥2 samples), `cropDbAdjustments` averages, and Tinygpt `predictBatchOffsetDays` (micro 4–59d wins, else foundation, else computed). Foundation values stay displayed; schedules/grids use effective values; learned badge + per-source rows shown.
+-   `SuccessionGapReport.tsx` rebuilds weeks from hybrid `getPredictedHarvestDate` per crop (micro 70/30 blend with scalar fallback), falling back to stored estimates; Tinygpt-adjusted badge when the model contributes.
+
+### Archive flow
+-   Crop list has Archive select mode (checkboxes, count, bottom action bar) writing `status: 'Archived'`; new `/crops/archive` route + `ArchivedCropsScreen` with per-crop Restore; `useCrops('Archived')`; main list and stage filters exclude archived.
+
+### Dashboard overhaul (`DashboardScreen.tsx`)
+-   Overview tiles replaced by two badges: 🌱 active-crop count (→ crops list) and 🔔 today+upcoming count (→ reminders).
+-   Today + Upcoming merged into one Tasks card (tappable today rows pinned, dated future rows below).
+-   Succession moved to a real More → Planning route (`/more/succession`); DB-entries count moved to Settings → Data Management.
+
+### Unified layout + navigation
+-   Removed duplicate in-screen back headers (details/create/archive); TopBar owns all navigation with dynamic titles; Herbicide + Reminders moved to `PanelPage`; all screens standardized on `min-h-screen bg-gray-50 pb-24 pt-2`; hardcoded `navigate('/crops…')` strings replaced with `ROUTES.*`; BottomNav/Drawer highlight parent tabs on sub-routes; aria-labels on icon buttons.
+
+### Backup, dates, learning, performance
+-   `backup.ts`: exports all 25 tables (was 16), version 7 with validation, single-transaction all-or-nothing restore with `bulkPut` upserts.
+-   Fixed "delete diary older than 1 year" (was comparing `dd-MMM-yyyy` against ISO lexicographically — deleted everything); now compares timestamps.
+-   New `formatDateStored()` (never emits the `'N/A'` sentinel) used at all DB write sites; `toInputDateStr`/`fromInputDateStr` converters unify all date inputs; reminder comparisons/sorts are chronological (timestamps), not lexicographic.
+-   Single learning-threshold constants (`SCALAR_CUSTOM_SAMPLES=3`, `PERSONAL_OVERRIDE_SAMPLES=2`, `MICRO_TRAIN_MIN_DOCS=4`); keep-best-model by `finalLoss`; hybrid model deserialization cached per refresh; dataset cropDb lookups hoisted to a Map; personal-DB key trim mismatch fixed; Data Management clear wipes all tables including learned state.
+-   `autoUpdateService` reads the store directly and delegates batch math to canonical `lib/continuous.ts` (also reused by the create wizard); batch promotion runs in one transaction; calendar day cells use an O(1) date map; Diary/Sales/Orders/Receipts/Activity lists capped.
+-   Ledger bulk import parses via Papa (quoted CSV safe) with a single `bulkAdd`; `getEffectiveCropData` fallback centralized in `resolveEffectiveCropData()`.
+
+### Forms, mobile, PWA, state, errors
+-   Validation toasts replace silent returns/`alert()` in create/details/reminders/props/herbicide/ledger; fixed vanishing custom-variety input; added missing plot-area input; Settings numbers can't become `NaN`.
+-   Uniform FAB safe-area offsets; 36px action buttons; pinch-zoom re-enabled; install meta tags; workbox `cacheId` + outdated-cache cleanup; data JSON excluded from precache; manifest scope/start honour `BASE_PATH`.
+-   Shared `EmptyState` component; `effectiveData` and personal list are live queries (no stale mirrors); Settings form resyncs from store; step-labeled try/catch on all touched write paths.
+-   Removed `// @ts-nocheck` from `CropDetailsScreen`; enabled `strict` + `noUnusedLocals` for the PWA and cleared all resulting errors; deleted dead `CropForm`/`CropDetail`/`UpdateCropForm`/`herb/HerbicideScreen` + 8 dead `ui/*` files; pruned 17 unused deps from `package.json` (run `pnpm install` to prune `node_modules`/lockfile).
+
+### Area Mapper integrity slice
+-   Manual sketches anchored to real land GPS bounds (previously persisted fake canvas-degrees → absurd areas + ocean pins); drag-edits recalc area; GPS fixes rougher than ±25m are shown but never recorded, with permission-specific errors; single ref-owned watch (no double-subscribe); navigation confirms before discarding unsaved points; delete resets orphaned selection; plot tags are max+1 (no reuse); spacing standardized to cm; uniform meter-based projection shared between SVG/Leaflet with exact inverse; tap-to-select + vertex drag on touch; pan-end clicks no longer misfire; land GPS re-walk mode wired; GeoJSON import validated with pre-allocated tags + single bulk write; crop linking supports move-between-plots with `updatedAt` and per-row state.
+
+### Update-time legacy migration (`migrateLegacy.ts`)
+-   Older app versions stored everything under IndexedDB databases named `CropManagerDB` (all releases), `CropManagerDB_v2` or `CropManagerDB_v3` (intermediate builds); current code opens `CropManagerDB_v4`, so an update would strand existing data. On startup, `migrateLegacyDatabases()` (`src/lib/migrateLegacy.ts`, wired in `App.tsx` before the auto-update service starts) checks each legacy name via `Dexie.exists`, reads every known table through the native IndexedDB API (no old-schema knowledge needed), normalizes each record to the current format, and upserts via `bulkPut` (idempotent, safe to re-run).
+-   Normalization per table: crops get a valid status (`Active` fallback), non-empty `plantStage`, `parentCropId: ''` instead of undefined (indexed field), boolean-coerced `isContinuous`; propagations get default status; reminders get string `sendDate` (`''` fallback) and boolean `sent`; all dated logs get string dates; `personalCropDb` keys are lowercased/trimmed with numeric fallbacks; records missing a primary key receive a `MIG_<table>_<ts>_<i>` fallback id instead of being dropped.
+-   Runs once per device (`cropmanager_legacy_migrated_v4` flag); verifies per-table row counts and only then deletes the legacy database; never crashes startup (all failures are caught and logged).

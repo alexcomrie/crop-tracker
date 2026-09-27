@@ -4,6 +4,28 @@ const router: IRouter = Router();
 
 const GAS_SYNC_URL = process.env["GAS_SYNC_URL"] || "";
 const GAS_SYNC_TOKEN = process.env["GAS_SYNC_TOKEN"] || "";
+const GAS_TIMEOUT_MS = 15000;
+
+async function fetchGasJson(url: string, init?: RequestInit): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GAS_TIMEOUT_MS);
+  try {
+    const gasRes = await fetch(url, { ...init, signal: controller.signal });
+    const text = await gasRes.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`GAS returned non-JSON response (status ${gasRes.status})`);
+    }
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`GAS request timed out after ${GAS_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * GET /api/sync/health
@@ -15,11 +37,10 @@ router.get("/health", async (_req: Request, res: Response) => {
     return;
   }
   try {
-    const gasRes = await fetch(GAS_SYNC_URL, { method: "GET" });
-    const data = await gasRes.json();
+    const data = await fetchGasJson(GAS_SYNC_URL, { method: "GET" });
     res.json(data);
   } catch (err: any) {
-    res.status(502).json({ success: false, error: "GAS unreachable: " + err.message });
+    res.status(502).json({ success: false, error: "GAS unhealthy: " + err.message });
   }
 });
 
@@ -42,16 +63,20 @@ router.post("/push", async (req: Request, res: Response) => {
     return;
   }
 
+  if (payload !== undefined && (typeof payload !== "object" || payload === null)) {
+    res.status(400).json({ success: false, error: "Payload must be an object" });
+    return;
+  }
+
   try {
-    const gasRes = await fetch(GAS_SYNC_URL, {
+    const data = await fetchGasJson(GAS_SYNC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: GAS_SYNC_TOKEN, action: "push", payload }),
     });
-    const data = await gasRes.json();
     res.json(data);
   } catch (err: any) {
-    res.status(502).json({ success: false, error: "GAS unreachable: " + err.message });
+    res.status(502).json({ success: false, error: "GAS push failed: " + err.message });
   }
 });
 
@@ -74,15 +99,14 @@ router.post("/pull", async (req: Request, res: Response) => {
   }
 
   try {
-    const gasRes = await fetch(GAS_SYNC_URL, {
+    const data = await fetchGasJson(GAS_SYNC_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: GAS_SYNC_TOKEN, action: "pull" }),
     });
-    const data = await gasRes.json();
     res.json(data);
   } catch (err: any) {
-    res.status(502).json({ success: false, error: "GAS unreachable: " + err.message });
+    res.status(502).json({ success: false, error: "GAS pull failed: " + err.message });
   }
 });
 

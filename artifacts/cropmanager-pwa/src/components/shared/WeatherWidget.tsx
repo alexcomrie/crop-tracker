@@ -4,7 +4,7 @@ import { getSprayWeatherWarnings } from '../../lib/weather';
 import { useAppStore } from '../../store/useAppStore';
 
 export function WeatherWidget() {
-  const { forecasts, loading, error, cacheAge } = useWeather();
+  const { forecasts, loading, error } = useWeather();
   const { settings } = useAppStore();
 
   if (loading && forecasts.length === 0) {

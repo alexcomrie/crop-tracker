@@ -1,240 +1,303 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCrops } from '../hooks/useCrops';
+import { useProps } from '../hooks/useProps';
 import { CropCard } from '../components/crops/CropCard';
-import { CropDetail } from '../components/crops/CropDetail';
-import { CropForm } from '../components/crops/CropForm';
-import { UpdateCropForm } from '../components/crops/UpdateCropForm';
-import { toast } from 'sonner';
-import type { Crop } from '../types';
+import { PropCard } from '../components/props/PropCard';
+import { PropDetail } from '../components/props/PropDetail';
+import { PropForm } from '../components/props/PropForm';
+import type { Propagation } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
-import { autoAdjustTransplantSchedule } from '../lib/stages';
+import { autoUpdateService } from '../lib/autoUpdateService';
+import { toast } from 'sonner';
 import db from '../db/db';
-import { formatDateShort } from '../lib/dates';
-import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
-import { autoTransitionCrop } from '../lib/stages';
+import { EmptyState } from '../components/shared/EmptyState';
+import { BottomSheet } from '../components/shared/BottomSheet';
+import { AddEntrySheet } from '../components/shared/AddEntrySheet';
+import { formatDateShort, today, parseDate, daysBetween } from '../lib/dates';
+import { ROUTES, cropDetailsPath } from '../lib/routes';
 
-const FILTERS = ['All', 'Active', 'Seedling', 'Vegetative', 'Flowering', 'Fruiting', 'Middle Vegetative', 'Final Vegetative', 'Harvested'];
+const CROP_FILTERS = ['All','Seed','Germinated','Seedling','Vegetative Early','Vegetative Middle','Vegetative Late','Flowering','Fruiting'];
+const PROP_FILTERS = ['All','Propagating','Callusing','Rooted','Potted / Transplanted','Failed'];
+const KINDS = [
+  { id: 'all', label: 'All' },
+  { id: 'crop', label: '🌾 Crops' },
+  { id: 'propagation', label: '🌿 Props' },
+] as const;
+
+type Kind = 'crop' | 'propagation';
 
 export function CropsScreen() {
-  const [filter, setFilter] = useState('All');
+  const [kind, setKind] = useState<'all' | Kind>('all');
+  const [cropFilter, setCropFilter] = useState('All');
+  const [propFilter, setPropFilter] = useState('All');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [showPropForm, setShowPropForm] = useState(false);
+  const [editProp, setEditProp] = useState<Propagation | undefined>(undefined);
+  const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
   const { cropDb } = useAppStore();
-  const cropsData = useCrops(filter);
-  const crops = cropsData ?? [];
-  const isLoading = cropsData === undefined;
+  const navigate = useNavigate();
+  const cropsData = useCrops('All');
+  const propsData = useProps('All');
+  const isLoading = cropsData === undefined || propsData === undefined;
 
-  const [selectedCrop, setSelectedCrop] = useState<Crop | null>(null);
-  const [updateCrop, setUpdateCrop] = useState<Crop | null>(null);
-  const [editCrop, setEditCrop] = useState<Crop | undefined>(undefined);
-  const [showForm, setShowForm] = useState(false);
-  const mountedRef = useRef(true);
+  const cropRows = (cropsData ?? []).filter(c =>
+    kind !== 'propagation' && (cropFilter === 'All' || c.plantStage === cropFilter)
+  );
+  const propRows = (propsData ?? []).filter(p =>
+    kind !== 'crop' && (propFilter === 'All' || p.status === propFilter)
+  );
+  const hasFilter = kind !== 'all' || cropFilter !== 'All' || propFilter !== 'All';
 
-  useEffect(() => { return () => { mountedRef.current = false; }; }, []);
-
-  // Auto-transition crops through all stages based on their timeframes
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      for (const c of crops) {
-        if (cancelled || !mountedRef.current) break;
-        if (c.status === 'Harvested' || c.status === 'Deleted') continue;
-        const cd = resolveCropData(cropDb, c.cropName);
-        if (!cd) continue;
-
-        const adjusted = autoAdjustTransplantSchedule(c, cd);
-        if (adjusted) await db.crops.put(adjusted);
-
-        const isTrayOrBed = c.plantingMethod === 'Seed Tray' || c.plantingMethod === 'Seed Bed';
-        const isPot = c.plantingMethod === 'Pot';
-        const needsManual = isTrayOrBed || isPot || (cd.transplant_days || 0) > 0;
-        if (needsManual && c.plantStage === 'Seedling' && !c.transplantDateActual) continue;
-
-        let didTransition = true;
-        let currentCrop = c;
-        while (didTransition && !cancelled && mountedRef.current) {
-          const result = await autoTransitionCrop(currentCrop, cd, { stageLogs: db.stageLogs, crops: db.crops });
-          didTransition = result;
-          if (result) {
-            const updated = await db.crops.get(currentCrop.id);
-            if (updated) currentCrop = updated;
-          }
-        }
-      }
-    })().catch(() => {});
-    return () => { cancelled = true; };
-  }, [crops, cropDb]);
-
-  useEffect(() => {
-    (async () => {
-      const threshold = Date.now() - 3 * 86400000;
-      const toDelete = await db.crops.where('status').equals('Deleted').toArray();
-      for (const c of toDelete) {
-        if (c.updatedAt < threshold) {
-          await db.crops.delete(c.id);
-          await db.stageLogs.where('trackingId').equals(c.id).delete();
-          await db.harvestLogs.where('cropTrackingId').equals(c.id).delete();
-          await db.reminders.where('trackingId').equals(c.id).delete();
-          await db.treatmentLogs.where('cropId').equals(c.id).delete();
-        }
-      }
-    })();
-  }, []);
+  type Row = { key: string; kind: Kind; updatedAt: number };
+  const rows: Row[] = [
+    ...cropRows.map(c => ({ key: `crop:${c.id}`, kind: 'crop' as const, updatedAt: c.updatedAt })),
+    ...propRows.map(p => ({ key: `prop:${p.id}`, kind: 'propagation' as const, updatedAt: p.updatedAt })),
+  ].sort((a, b) => b.updatedAt - a.updatedAt);
+  const cropById = new Map((cropsData ?? []).map(c => [c.id, c]));
+  const propById = new Map((propsData ?? []).map(p => [p.id, p]));
 
   async function refreshTimings() {
-    const adjustments = await db.cropDbAdjustments.toArray();
-    const allActive = await db.crops.where('status').equals('Active').toArray();
-    for (const c of allActive) {
-      const cd = resolveCropData(cropDb, c.cropName);
-      if (!cd) continue;
-      const planted = new Date(c.plantingDate);
-      const tDate = calculateTransplantDate(planted, null, cd, adjustments, c.cropName.toLowerCase(), c.variety);
-      const hDate = calculateHarvestDate(c, cd, adjustments);
-      
-      const patch: Partial<Crop> = { updatedAt: Date.now() };
-      if (tDate) patch.transplantDateScheduled = formatDateShort(tDate);
-      if (hDate) patch.harvestDateEstimated = formatDateShort(hDate);
-
-      // Apply C-H Logic Update if enabled
-      if (c.isContinuous) {
-        // Calculate based on the newly updated C-H logic (same as CropForm)
-        const growDays = cd.growing_time_days || 60;
-        const harvestWks = cd.number_of_weeks_harvest || 1;
-        const harvestDays = harvestWks * 7;
-        const harvestIntv = cd.harvest_interval || 7;
-        const isMulti = harvestWks > 1;
-        
-        const freqDays = c.harvestFrequency || 7;
-        
-        let batchOffset: number;
-        if (cd.batch_offset_days && cd.batch_offset_days > 0) {
-          batchOffset = cd.batch_offset_days;
-        } else if (!isMulti) {
-          batchOffset = freqDays;
-        } else {
-          const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
-          batchOffset = Math.max(naturalOffset, freqDays);
-        }
-        
-        let numBatches: number;
-        if (!isMulti) numBatches = Math.ceil(growDays / batchOffset);
-        else numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
-
-        patch.batchOffset = batchOffset;
-        patch.numPlots = numBatches;
-      }
-
-      await db.crops.update(c.id, patch);
-
-      // Update existing batch planting logs with recalculated dates
-      if (c.isContinuous && patch.batchOffset != null) {
-        const existingBatches = await db.batchPlantingLogs.where('cropTrackingId').equals(c.id).toArray();
-        const planted = new Date(c.plantingDate);
-        for (const batch of existingBatches) {
-          const batchDate = new Date(planted.getTime() + (batch.batchNumber - 1) * patch.batchOffset * 86400000);
-          const nextBatchDate = new Date(planted.getTime() + batch.batchNumber * patch.batchOffset * 86400000);
-          await db.batchPlantingLogs.update(batch.id, {
-            batchPlantingDate: formatDateShort(batchDate),
-            nextBatchDate: formatDateShort(nextBatchDate),
-            updatedAt: Date.now(),
-          });
-        }
-      }
-    }
-    toast.success('Timings and Continuous Harvest logic refreshed.');
+    await autoUpdateService.triggerNow('manual');
+    toast.success('Timings refreshed');
   }
-  const handleDeleteCrop = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this crop from your tracker? This will remove all logs and reminders associated with it.')) {
-      return;
-    }
-    
+
+  function toggleSelect(key: string) {
+    setSelectedKeys(prev => prev.includes(key) ? prev.filter(x => x !== key) : [...prev, key]);
+  }
+
+  function cancelSelecting() {
+    setSelecting(false);
+    setSelectedKeys([]);
+  }
+
+  async function archiveSelected() {
+    if (selectedKeys.length === 0) return;
+    const now = Date.now();
     try {
-      await db.crops.delete(id);
-      await db.stageLogs.where('trackingId').equals(id).delete();
-      await db.harvestLogs.where('cropTrackingId').equals(id).delete();
-      await db.reminders.where('trackingId').equals(id).delete();
-      await db.treatmentLogs.where('cropId').equals(id).delete();
-      
-      setSelectedCrop(null);
-    } catch (err) {
-      toast.error('Failed to delete crop. Please try again.');
+      const cropIds = selectedKeys.filter(k => k.startsWith('crop:')).map(k => k.slice(5));
+      const propIds = selectedKeys.filter(k => k.startsWith('prop:')).map(k => k.slice(5));
+      await Promise.all([
+        ...cropIds.map(async id => {
+          const c = cropById.get(id);
+          await db.crops.update(id, { status: 'Archived', archivedFrom: c?.status ?? 'Active', updatedAt: now } as never);
+        }),
+        ...propIds.map(async id => {
+          const p = propById.get(id);
+          await db.propagations.update(id, { status: 'Archived', archivedFrom: p?.status ?? 'Propagating', updatedAt: now } as never);
+        }),
+      ]);
+      toast.success(`Archived ${selectedKeys.length} item${selectedKeys.length === 1 ? '' : 's'}`);
+      cancelSelecting();
+    } catch (e) {
+      console.error('[crops] archive failed', { e });
+      toast.error('Archive failed: ' + (e instanceof Error ? e.message : String(e)));
     }
-  };
+  }
+
+  async function handleDeleteProp(id: string) {
+    try {
+      await db.propagations.delete(id);
+      await db.reminders.where('trackingId').equals(id).delete();
+      setSelectedProp(null);
+      toast.success('Propagation deleted');
+    } catch (e) {
+      console.error('[props] delete failed', { id, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handlePropAction(prop: Propagation, newStatus: string) {
+    const update: Partial<Propagation> = { status: newStatus, updatedAt: Date.now() };
+    if (newStatus === 'Rooted') {
+      update.actualRootingDate = formatDateShort(today());
+      const start = parseDate(prop.propagationDate);
+      if (start) {
+        update.daysToRootActual = daysBetween(start, today());
+      }
+    }
+    try {
+      await db.propagations.update(prop.id, update);
+    } catch (e) {
+      console.error('[props] status change failed', { id: prop.id, newStatus, e });
+      toast.error('Update failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  function clearFilters() {
+    setKind('all');
+    setCropFilter('All');
+    setPropFilter('All');
+  }
 
   return (
-    <div className="pb-24 pt-2">
-      {/* Filter chips */}
-      <div className="flex gap-2 overflow-x-auto px-4 pb-2 whitespace-nowrap scrollbar-hide">
-        {FILTERS.map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-sm border ${filter === f ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 text-gray-700'}`}>
-            {f}
-          </button>
-        ))}
+    <div className="min-h-screen bg-gray-50 pb-24 pt-2">
+      <div className="px-4 pb-2 flex items-center justify-between gap-2">
+        <button
+          onClick={() => setFilterOpen(true)}
+          aria-label="Filter tracker"
+          className="flex items-center gap-1.5 px-3 py-2 min-h-[36px] rounded-full text-xs border font-semibold bg-white border-gray-300 text-gray-700"
+        >
+          <span aria-hidden="true">🔍</span>
+          {hasFilter ? 'Filtered' : 'Filter'}
+          {hasFilter && <span className="w-2 h-2 rounded-full bg-green-600" />}
+        </button>
+        <button
+          onClick={() => navigate(ROUTES.CROPS_ARCHIVE)}
+          className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50"
+          title="View archived items"
+          aria-label="View archived items"
+        >📦</button>
       </div>
-      <div className="px-4">
-        <button onClick={refreshTimings} className="text-xs px-2 py-1 rounded border bg-white hover:bg-gray-50">Refresh Timings</button>
+      <BottomSheet open={filterOpen} onClose={() => setFilterOpen(false)} title="Filter tracker">
+        <div className="pt-2 space-y-4">
+          <div>
+            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Type</p>
+            <div className="flex gap-2">
+              {KINDS.map(k => (
+                <button key={k.id} onClick={() => setKind(k.id)}
+                  className={`flex-1 px-3 py-2 rounded-full text-xs border font-semibold ${kind===k.id?'bg-green-700 text-white border-green-700':'bg-white border-gray-300 text-gray-700'}`}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {kind !== 'propagation' && (
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Crop stage</p>
+              <div className="flex flex-wrap gap-2">
+                {CROP_FILTERS.map(f => (
+                  <button key={f} onClick={() => setCropFilter(f)}
+                    className={`px-3 py-2 rounded-full text-xs border font-semibold ${cropFilter===f?'bg-green-700 text-white border-green-700':'bg-white border-gray-300 text-gray-700'}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {kind !== 'crop' && (
+            <div>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Propagation status</p>
+              <div className="flex flex-wrap gap-2">
+                {PROP_FILTERS.map(f => (
+                  <button key={f} onClick={() => setPropFilter(f)}
+                    className={`px-3 py-2 rounded-full text-xs border font-semibold ${propFilter===f?'bg-blue-700 text-white border-blue-700':'bg-white border-gray-300 text-gray-700'}`}>
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasFilter && (
+            <button onClick={() => { clearFilters(); setFilterOpen(false); }} className="w-full mt-1 text-sm text-muted-foreground">Clear filters</button>
+          )}
+        </div>
+      </BottomSheet>
+      <div className="px-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button onClick={refreshTimings} className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50">Refresh</button>
+          {selecting ? (
+            <button onClick={cancelSelecting} className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50">Cancel</button>
+          ) : (
+            <button onClick={() => setSelecting(true)} className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50">Archive</button>
+          )}
+        </div>
+        <span className="text-[11px] text-muted-foreground">
+          {selecting ? `${selectedKeys.length} selected` : `${cropRows.length} crops · ${propRows.length} props`}
+        </span>
       </div>
+      {selecting && (
+        <p className="px-4 pt-2 text-[11px] text-muted-foreground">Tap items to select them for archiving.</p>
+      )}
 
-      <div className="px-4 pt-2">
+      <div className="px-4 pt-3">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : crops.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-4xl mb-3">🌱</p>
-            <p className="font-semibold text-lg">No crops yet</p>
-            <p className="text-sm text-muted-foreground mb-4">Tap + to log your first crop.</p>
-          </div>
+          <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /></div>
+        ) : rows.length === 0 ? (
+          <EmptyState emoji="🌱" title="Nothing here yet" subtitle="Tap + to log your first crop or propagation." />
         ) : (
-          <div className="space-y-3">
-            {crops.map(crop => (
-              <CropCard
-                key={crop.id}
-                crop={crop}
-                cropData={resolveCropData(cropDb, crop.cropName) || undefined}
-                onClick={() => setSelectedCrop(crop)}
-                onAction={action => {
-                  if (action === 'update') setUpdateCrop(crop);
-                  if (action === 'harvest') setUpdateCrop(crop);
-                }}
-              />
-            ))}
+          <div className="space-y-2">
+            {rows.map(row => {
+              if (row.kind === 'crop') {
+                const crop = cropById.get(row.key.slice(5));
+                if (!crop) return null;
+                const selKey = row.key;
+                return (
+                  <CropCard
+                    key={selKey}
+                    crop={crop}
+                    cropData={resolveCropData(cropDb, crop.cropName) || undefined}
+                    kind="crop"
+                    selectMode={selecting}
+                    selected={selectedKeys.includes(selKey)}
+                    onToggle={() => toggleSelect(selKey)}
+                    onClick={() => selecting ? toggleSelect(selKey) : navigate(cropDetailsPath(crop.id))}
+                  />
+                );
+              }
+              const prop = propById.get(row.key.slice(5));
+              if (!prop) return null;
+              const selKey = row.key;
+              return (
+                <PropCard
+                  key={selKey}
+                  prop={prop}
+                  selectMode={selecting}
+                  selected={selectedKeys.includes(selKey)}
+                  onToggle={() => toggleSelect(selKey)}
+                  onClick={() => selecting ? toggleSelect(selKey) : setSelectedProp(prop)}
+                  onAction={action => handlePropAction(prop, action)}
+                />
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* FAB */}
-      <button
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 hover:bg-amber-600 active:scale-95 transition-all"
-      >
-        +
-      </button>
-
-      {showForm && (
-        <CropForm 
-          open={showForm} 
-          onClose={() => { setShowForm(false); setEditCrop(undefined); }} 
-          editCrop={editCrop}
-        />
+      {selecting && (
+        <div className="fixed left-4 right-4 z-40" style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+          <button
+            onClick={archiveSelected}
+            disabled={selectedKeys.length === 0}
+            className="w-full bg-green-700 text-white rounded-xl py-3 text-sm font-semibold shadow-lg disabled:opacity-40"
+          >
+            Archive {selectedKeys.length} item{selectedKeys.length === 1 ? '' : 's'}
+          </button>
+        </div>
       )}
 
-      {selectedCrop && (
-        <CropDetail
-          crop={selectedCrop}
-          onClose={() => setSelectedCrop(null)}
-          onUpdate={() => { setUpdateCrop(selectedCrop); setSelectedCrop(null); }}
-          onEdit={() => { setEditCrop(selectedCrop); setShowForm(true); setSelectedCrop(null); }}
-          onDelete={() => handleDeleteCrop(selectedCrop.id)}
-        />
+      {!selecting && (
+        <button
+          onClick={() => setChooserOpen(true)}
+          aria-label="Add crop or propagation"
+          className="fixed right-4 w-14 h-14 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center text-2xl z-40 hover:bg-amber-600 active:scale-95"
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
+        >+</button>
       )}
 
-      {updateCrop && (
-        <UpdateCropForm
-          crop={updateCrop}
-          open
-          onClose={() => setUpdateCrop(null)}
+      <AddEntrySheet
+        open={chooserOpen}
+        onClose={() => setChooserOpen(false)}
+        onSelectCrop={() => { setChooserOpen(false); navigate(ROUTES.CROP_CREATE); }}
+        onSelectPropagation={() => { setChooserOpen(false); setEditProp(undefined); setShowPropForm(true); }}
+      />
+      {showPropForm && (
+        <PropForm
+          open={showPropForm}
+          onClose={() => { setShowPropForm(false); setEditProp(undefined); }}
+          editProp={editProp}
+        />
+      )}
+      {selectedProp && (
+        <PropDetail
+          prop={selectedProp}
+          onClose={() => setSelectedProp(null)}
+          onEdit={() => { setEditProp(selectedProp); setShowPropForm(true); setSelectedProp(null); }}
+          onDelete={() => handleDeleteProp(selectedProp.id)}
         />
       )}
     </div>

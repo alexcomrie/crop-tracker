@@ -1,6 +1,5 @@
 import type { Crop, CropData, CropDbAdjustment } from '../types';
-import { parseDate, addDays, formatDateShort, today } from './dates';
-import { getAdjustedValue } from './harvest';
+import { parseDate, addDays, today } from './dates';
 
 export function getConsistentPlantingDates(
   cropData: CropData,
@@ -40,6 +39,33 @@ export function buildSuccessionGapData(
     const weekCrops: string[] = [];
     crops.filter(c => c.status === 'Active').forEach(crop => {
       const harvest = parseDate(crop.harvestDateEstimated);
+      if (harvest && harvest >= start && harvest <= end) {
+        weekCrops.push(`${crop.cropName}${crop.variety ? ' (' + crop.variety + ')' : ''}`);
+      }
+    });
+    weeks.push({ start, end, crops: weekCrops, hasHarvest: weekCrops.length > 0 });
+  }
+  return weeks;
+}
+
+/**
+ * Tinygpt-aware variant: buckets precomputed per-crop harvest dates
+ * (e.g. hybrid micro + scalar predictions) into weeks instead of relying
+ * solely on the stored harvestDateEstimated.
+ */
+export function buildSuccessionGapDataFromDates(
+  crops: Crop[],
+  harvestDates: Map<string, Date>,
+  weekCount = 12
+): WeekGapData[] {
+  const weeks: WeekGapData[] = [];
+  const base = today();
+  for (let i = 0; i < weekCount; i++) {
+    const start = addDays(base, i * 7);
+    const end = addDays(start, 6);
+    const weekCrops: string[] = [];
+    crops.filter(c => c.status === 'Active').forEach(crop => {
+      const harvest = harvestDates.get(crop.id) ?? parseDate(crop.harvestDateEstimated);
       if (harvest && harvest >= start && harvest <= end) {
         weekCrops.push(`${crop.cropName}${crop.variety ? ' (' + crop.variety + ')' : ''}`);
       }

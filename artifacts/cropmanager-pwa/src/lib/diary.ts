@@ -1,6 +1,7 @@
 import { generateId } from './ids';
 import db from '../db/db';
 import type { DiaryEntry, DiaryEntryType } from '../types';
+import { formatDateShort, today } from './dates';
 
 export async function addDiaryEntry(opts: {
   entryType: DiaryEntryType;
@@ -13,7 +14,7 @@ export async function addDiaryEntry(opts: {
 }) {
   const entry: DiaryEntry = {
     id: generateId('DE'),
-    date: opts.date ?? new Date().toISOString().split('T')[0],
+    date: opts.date ?? formatDateShort(today()),
     entryType: opts.entryType,
     cropId: opts.cropId ?? '',
     cropName: opts.cropName ?? '',

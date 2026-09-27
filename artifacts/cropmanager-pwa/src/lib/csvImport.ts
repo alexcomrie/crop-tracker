@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 import db from '../db/db';
 import { generateId } from './ids';
-import type { Crop, Propagation, Reminder } from '../types';
+import type { Crop, Propagation } from '../types';
 
 export interface ImportResult {
   success: boolean;

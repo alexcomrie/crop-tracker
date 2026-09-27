@@ -38,9 +38,6 @@ export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
   printCharPerLine: 32,
 };
 
-const ESC = '\x1b';
-const GS = '\x1d';
-
 function textCommand(text: string): Uint8Array {
   return new TextEncoder().encode(text + '\n');
 }

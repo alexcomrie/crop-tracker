@@ -19,6 +19,7 @@ export function BottomSheet({ open, onClose, title, children, position = 'center
               <button
                 type="button"
                 onClick={onClose}
+                aria-label="Close"
                 className="absolute right-3 top-3 text-xs text-muted-foreground"
               >
                 ✕
@@ -41,6 +42,7 @@ export function BottomSheet({ open, onClose, title, children, position = 'center
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close"
               className="absolute right-3 top-3 text-xs text-muted-foreground"
             >
               ✕

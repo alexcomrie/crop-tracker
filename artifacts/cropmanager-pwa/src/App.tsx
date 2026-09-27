@@ -7,7 +7,9 @@ import { BottomNav } from './components/layout/BottomNav';
 import { NavigationDrawer } from './components/layout/NavigationDrawer';
 import { DashboardScreen } from './screens/DashboardScreen';
 import { CropsScreen } from './screens/CropsScreen';
-import { PropagationsScreen } from './screens/PropagationsScreen';
+import { ArchivedCropsScreen } from './screens/ArchivedCropsScreen';
+import { CropDetailsScreen } from './screens/CropDetailsScreen';
+import { CropCreateScreen } from './screens/CropCreateScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { HerbicideScheduleScreen } from './screens/HerbicideScheduleScreen';
@@ -17,6 +19,7 @@ import { CropDatabaseScreen } from './components/CropDatabaseScreen';
 import { FertilizerDatabaseScreen } from './components/FertilizerDatabaseScreen';
 import { CropHistoryScreen } from './components/reports/CropHistory';
 import { CHCalculatorScreen } from './components/ch/CHCalculatorScreen';
+import { SuccessionGapReport } from './components/reports/SuccessionGapReport';
 import { ActivityScreen } from './components/activity/ActivityScreen';
 import { FarmLedgerScreen } from './components/ledger/FarmLedgerScreen';
 import { TreatmentAppRatesScreen } from './components/treatment/TreatmentAppRatesScreen';
@@ -26,6 +29,8 @@ import FarmCalculatorScreen from './components/calculator/FarmCalculatorScreen';
 import POSScreen from './components/pos/POSScreen';
 import { useAppStore } from './store/useAppStore';
 import { useTelegramReminders } from './hooks/useTelegramReminders';
+import { autoUpdateService } from './lib/autoUpdateService';
+import { migrateLegacyDatabases } from './lib/migrateLegacy';
 import type { CropDatabase, FertDatabase } from './types';
 import { loadCropDatabase } from './lib/cropDb';
 import { loadFertDatabase } from './lib/fertDb';
@@ -104,10 +109,10 @@ function AppContent() {
 
   useEffect(() => {
     async function migrateCrops() {
-      const crops = await db.crops.where('isContinuous').equals(1).toArray();
+      const allCrops = await db.crops.toArray();
+      const crops = allCrops.filter(c => (c as unknown as { isContinuous?: boolean | number }).isContinuous === true || (c as unknown as { isContinuous?: boolean | number }).isContinuous === 1);
       for (const crop of crops) {
         if (!crop.harvestFrequency || !crop.batchOffset) {
-          const numWeeks = 1;
           const batchOffset = 7;
           await db.crops.update(crop.id, {
             harvestFrequency: crop.harvestFrequency || 7,
@@ -126,6 +131,22 @@ function AppContent() {
     }
   }, []);
 
+  useEffect(() => {
+    let stopped = false;
+    // On update from older app versions: import legacy IndexedDB databases
+    // (CropManagerDB, _v2, _v3) into the current one and normalize records,
+    // then start background refreshes.
+    migrateLegacyDatabases()
+      .catch(e => console.error('[migrate] startup migration failed (continuing anyway)', e))
+      .finally(() => {
+        if (!stopped) autoUpdateService.start();
+      });
+    return () => {
+      stopped = true;
+      autoUpdateService.stop();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative">
       <TopBar />
@@ -135,16 +156,19 @@ function AppContent() {
           <Routes location={location} key={location.pathname}>
             <Route path={ROUTES.DASHBOARD} element={<AnimatedPage><DashboardScreen /></AnimatedPage>} />
             <Route path={ROUTES.CROPS} element={<AnimatedPage><CropsScreen /></AnimatedPage>} />
-            <Route path={ROUTES.PROPAGATIONS} element={<AnimatedPage><PropagationsScreen /></AnimatedPage>} />
+            <Route path={ROUTES.CROP_CREATE} element={<PanelPage><CropCreateScreen /></PanelPage>} />
+            <Route path={ROUTES.CROPS_ARCHIVE} element={<PanelPage><ArchivedCropsScreen /></PanelPage>} />
+            <Route path={ROUTES.CROP_DETAILS} element={<PanelPage><CropDetailsScreen /></PanelPage>} />
             <Route path={ROUTES.CALENDAR} element={<AnimatedPage><CalendarScreen /></AnimatedPage>} />
             <Route path={ROUTES.MORE} element={<AnimatedPage><MoreScreen /></AnimatedPage>} />
-            <Route path={ROUTES.HERB_SCHEDULE} element={<AnimatedPage><HerbicideScheduleScreen /></AnimatedPage>} />
-            <Route path={ROUTES.REMINDERS} element={<AnimatedPage><RemindersScreen /></AnimatedPage>} />
+            <Route path={ROUTES.HERB_SCHEDULE} element={<PanelPage><HerbicideScheduleScreen /></PanelPage>} />
+            <Route path={ROUTES.REMINDERS} element={<PanelPage><RemindersScreen /></PanelPage>} />
             <Route path={ROUTES.SETTINGS} element={<AnimatedPage><SettingsScreen /></AnimatedPage>} />
             <Route path={ROUTES.MORE_CROP_DB} element={<PanelPage><CropDatabaseRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_FERT_DB} element={<PanelPage><FertilizerDatabaseRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_HISTORY} element={<PanelPage><CropHistoryRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_CH_CALC} element={<PanelPage><CHCalculatorRoute /></PanelPage>} />
+            <Route path={ROUTES.MORE_SUCCESSION} element={<PanelPage><div className="p-4"><SuccessionGapReport /></div></PanelPage>} />
             <Route path={ROUTES.MORE_ACTIVITY} element={<PanelPage><ActivityRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_LEDGER} element={<PanelPage><FarmLedgerRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_TREATMENT_RATES} element={<PanelPage><TreatmentAppRatesRoute /></PanelPage>} />

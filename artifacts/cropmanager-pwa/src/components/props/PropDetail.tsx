@@ -2,9 +2,8 @@ import React from 'react';
 import { BottomSheet } from '../shared/BottomSheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatDateShort } from '../../lib/dates';
 import type { Propagation } from '../../types';
-import { Trash2, Edit3, Calendar, Tag, Info } from 'lucide-react';
+import { Trash2, Edit3, Calendar, Info } from 'lucide-react';
 
 interface PropDetailProps {
   prop: Propagation;

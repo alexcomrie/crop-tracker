@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Trash2, Download, ChevronLeft, X, ArrowRight, Tag, ArrowLeft } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import dexieDb from '../db/db';
+import { Search, Plus, Trash2, Download, ChevronLeft, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { loadCropDatabase, getNonAliasCrops, getAliases, isAlias, saveCropDatabaseOverride } from '../lib/cropDb';
-import type { CropDatabase, CropData, CropDbRecord } from '../types';
+import type { CropDatabase, CropData } from '../types';
 import { useAppStore } from '../store/useAppStore';
 
 const PLANT_TYPES = [
@@ -22,12 +24,14 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newKey, setNewKey] = useState('');
+  const [tab, setTab] = useState<'foundation'|'personal'>('personal');
+  const personalList = useLiveQuery(() => dexieDb.personalCropDb.toArray(), []) ?? [];
 
   useEffect(() => {
     loadCropDatabase().then(data => {
       setDb(data);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading || !db) return <div className="p-8 text-center">Loading database...</div>;
@@ -94,7 +98,13 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
 
   const handleSaveDb = () => {
     if (!db) return;
-    saveCropDatabaseOverride(db);
+    try {
+      saveCropDatabaseOverride(db);
+    } catch (e) {
+      console.error('[cropdb] save override failed', { e });
+      toast.error('Could not save database: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     setCropDb(db);
     toast.success('Crop Database saved locally on this device.');
   };
@@ -112,35 +122,43 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="flex flex-col h-full bg-white animate-in slide-in-from-right duration-300">
-      <header className="flex items-center justify-between p-4 border-b shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={selectedKey ? () => setSelectedKey(null) : onClose} className="p-1 hover:bg-gray-100 rounded-full">
-            {selectedKey ? (
-              <>
-                <ArrowLeft className="w-6 h-6 md:hidden" />
-                <ChevronLeft className="w-6 h-6 hidden md:block" />
-              </>
-            ) : (
-              <ChevronLeft className="w-6 h-6" />
+      <header className="flex flex-col border-b shrink-0">
+        <div className="flex items-center justify-between p-4 pb-2">
+          <div className="flex items-center gap-3">
+            <button onClick={selectedKey ? () => setSelectedKey(null) : onClose} className="p-1 hover:bg-gray-100 rounded-full">
+              {selectedKey ? (
+                <>
+                  <ArrowLeft className="w-6 h-6 md:hidden" />
+                  <ChevronLeft className="w-6 h-6 hidden md:block" />
+                </>
+              ) : (
+                <ChevronLeft className="w-6 h-6" />
+              )}
+            </button>
+            <h2 className="font-bold text-lg">
+              {selectedKey && !isAlias(selectedEntry) ? (selectedEntry as CropData).display_name : 'Crop Database'}
+            </h2>
+          </div>
+          <div className="flex gap-2">
+            {!selectedKey && tab==='foundation' && (
+              <Button size="sm" onClick={() => setIsAdding(true)} className="bg-green-700">
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
             )}
-          </button>
-          <h2 className="font-bold text-lg">
-            {selectedKey && !isAlias(selectedEntry) ? (selectedEntry as CropData).display_name : 'Crop Database'}
-          </h2>
-        </div>
-        <div className="flex gap-2">
-          {!selectedKey && (
-            <Button size="sm" onClick={() => setIsAdding(true)} className="bg-green-700">
-              <Plus className="w-4 h-4 mr-1" /> Add
+            <Button variant="ghost" size="sm" onClick={handleSaveDb} className="text-green-700 hidden sm:flex">
+               Save File
             </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleSaveDb} className="text-green-700 hidden sm:flex">
-             Save File
-          </Button>
-          <Button variant="ghost" size="sm" onClick={exportJson} className="text-green-700 hidden sm:flex">
-            <Download className="w-4 h-4 mr-2" /> Export
-          </Button>
+            <Button variant="ghost" size="sm" onClick={exportJson} className="text-green-700 hidden sm:flex">
+              <Download className="w-4 h-4 mr-2" /> Export
+            </Button>
+          </div>
         </div>
+        <div className="flex gap-1 px-4 pb-3">
+          <button onClick={()=>setTab('personal')} className={`flex-1 py-1.5 rounded-full text-xs font-bold border ${tab==='personal'?'bg-green-700 text-white border-green-700':'bg-white border-gray-200'}`}>Personal (tinygpt)</button>
+          <button onClick={()=>setTab('foundation')} className={`flex-1 py-1.5 rounded-full text-xs font-bold border ${tab==='foundation'?'bg-green-700 text-white border-green-700':'bg-white border-gray-200'}`}>Foundation (ref)</button>
+        </div>
+        {tab==='personal' && <p className="px-4 pb-2 text-[11px] text-muted-foreground">Personal DB built from your crops via tinygpt. Foundation is read-only reference.</p>}
+        {tab==='foundation' && <p className="px-4 pb-2 text-[11px] text-amber-600">Foundation is reference only — edits disabled. Use Personal.</p>}
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -156,42 +174,58 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
                 onChange={e => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setShowAliases(!showAliases)}
-                className={`flex-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors ${showAliases ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
-              >
-                {showAliases ? 'Aliases On' : 'Show Aliases'}
-              </button>
-              <Button size="sm" onClick={() => setIsAdding(true)} className="bg-green-700 md:hidden h-7 px-2 text-[10px]">
-                <Plus className="w-3 h-3 mr-1" /> Add
-              </Button>
-            </div>
+            {tab==='foundation' && (
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setShowAliases(!showAliases)}
+                  className={`flex-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors ${showAliases ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}
+                >
+                  {showAliases ? 'Aliases On' : 'Show Aliases'}
+                </button>
+                <Button size="sm" onClick={() => setIsAdding(true)} className="bg-green-700 md:hidden h-7 px-2 text-[10px]">
+                  <Plus className="w-3 h-3 mr-1" /> Add
+                </Button>
+              </div>
+            )}
           </div>
           
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredCrops.map(({ key, entry }) => (
-              <button
-                key={key}
-                onClick={() => setSelectedKey(key)}
-                className={`w-full text-left p-2 rounded-lg transition-colors ${selectedKey === key ? 'bg-green-50 text-green-700 border-green-200 border' : 'hover:bg-gray-50'}`}
-              >
-                <p className="text-sm font-bold truncate">{entry.display_name}</p>
-                <p className="text-[10px] uppercase text-gray-500">{entry.plant_type}</p>
-              </button>
-            ))}
-            {filteredAliases.map(({ key, target }) => (
-              <button
-                key={key}
-                onClick={() => setSelectedKey(key)}
-                className={`w-full text-left p-2 rounded-lg border border-dashed transition-colors ${selectedKey === key ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-gray-200 hover:bg-gray-50'}`}
-              >
-                <p className="text-sm font-bold truncate flex items-center gap-1">
-                  <ArrowRight className="w-3 h-3 shrink-0" /> {key}
-                </p>
-                <p className="text-[10px] text-gray-400">Alias for {target}</p>
-              </button>
-            ))}
+            {tab==='personal' ? (
+              <>
+                {personalList.filter((r:any)=> r.key.includes(searchQuery.toLowerCase()) || r.displayName.toLowerCase().includes(searchQuery.toLowerCase())).map((r:any)=>(
+                  <div key={r.key} className="p-2 rounded-lg border bg-green-50 border-green-200">
+                    <p className="text-sm font-bold truncate">{r.displayName}</p>
+                    <p className="text-[10px] text-gray-600">{r.growingTimeDays}d · {r.plantType} · ×{r.sampleCount}</p>
+                  </div>
+                ))}
+                {personalList.length===0 && <p className="text-xs text-muted-foreground p-2">No personal data yet — add crops to build.</p>}
+              </>
+            ) : (
+              <>
+                {filteredCrops.map(({ key, entry }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedKey(key)}
+                    className={`w-full text-left p-2 rounded-lg transition-colors ${selectedKey === key ? 'bg-green-50 text-green-700 border-green-200 border' : 'hover:bg-gray-50'}`}
+                  >
+                    <p className="text-sm font-bold truncate">{entry.display_name}</p>
+                    <p className="text-[10px] uppercase text-gray-500">{entry.plant_type}</p>
+                  </button>
+                ))}
+                {filteredAliases.map(({ key, target }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSelectedKey(key)}
+                    className={`w-full text-left p-2 rounded-lg border border-dashed transition-colors ${selectedKey === key ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    <p className="text-sm font-bold truncate flex items-center gap-1">
+                      <ArrowRight className="w-3 h-3 shrink-0" /> {key}
+                    </p>
+                    <p className="text-[10px] text-gray-400">Alias for {target}</p>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
           
           <div className="p-3 border-t md:hidden bg-gray-50 flex gap-2">
@@ -201,11 +235,17 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Editor */}
-        <div className={`${selectedKey ? 'flex' : 'hidden md:block'} flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 flex-col`}>
-          {!selectedKey ? (
+        <div className={`${selectedKey ? 'flex' : 'hidden md:block'} flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 flex-col ${tab==='personal' ? 'opacity-40 pointer-events-none' : ''}`}>
+          {tab==='personal' ? (
+            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4 text-xl">🧠</div>
+              <p className="text-sm font-semibold">Personal DB — built by tinygpt</p>
+              <p className="text-xs mt-1">Adds crops to learn your timing.</p>
+            </div>
+          ) : !selectedKey ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-3xl">🌱</div>
-              <p>Select a crop to edit its definitions</p>
+              <p>Select a crop to view foundation (reference only)</p>
             </div>
           ) : isAlias(selectedEntry) ? (
             <div className="max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-2xl border shadow-sm space-y-6">

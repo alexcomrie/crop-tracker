@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '../store/useAppStore';
@@ -14,6 +14,9 @@ export function SettingsScreen() {
   const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
 
+  // Keep the editable copy in sync if settings change elsewhere
+  useEffect(() => { setLocal(settings); }, [settings]);
+
   function handleSave() {
     updateSettings(local);
     setSaved(true);
@@ -27,7 +30,13 @@ export function SettingsScreen() {
         type={type}
         value={String((local as any)[key] ?? '')}
         placeholder={placeholder}
-        onChange={e => setLocal(l => ({ ...l, [key]: type === 'number' ? Number(e.target.value) : e.target.value }))}
+        onChange={e => setLocal(l => {
+          if (type !== 'number') return { ...l, [key]: e.target.value };
+          // Empty input clears to previous saved value instead of storing NaN
+          if (e.target.value === '') return l;
+          const n = Number(e.target.value);
+          return { ...l, [key]: Number.isNaN(n) ? l[key] : n };
+        })}
         className="h-10"
       />
       {hint && <p className="text-[10px] text-muted-foreground leading-tight italic">{hint}</p>}
@@ -35,7 +44,7 @@ export function SettingsScreen() {
   );
 
   return (
-    <div className="pb-24 pt-2 px-4 space-y-4 max-w-md mx-auto">
+    <div className="min-h-screen bg-gray-50 pb-24 pt-2 px-4 space-y-4 max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-4">Settings</h1>
 
       {/* Weather */}

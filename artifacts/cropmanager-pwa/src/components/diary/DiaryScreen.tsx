@@ -24,7 +24,7 @@ export default function DiaryScreen() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const allEntries = useLiveQuery(
-    () => db.diaryEntries.orderBy('updatedAt').toArray(),
+    () => db.diaryEntries.orderBy('updatedAt').reverse().limit(200).toArray(),
     []
   ) ?? [];
 
@@ -52,14 +52,18 @@ export default function DiaryScreen() {
       map.get(key)!.entries.push(e);
     }
 
+    const ts = (d: string) => {
+      const parsed = parseDate(d);
+      return parsed ? parsed.getTime() : 0;
+    };
     for (const group of map.values()) {
-      group.entries.sort((a, b) => a.date.localeCompare(b.date));
+      group.entries.sort((a, b) => ts(a.date) - ts(b.date));
     }
 
     return Array.from(map.values()).sort((a, b) => {
       const aLast = a.entries[a.entries.length - 1]?.date || '';
       const bLast = b.entries[b.entries.length - 1]?.date || '';
-      return bLast.localeCompare(aLast);
+      return ts(bLast) - ts(aLast);
     });
   }, [allEntries, filterType, search]);
 
@@ -73,7 +77,11 @@ export default function DiaryScreen() {
   };
 
   async function handleDeleteEntry(id: string) {
-    await db.diaryEntries.delete(id);
+    try {
+      await db.diaryEntries.delete(id);
+    } catch (e) {
+      console.error('[diary] delete failed', { id, e });
+    }
   }
 
   const formatDate = (dateStr: string) => {

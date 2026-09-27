@@ -58,11 +58,15 @@ const DEFAULT_META = {
 
 export function getFertProfile(cropName: string, fertDb: FertDatabase, cropDb: Record<string, any>): FertProfile {
   const key = cropName.toLowerCase().replace(/\s+/g, '_');
-  if (fertDb[key]) return fertDb[key];
-  if (fertDb[cropName]) return fertDb[cropName];
-  const partial = Object.keys(fertDb).find(k => key.includes(k) || k.includes(key));
-  if (partial) return fertDb[partial];
-  const profileKey = CROP_FERT_TYPE[key] ?? 'leafy';
+  const cropsMap = (fertDb as unknown as { crops?: Record<string, unknown> }).crops ?? (fertDb as unknown as Record<string, unknown>);
+  if ((cropsMap as Record<string, unknown>)[key]) return (cropsMap as Record<string, unknown>)[key] as FertProfile;
+  if ((cropsMap as Record<string, unknown>)[cropName]) return (cropsMap as Record<string, unknown>)[cropName] as FertProfile;
+  const partial = Object.keys(cropsMap).find(k => key.includes(k) || k.includes(key));
+  if (partial) return (cropsMap as Record<string, unknown>)[partial] as FertProfile;
+  const typeKey = CROP_FERT_TYPE[key] ?? CROP_FERT_TYPE[cropName.toLowerCase()] ?? 'leafy';
+  // cucurbit/brassica/root/legume/allium map to leafy or fruiting
+  const mapped: Record<string, string> = { cucurbit: 'fruiting', brassica: 'leafy', root: 'leafy', legume: 'leafy', allium: 'leafy', tuber: 'leafy', grain: 'leafy' };
+  const profileKey = mapped[typeKey] ?? typeKey;
   return FERT_PROFILES[profileKey] ?? FERT_PROFILES.leafy;
 }
 
@@ -93,11 +97,16 @@ export function buildFertScheduleData(
 
   const planted = parseDate(crop.plantingDate);
   const daysOld = planted ? daysBetween(planted, today()) : 0;
-
+  // proportional thresholds based on growing_time_days if available via cropData
+  let growTotal = 60;
+  try {
+    const cd = (cropDb as Record<string, unknown>)[crop.cropName.toLowerCase()] as unknown as CropData | undefined;
+    if (cd?.growing_time_days) growTotal = cd.growing_time_days;
+  } catch {}
   let currentActiveStageKey = 'seedling';
-  if (daysOld > 60) currentActiveStageKey = 'fruiting';
-  else if (daysOld > 40) currentActiveStageKey = 'flowering';
-  else if (daysOld > 20) currentActiveStageKey = 'mid_vegetative';
+  if (daysOld > growTotal * 0.7) currentActiveStageKey = 'fruiting';
+  else if (daysOld > growTotal * 0.45) currentActiveStageKey = 'flowering';
+  else if (daysOld > growTotal * 0.25) currentActiveStageKey = 'mid_vegetative';
 
   const stageKeys = ['seedling', 'mid_vegetative', 'flowering', 'fruiting'];
   const stageLabels: Record<string, string> = {

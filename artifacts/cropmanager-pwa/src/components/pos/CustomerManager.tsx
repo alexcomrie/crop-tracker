@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { User, Plus, Pencil, Trash2, X, Search, Save } from 'lucide-react';
 import type { PosCustomer } from '../../types';
-import { formatDateShort, today } from '../../lib/dates';
 
 interface Props {
   onClose: () => void;
@@ -42,25 +41,36 @@ export function CustomerManager({ onClose, onSelect }: Props) {
   async function handleSave() {
     if (!name) { toast.error('Customer name is required'); return; }
     const now = Date.now();
-    if (editCustomer) {
-      await db.posCustomers.update(editCustomer.id, { name, phone, email, notes, updatedAt: now });
-      toast.success(`"${name}" updated`);
-    } else {
-      await db.posCustomers.add({
-        id: generateId('CT'),
-        name, phone, email, notes,
-        totalPurchases: 0, pointsBalance: 0, pointsLifetime: 0,
-        lastPurchaseDate: '', createdAt: now, updatedAt: now,
-      });
-      toast.success(`"${name}" added`);
+    try {
+      if (editCustomer) {
+        await db.posCustomers.update(editCustomer.id, { name, phone, email, notes, updatedAt: now });
+        toast.success(`"${name}" updated`);
+      } else {
+        await db.posCustomers.add({
+          id: generateId('CT'),
+          name, phone, email, notes,
+          totalPurchases: 0, pointsBalance: 0, pointsLifetime: 0,
+          lastPurchaseDate: '', createdAt: now, updatedAt: now,
+        });
+        toast.success(`"${name}" added`);
+      }
+    } catch (e) {
+      console.error('[pos] customer save failed', { name, e });
+      toast.error('Could not save customer: ' + (e instanceof Error ? e.message : String(e)));
+      return;
     }
     resetForm();
   }
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this customer? This will NOT delete their sales history.')) {
-      await db.posCustomers.delete(id);
-      toast.success('Customer deleted');
+      try {
+        await db.posCustomers.delete(id);
+        toast.success('Customer deleted');
+      } catch (e) {
+        console.error('[pos] customer delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 

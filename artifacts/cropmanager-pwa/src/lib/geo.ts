@@ -26,6 +26,69 @@ export function calcArea(points: GeoPoint[] | undefined | null): { sqM: number; 
   return { sqM: area, display: `${area.toFixed(1)} m²` };
 }
 
+/**
+ * Uniform meter-based projection shared by every SVG map (M2).
+ * Previously lat/lng were stretched independently to fill w×h, so long thin
+ * farms rendered square in SVG but correct in Leaflet, and the distance tool
+ * measured on distorted coordinates. One scale + centering keeps SVG and
+ * Leaflet in agreement; `unprojectPoint` is the exact inverse for edits.
+ */
+export interface ProjectionFrame {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  mPerDegLat: number;
+  mPerDegLng: number;
+  scale: number;
+  offX: number;
+  offY: number;
+}
+
+export function projectionFrame(
+  allPoints: (GeoPoint[] | undefined | null)[],
+  w: number,
+  h: number,
+  pad = 20
+): ProjectionFrame | null {
+  const valid = allPoints.filter((p): p is GeoPoint[] => !!p && p.length > 0);
+  if (valid.length === 0) return null;
+  const flat = valid.flat().filter(p => p.lat !== 0 || p.lng !== 0);
+  if (flat.length === 0) return null;
+  const lats = flat.map(p => p.lat);
+  const lngs = flat.map(p => p.lng);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const avgLat = (minLat + maxLat) / 2;
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos((avgLat * Math.PI) / 180);
+  const rangeXM = Math.max(1, (maxLng - minLng) * mPerDegLng);
+  const rangeYM = Math.max(1, (maxLat - minLat) * mPerDegLat);
+  const uw = w - pad * 2;
+  const uh = h - pad * 2;
+  const scale = Math.min(uw / rangeXM, uh / rangeYM);
+  return {
+    minLat, maxLat, minLng, mPerDegLat, mPerDegLng, scale,
+    offX: pad + (uw - rangeXM * scale) / 2,
+    offY: pad + (uh - rangeYM * scale) / 2,
+  };
+}
+
+export function projectPoint(p: GeoPoint, f: ProjectionFrame): { x: number; y: number } {
+  return {
+    x: f.offX + (p.lng - f.minLng) * f.mPerDegLng * f.scale,
+    y: f.offY + (f.maxLat - p.lat) * f.mPerDegLat * f.scale,
+  };
+}
+
+export function unprojectPoint(x: number, y: number, f: ProjectionFrame): GeoPoint {
+  return {
+    lng: f.minLng + (x - f.offX) / (f.mPerDegLng * f.scale),
+    lat: f.maxLat - (y - f.offY) / (f.mPerDegLat * f.scale),
+  };
+}
+
 export function gpsToSvgAll(
   allPoints: (GeoPoint[] | undefined | null)[],
   w: number,
@@ -34,22 +97,10 @@ export function gpsToSvgAll(
 ): { x: number; y: number }[][] {
   const valid = allPoints.filter((p): p is GeoPoint[] => !!p);
   if (valid.length === 0 || valid.every(p => p.length === 0)) return [];
-  const flat = valid.filter(p => p.length > 0).flat();
-  const lats = flat.map(p => p.lat);
-  const lngs = flat.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = (maxLat - minLat) || 0.0001;
-  const lngRange = (maxLng - minLng) || 0.0001;
-  const uw = w - pad * 2;
-  const uh = h - pad * 2;
+  const frame = projectionFrame(valid, w, h, pad);
+  if (!frame) return valid.map(() => []);
   return valid.map(pts =>
-    pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
-      x: pad + ((p.lng - minLng) / lngRange) * uw,
-      y: pad + ((maxLat - p.lat) / latRange) * uh,
-    }))
+    pts.filter(p => p.lat !== 0 || p.lng !== 0).map(p => projectPoint(p, frame))
   );
 }
 
@@ -60,23 +111,9 @@ export function projectPoints(
   h: number,
   pad: number
 ): { x: number; y: number }[] {
-  const valid = allRefPoints.filter((p): p is GeoPoint[] => !!p && p.length > 0);
-  if (valid.length === 0) return [];
-  const flat = valid.flat();
-  const lats = flat.map(p => p.lat);
-  const lngs = flat.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const latRange = (maxLat - minLat) || 0.0001;
-  const lngRange = (maxLng - minLng) || 0.0001;
-  const uw = w - pad * 2;
-  const uh = h - pad * 2;
-  return points.filter(p => p.lat !== 0 || p.lng !== 0).map(p => ({
-    x: pad + ((p.lng - minLng) / lngRange) * uw,
-    y: pad + ((maxLat - p.lat) / latRange) * uh,
-  }));
+  const frame = projectionFrame(allRefPoints, w, h, pad);
+  if (!frame) return [];
+  return points.filter(p => p.lat !== 0 || p.lng !== 0).map(p => projectPoint(p, frame));
 }
 
 export function formatAreaShort(sqm: number): string {

@@ -2,20 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { generateId } from '../../lib/ids';
-import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye, Link, Unlink } from 'lucide-react';
+import { MapPin, Navigation, Trash2, Edit3, Hand, Save, RotateCcw, Pencil, Plus, Home, ChevronRight, Eye, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { InteractiveMap } from './InteractiveMap';
 import { LeafletMapView } from './LeafletMapView';
 import { LinkCropModal } from './LinkCropModal';
 import { haversineMeters, calcArea, gpsToSvgAll, formatAreaShort } from '../../lib/geo';
-import type { GeoPoint, FarmArea, FarmLand, RowDetail, CropAssignment } from '../../types';
+import type { GeoPoint, FarmArea, FarmLand, CropAssignment } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
 const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Pot / Container', 'Hydroponic'];
 const CANVAS_W = 340;
 const CANVAS_H = 280;
 const MIN_POINT_DISTANCE = 1.5;
+// Fixes rougher than this are displayed but never recorded (C5)
+const MAX_GPS_ACCURACY_M = 25;
 
 function AreaSvgThumb({ points, w = 120, h = 80 }: { points: GeoPoint[] | undefined | null; w?: number; h?: number }) {
   const svg = points && points.length >= 3 ? gpsToSvgAll([points], w, h, 8)[0] : [];
@@ -37,8 +39,14 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 async function getNextPlotTag(): Promise<string> {
-  const count = await db.farmAreas.count();
-  return `PLOT${(count + 1).toString().padStart(4, '0')}`;
+  // Max numeric suffix + 1: count-based tags get reused after deletes (C3)
+  const areas = await db.farmAreas.toArray();
+  let max = 0;
+  for (const a of areas) {
+    const m = /^PLOT(\d+)$/.exec(a.tag || '');
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `PLOT${(max + 1).toString().padStart(4, '0')}`;
 }
 
 
@@ -53,13 +61,16 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [plotName, setPlotName] = useState('');
   const [landName, setLandName] = useState('');
   const [landEditId, setLandEditId] = useState<string | null>(null);
-  const [watchId, setWatchId] = useState<number | null>(null);
+  // Single GPS watch owned by a ref (never state) so start/stop can't double-subscribe (M1)
+  const watchIdRef = useRef<number | null>(null);
+  const [recording, setRecording] = useState(false);
   const [gpsStatus, setGpsStatus] = useState('');
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [status, setStatus] = useState<'unmapped' | 'mapped' | 'cultivated'>('unmapped');
-  const [rowSpacing, setRowSpacing] = useState(12);
-  const [cropAssignments, setCropAssignments] = useState<CropAssignment[]>([{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
+  // Row spacing is stored in cm (inputs were previously labelled inches — see M6)
+  const [rowSpacing, setRowSpacing] = useState(30);
+  const [cropAssignments, setCropAssignments] = useState<CropAssignment[]>([{ cropName: '', rowCount: 1, spacingInRow: 30 }]);
   const [plantingMethod, setPlantingMethod] = useState('Direct Ground');
   const [farmNotes, setFarmNotes] = useState('');
   const manualCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -102,13 +113,55 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setGpsStatus(`Obstacle bypassed: ${newPoints.length} points added`);
   }
 
+  // Cleanup on unmount only — the ref always holds the live watch id (M1)
   useEffect(() => {
-    return () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId); };
-  }, [watchId]);
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    };
+  }, []);
+
+  function stopWatch() {
+    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    watchIdRef.current = null;
+    setRecording(false);
+  }
+
+  function gpsErrorMessage(err: GeolocationPositionError): string {
+    if (err.code === err.PERMISSION_DENIED) return 'Location permission denied — enable it in your browser settings, then try again.';
+    if (err.code === err.POSITION_UNAVAILABLE) return 'No GPS signal — move outdoors with a clear sky view.';
+    return `GPS timeout — still trying. ${err.message}`;
+  }
 
   useEffect(() => {
     if (mode === 'manual' && manualCanvasRef.current) drawManualGrid(manualCanvasRef.current, currentPoints);
   }, [mode, currentPoints]);
+
+  // Anchor the manual sketch grid to the selected land's real GPS bounds (C1).
+  // Previously the canvas invented pseudo-degrees (±1.1° ≈ hundreds of km) that were
+  // persisted as real coordinates — absurd areas + pins in the ocean on Leaflet.
+  function manualAnchor(): { minLat: number; minLng: number; mPerPxX: number; mPerPxY: number; w: number; h: number } | null {
+    const pts = selectedLand?.points;
+    if (!pts || pts.length < 3) return null;
+    const lats = pts.map(p => p.lat);
+    const lngs = pts.map(p => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const wM = haversineMeters({ lat: minLat, lng: minLng }, { lat: minLat, lng: maxLng }) || 1;
+    const hM = haversineMeters({ lat: minLat, lng: minLng }, { lat: maxLat, lng: minLng }) || 1;
+    const canvas = manualCanvasRef.current;
+    const w = canvas?.width ?? 340;
+    const h = canvas?.height ?? 300;
+    return { minLat, minLng, mPerPxX: wM / w, mPerPxY: hM / h, w, h };
+  }
+
+  function projectManualToPx(p: GeoPoint, anchor: { minLat: number; minLng: number; mPerPxX: number; mPerPxY: number; w: number; h: number }) {
+    const dxM = (p.lng - anchor.minLng) * 111320 * Math.cos(anchor.minLat * Math.PI / 180);
+    const dyM = (p.lat - anchor.minLat) * 111320;
+    return { x: dxM / anchor.mPerPxX, y: anchor.h - dyM / anchor.mPerPxY };
+  }
 
   function drawManualGrid(canvas: HTMLCanvasElement, pts: GeoPoint[]) {
     const ctx = canvas.getContext('2d');
@@ -120,12 +173,15 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     ctx.lineWidth = 0.5;
     for (let x = 0; x <= w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
     for (let y = 0; y <= h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    const anchor = manualAnchor();
+    if (!anchor) {
+      ctx.fillStyle = '#9ca3af';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Select a GPS-mapped land to anchor the sketch', 12, 20);
+      return;
+    }
     if (pts.length === 0) return;
-    const maxCoord = Math.max(w, h);
-    const scale = maxCoord * 0.4;
-    const cx = w / 2;
-    const cy = h / 2;
-    const scaled = pts.map(p => ({ x: cx + p.lng * scale, y: cy - p.lat * scale }));
+    const scaled = pts.map(p => projectManualToPx(p, anchor));
     ctx.beginPath(); ctx.moveTo(scaled[0].x, scaled[0].y);
     for (let i = 1; i < scaled.length; i++) ctx.lineTo(scaled[i].x, scaled[i].y);
     ctx.closePath();
@@ -138,69 +194,62 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     }
   }
 
+  // Shared fix handler: gates on accuracy (C5) so poor fixes never poison the polygon
+  function handleGpsFix(pos: GeolocationPosition) {
+    const accuracy = pos.coords.accuracy;
+    setGpsAccuracy(accuracy);
+    const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    if (accuracy > MAX_GPS_ACCURACY_M) {
+      setGpsStatus(`Waiting for better GPS fix (±${accuracy.toFixed(0)} m, need ±${MAX_GPS_ACCURACY_M} m)…`);
+      return;
+    }
+    if (obstacleActiveRef.current) {
+      setObstacleCurrentPos(pt);
+      setGpsStatus('Obstacle mode: monitoring GPS...');
+    } else {
+      setGpsStatus('Recording…');
+      setCurrentPoints(prev => {
+        if (prev.length === 0) return [pt];
+        if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
+        return [...prev, pt];
+      });
+    }
+  }
+
   function startGpsWalk() {
     if (!navigator.geolocation) { setGpsStatus('Geolocation not available'); return; }
+    // Never double-subscribe: clear any live watch first (M1)
+    stopWatch();
     setCurrentPoints([]);
     setGpsAccuracy(null);
     setGpsStatus('Getting starting position...');
+    setRecording(true);
     // Get an immediate starting position first, then switch to watchPosition
     navigator.geolocation.getCurrentPosition(
       initialPos => {
-        const startPt: GeoPoint = { lat: initialPos.coords.latitude, lng: initialPos.coords.longitude };
-        setCurrentPoints([startPt]);
-        setGpsAccuracy(initialPos.coords.accuracy);
+        handleGpsFix(initialPos);
         setGpsStatus('Starting position acquired — now recording...');
-        // Now start the continuous watch for subsequent points
-        const id = navigator.geolocation.watchPosition(
-          pos => {
-            const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setGpsAccuracy(pos.coords.accuracy);
-            if (obstacleActiveRef.current) {
-              setObstacleCurrentPos(pt);
-              setGpsStatus('Obstacle mode: monitoring GPS...');
-            } else {
-              setCurrentPoints(prev => {
-                if (prev.length === 0) return [pt];
-                if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
-                return [...prev, pt];
-              });
-            }
-          },
-          err => setGpsStatus(`GPS error: ${err.message}`),
-          { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handleGpsFix,
+          err => setGpsStatus(gpsErrorMessage(err)),
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
         );
-        setWatchId(id);
       },
       err => {
         // Fallback: start watchPosition directly if getCurrentPosition fails
         setGpsStatus('Fast fix unavailable, acquiring GPS...');
-        const id = navigator.geolocation.watchPosition(
-          pos => {
-            const pt: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            setGpsAccuracy(pos.coords.accuracy);
-            if (obstacleActiveRef.current) {
-              setObstacleCurrentPos(pt);
-              setGpsStatus('Obstacle mode: monitoring GPS...');
-            } else {
-              setCurrentPoints(prev => {
-                if (prev.length === 0) return [pt];
-                if (haversineMeters(prev[prev.length - 1], pt) < MIN_POINT_DISTANCE) return prev;
-                return [...prev, pt];
-              });
-            }
-          },
-          err2 => setGpsStatus(`GPS error: ${err2.message}`),
-          { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          handleGpsFix,
+          err2 => setGpsStatus(gpsErrorMessage(err2)),
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
         );
-        setWatchId(id);
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 2000 }
     );
   }
 
   function stopGpsWalk() {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    setWatchId(null);
+    stopWatch();
     if (currentPoints.length < 3) setGpsStatus('Need at least 3 points');
     else setGpsStatus(`${currentPoints.length} points recorded`);
   }
@@ -208,14 +257,20 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   function addManualPoint(e: React.MouseEvent<HTMLCanvasElement>) {
     const canvas = manualCanvasRef.current;
     if (!canvas) return;
+    const anchor = manualAnchor();
+    if (!anchor) {
+      toast.error('Select a GPS-mapped land first — manual sketches need real bounds');
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const w = canvas.width;
-    const h = canvas.height;
-    const maxCoord = Math.max(w, h);
-    const scale = maxCoord * 0.4;
-    setCurrentPoints(prev => [...prev, { lat: (h / 2 - y) / scale, lng: (x - w / 2) / scale }]);
+    // Canvas backing store can differ from CSS size — scale accordingly
+    const px = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const py = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const dxM = px * anchor.mPerPxX;
+    const dyM = (anchor.h - py) * anchor.mPerPxY;
+    const lat = anchor.minLat + dyM / 111320;
+    const lng = anchor.minLng + dxM / (111320 * Math.cos(anchor.minLat * Math.PI / 180));
+    setCurrentPoints(prev => [...prev, { lat, lng }]);
   }
 
   function undoLastPoint() { setCurrentPoints(prev => prev.slice(0, -1)); }
@@ -226,8 +281,8 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setPlotName('');
     setEditId(null);
     setStatus('unmapped');
-    setRowSpacing(12);
-    setCropAssignments([{ cropName: '', rowCount: 1, spacingInRow: 12 }]);
+    setRowSpacing(30);
+    setCropAssignments([{ cropName: '', rowCount: 1, spacingInRow: 30 }]);
     setPlantingMethod('Direct Ground');
     setFarmNotes('');
     setGpsAccuracy(null);
@@ -262,14 +317,26 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       if (landEditId) { setSelectedLand(land); setMode('plots'); toast.success('Land updated'); }
       else { resetLandForm(); setMode('lands'); toast.success('Land saved'); }
     } catch (err) {
+      console.error('[area] save land failed', { err });
       toast.error('Failed to save land: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
   async function deleteLand(id: string) {
     if (!window.confirm('Delete this land and all its plots?')) return;
-    await db.farmAreas.where('landId').equals(id).delete();
-    await db.farmLands.delete(id);
+    try {
+      await db.farmAreas.where('landId').equals(id).delete();
+      await db.farmLands.delete(id);
+      // Never leave the UI pointing at a deleted land (M7)
+      if (selectedLand?.id === id) {
+        setSelectedLand(null);
+        setMode('lands');
+      }
+      toast.success('Land deleted');
+    } catch (err) {
+      console.error('[area] delete land failed', { id, err });
+      toast.error('Delete failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   }
 
   function selectLand(land: FarmLand) {
@@ -277,14 +344,14 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     setMode('plots');
   }
 
-  function editLandPerimeter(land: FarmLand) {
-    setCurrentPoints(land.points || []);
-    setLandName(land.name);
-    setLandEditId(land.id);
-    setMode('land-edit');
+  // Guard destructive navigation while a capture holds unsaved points (M5)
+  function confirmDiscardUnsaved(): boolean {
+    if (currentPoints.length === 0) return true;
+    return window.confirm(`Discard ${currentPoints.length} unsaved point${currentPoints.length === 1 ? '' : 's'}?`);
   }
 
   function backToLands() {
+    if (!confirmDiscardUnsaved()) return;
     setSelectedLand(null);
     resetPlotForm();
     resetLandForm();
@@ -322,6 +389,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       setMode('plots');
       toast.success('Plot saved');
     } catch (err) {
+      console.error('[area] save plot failed', { err });
       toast.error('Failed to save plot: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
@@ -344,12 +412,19 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       setMode('plots');
       toast.success('Plot details saved');
     } catch (err) {
+      console.error('[area] save details failed', { err });
       toast.error('Failed to save details: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
   async function deletePlot(id: string) {
-    if (window.confirm('Delete this plot?')) await db.farmAreas.delete(id);
+    if (!window.confirm('Delete this plot?')) return;
+    try {
+      await db.farmAreas.delete(id);
+    } catch (err) {
+      console.error('[area] delete plot failed', { id, err });
+      toast.error('Delete failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   }
 
   function editPlotPerimeter(plot: FarmArea) {
@@ -418,7 +493,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
           <label className="text-xs text-gray-500 shrink-0">Row Spacing:</label>
           <div className="flex items-center gap-1">
             <input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-20 border rounded-lg px-2 py-1.5 text-sm" />
-            <span className="text-xs text-gray-400">inches</span>
+            <span className="text-xs text-gray-400">cm</span>
           </div>
         </div>
         <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -455,7 +530,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             </div>
           </div>
         ))}
-        <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 12 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
+        <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 30 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
           + Add Another Crop
         </button>
 
@@ -469,21 +544,24 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   }
 
   function stopGps() {
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); setWatchId(null); }
+    stopWatch();
   }
 
   const backBtn = (onBack: () => void) => (
     <button onClick={onBack} className="text-gray-600 text-lg">←</button>
   );
 
-  const backToPlots = () => { stopGps(); resetPlotForm(); setMode('plots'); };
+  const backToPlots = () => {
+    if (!confirmDiscardUnsaved()) return;
+    stopGps(); resetPlotForm(); setMode('plots');
+  };
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="flex items-center gap-3 px-4 py-3 bg-white border-b sticky top-0 z-10">
         {mode === 'lands' ? backBtn(onClose)
-          : mode === 'land-gps' ? backBtn(() => { stopGps(); resetLandForm(); setMode('lands'); })
-          : mode === 'land-edit' ? backBtn(() => { stopGps(); resetLandForm(); setMode('plots'); })
+          : mode === 'land-gps' ? backBtn(() => { if (!confirmDiscardUnsaved()) return; stopGps(); resetLandForm(); setMode('lands'); })
+          : mode === 'land-edit' ? backBtn(() => { if (!confirmDiscardUnsaved()) return; stopGps(); resetLandForm(); setMode('plots'); })
           : mode === 'plots' ? backBtn(backToLands)
           : backBtn(backToPlots)}
         <h1 className="font-bold text-lg">Area Mapper</h1>
@@ -529,7 +607,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               <p className="text-sm text-gray-500">Walk around the boundary of your land to map its shape.</p>
               <input type="text" placeholder="Land name (e.g. North Property)" value={landName} onChange={e => setLandName(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
+                <span className={`px-2 py-0.5 rounded font-bold ${recording ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{recording ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
@@ -538,7 +616,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 {renderLiveSvg(currentPoints)}
                 {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
               </div>
-              {watchId === null ? (
+              {!recording ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
                 <div className="flex gap-2">
@@ -568,7 +646,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               <h2 className="font-semibold">Edit Land Perimeter — {selectedLand.name}</h2>
               <p className="text-sm text-gray-500">Walk around the boundary to update the land shape.</p>
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
+                <span className={`px-2 py-0.5 rounded font-bold ${recording ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{recording ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
@@ -577,7 +655,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 {renderLiveSvg(currentPoints)}
                 {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
               </div>
-              {watchId === null ? (
+              {!recording ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
                 <div className="flex gap-2">
@@ -611,8 +689,14 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 editingLandId={editingLandPoints ? selectedLand.id : undefined}
                 onPointsChange={(id, points) => {
                   if (id === selectedLand.id) {
+                    // Recalc area on every drag-edit or it goes stale forever (C4)
                     const now = Date.now();
-                    db.farmLands.where('id').equals(id).modify({ points, updatedAt: now });
+                    const { sqM, display } = calcArea(points);
+                    db.farmLands.where('id').equals(id).modify({ points, areaSqM: sqM, areaDisplay: display, updatedAt: now })
+                      .catch((e: unknown) => {
+                        console.error('[area] land perimeter update failed', { id, e });
+                        toast.error('Update failed: ' + (e instanceof Error ? e.message : String(e)));
+                      });
                     toast.success('Land perimeter updated');
                     setEditingLandPoints(false);
                   }
@@ -621,14 +705,29 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               />
             )}
             <div className="flex gap-2">
-              <button onClick={() => { resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
-              <button onClick={() => { resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
+              <button onClick={() => { if (!confirmDiscardUnsaved()) return; resetPlotForm(); setMode('gps'); }} className="flex-1 bg-green-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Navigation className="w-5 h-5" /> GPS Walk</button>
+              <button onClick={() => { if (!confirmDiscardUnsaved()) return; resetPlotForm(); setMode('manual'); }} className="flex-1 bg-blue-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><Hand className="w-5 h-5" /> Manual</button>
               {selectedLand.points?.length >= 3 && (
                 <button onClick={() => setMode('map')} className="flex-1 bg-indigo-600 text-white rounded-xl py-3 font-semibold flex items-center justify-center gap-2"><MapPin className="w-5 h-5" /> Map</button>
               )}
             </div>
             {selectedLand.points?.length >= 3 && (
-              <button onClick={() => setEditingLandPoints(!editingLandPoints)} className={`w-full text-xs rounded-lg py-2 flex items-center justify-center gap-1 ${editingLandPoints ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'text-gray-500 border border-dashed hover:bg-gray-50'}`}><Pencil className="w-3 h-3" /> {editingLandPoints ? 'Done Editing' : 'Edit land perimeter'}</button>
+              <div className="flex gap-2">
+                <button onClick={() => setEditingLandPoints(!editingLandPoints)} className={`flex-1 text-xs rounded-lg py-2 flex items-center justify-center gap-1 ${editingLandPoints ? 'bg-blue-100 text-blue-700 border border-blue-300' : 'text-gray-500 border border-dashed hover:bg-gray-50'}`}><Pencil className="w-3 h-3" /> {editingLandPoints ? 'Done Editing' : 'Edit land perimeter'}</button>
+                <button
+                  onClick={() => {
+                    if (!confirmDiscardUnsaved()) return;
+                    // Enter the GPS re-walk flow for this land (C2 — mode was unreachable)
+                    setLandEditId(selectedLand.id);
+                    setLandName(selectedLand.name);
+                    setCurrentPoints(selectedLand.points || []);
+                    setGpsAccuracy(null);
+                    setGpsStatus('');
+                    setMode('land-edit');
+                  }}
+                  className="flex-1 text-xs rounded-lg py-2 flex items-center justify-center gap-1 text-gray-500 border border-dashed hover:bg-gray-50"
+                ><Navigation className="w-3 h-3" /> Re-walk perimeter</button>
+              </div>
             )}
             <p className="text-xs text-gray-400">{plots?.length || 0} plot{(plots?.length || 0) !== 1 ? 's' : ''}</p>
             {(!plots || plots.length === 0) && (
@@ -692,22 +791,42 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                     try {
                       const { parseGeoJsonFile, geoJsonToPlots } = await import('../../lib/geoJson');
                       const fc = await parseGeoJsonFile(file);
+                      const parsed = geoJsonToPlots(fc, selectedLand.id);
+                      if (parsed.length === 0) {
+                        toast.error('No valid polygons found in file');
+                        return;
+                      }
                       const now = Date.now();
-                      for (const plot of geoJsonToPlots(fc, selectedLand.id)) {
+                      // Pre-allocate tags sequentially (no per-feature tag race), one bulk write (M8)
+                      const existing = await db.farmAreas.toArray();
+                      const taken = new Set(existing.map(a => a.tag));
+                      let max = 0;
+                      for (const a of existing) {
+                        const m = /^PLOT(\d+)$/.exec(a.tag || '');
+                        if (m) max = Math.max(max, parseInt(m[1], 10));
+                      }
+                      const docs = parsed.map(plot => {
+                        let tag = plot.tag;
+                        if (!tag || taken.has(tag)) {
+                          max += 1;
+                          tag = `PLOT${max.toString().padStart(4, '0')}`;
+                        }
+                        taken.add(tag);
                         const { sqM, display } = calcArea(plot.points);
-                        const tag = await getNextPlotTag();
-                        await db.farmAreas.put({
+                        return {
                           ...plot,
                           id: generateId('FA'),
-                          tag: plot.tag || tag,
+                          tag,
                           areaSqM: sqM,
                           areaDisplay: display,
                           createdAt: new Date().toISOString(),
                           updatedAt: now,
-                        });
-                      }
-                      toast.success('GeoJSON plots imported');
+                        };
+                      });
+                      await db.farmAreas.bulkAdd(docs);
+                      toast.success(`Imported ${docs.length} plot${docs.length === 1 ? '' : 's'}`);
                     } catch (e) {
+                      console.error('[area] geojson import failed', { e });
                       toast.error('Import failed: ' + (e instanceof Error ? e.message : 'unknown error'));
                     }
                   };
@@ -733,6 +852,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
           <LinkCropModal
             plotId={linkModalPlot}
             crops={allCrops}
+            plots={plots || []}
             onClose={() => setLinkModalPlot(null)}
           />
         )}
@@ -743,7 +863,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             <div className="bg-white rounded-xl border p-4 space-y-3">
               <h2 className="font-semibold flex items-center gap-2"><Navigation className="w-5 h-5 text-green-600" /> Walk Plot Perimeter{plotTag ? ` — ${plotTag}` : ''}</h2>
               <div className="flex items-center gap-2 flex-wrap text-xs">
-                <span className={`px-2 py-0.5 rounded font-bold ${watchId !== null ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{watchId !== null ? '● Recording' : 'Stopped'}</span>
+                <span className={`px-2 py-0.5 rounded font-bold ${recording ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{recording ? '● Recording' : 'Stopped'}</span>
                 {gpsAccuracy !== null && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">GPS ±{gpsAccuracy.toFixed(0)} m</span>}
                 <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{currentPoints.length} points</span>
                 {currentPoints.length >= 3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded font-mono">{calcArea(currentPoints).display}</span>}
@@ -753,7 +873,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 {obstacleActive && obstacleStartPos && obstacleCurrentPos && renderObstaclePreview(currentPoints, obstacleStartPos, obstacleCurrentPos)}
               </div>
               <p className="text-xs text-gray-500">{gpsStatus}</p>
-              {watchId === null ? (
+              {!recording ? (
                 <Button onClick={startGpsWalk} className="w-full bg-green-600 hover:bg-green-700"><Navigation className="w-4 h-4" /> {currentPoints.length > 0 ? 'Resume Recording' : 'Start Walk'}</Button>
               ) : (
                 <div className="flex gap-2">
@@ -783,7 +903,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-4 space-y-3">
               <h2 className="font-semibold flex items-center gap-2"><Hand className="w-5 h-5 text-blue-600" /> Manual Point Entry</h2>
-              <p className="text-sm text-gray-500">Tap the grid to place points.</p>
+              <p className="text-sm text-gray-500">Tap the grid to place points. Sketch is anchored to {selectedLand?.name ?? 'the land'} bounds — verify on Map before saving.</p>
               <canvas ref={manualCanvasRef} width={340} height={300} onClick={addManualPoint} className="w-full border rounded-lg bg-white cursor-crosshair" style={{ maxWidth: 340, margin: '0 auto' }} />
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">{currentPoints.length} points</span>
@@ -812,7 +932,12 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 editingPlotId={editingPoints ? (editId ?? undefined) : undefined}
                 onPointsChange={(plotId, points) => {
                   const now = Date.now();
-                  db.farmAreas.where('id').equals(plotId).modify({ points, updatedAt: now });
+                  const { sqM, display } = calcArea(points);
+                  db.farmAreas.where('id').equals(plotId).modify({ points, areaSqM: sqM, areaDisplay: display, updatedAt: now })
+                    .catch((e: unknown) => {
+                      console.error('[area] plot points update failed', { plotId, e });
+                      toast.error('Update failed: ' + (e instanceof Error ? e.message : String(e)));
+                    });
                   toast.success('Points updated');
                   setEditingPoints(false);
                 }}
@@ -831,7 +956,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                 <label className="text-xs text-gray-500 shrink-0">Row Spacing:</label>
                 <div className="flex items-center gap-1">
                   <input type="number" min={1} value={rowSpacing} onChange={e => setRowSpacing(Number(e.target.value))} className="w-20 border rounded-lg px-2 py-1.5 text-sm" />
-                  <span className="text-xs text-gray-400">inches</span>
+                  <span className="text-xs text-gray-400">cm</span>
                 </div>
               </div>
               <select value={plantingMethod} onChange={e => setPlantingMethod(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -865,7 +990,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                   </div>
                 </div>
               ))}
-              <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 12 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
+              <button onClick={() => setCropAssignments(prev => [...prev, { cropName: '', rowCount: 1, spacingInRow: 30 }])} className="text-xs text-blue-600 font-semibold w-full py-1.5 border border-dashed rounded-lg hover:bg-blue-50">
                 + Add Another Crop
               </button>
               <textarea placeholder="General notes..." value={farmNotes} onChange={e => setFarmNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />

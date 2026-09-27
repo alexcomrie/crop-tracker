@@ -6,6 +6,9 @@ interface PropCardProps {
   prop: Propagation;
   onClick: () => void;
   onAction: (action: string) => void;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggle?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -16,7 +19,7 @@ const STATUS_COLORS: Record<string, string> = {
   Failed: '#e53935',
 };
 
-export function PropCard({ prop, onClick, onAction }: PropCardProps) {
+export function PropCard({ prop, onClick, onAction, selectMode, selected, onToggle }: PropCardProps) {
   const propDate = parseDate(prop.propagationDate);
   const daysOld = propDate ? daysBetween(propDate, today()) : 0;
   const rootingEnd = parseDate(prop.expectedRootingEnd);
@@ -24,17 +27,31 @@ export function PropCard({ prop, onClick, onAction }: PropCardProps) {
 
   return (
     <div
-      className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 cursor-pointer active:scale-[0.98] transition-all"
+      className={`bg-white rounded-xl shadow-sm border py-3 px-3 cursor-pointer active:scale-[0.98] transition-all ${selected ? 'border-green-600 ring-1 ring-green-600' : 'border-gray-100'}`}
       onClick={onClick}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div>
-          <h3 className="font-semibold text-gray-900">{prop.plantName}</h3>
-          <p className="text-sm text-muted-foreground">{prop.propagationMethod}</p>
+      <div className="flex items-start justify-between mb-2 gap-2">
+        {selectMode && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={e => { e.stopPropagation(); onToggle?.(); }}
+            onClick={e => e.stopPropagation()}
+            className="w-5 h-5 accent-green-700 shrink-0 mt-0.5"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 truncate">{prop.plantName}</h3>
+          <p className="text-sm text-muted-foreground truncate">{prop.propagationMethod}</p>
         </div>
-        <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white ml-2 whitespace-nowrap"
-          style={{ backgroundColor: STATUS_COLORS[prop.status] ?? '#9e9e9e' }}>
-          {prop.status}
+        <span className="flex items-center gap-1 shrink-0">
+          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none bg-blue-50 text-blue-700">
+            🌿 Prop
+          </span>
+          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white ml-1 whitespace-nowrap leading-none"
+            style={{ backgroundColor: STATUS_COLORS[prop.status] ?? '#9e9e9e' }}>
+            {prop.status}
+          </span>
         </span>
       </div>
 

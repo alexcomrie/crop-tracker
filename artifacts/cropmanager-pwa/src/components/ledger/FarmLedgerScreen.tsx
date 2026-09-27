@@ -4,9 +4,11 @@ import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, Trash2, DollarSign, ShoppingCart, Package, TrendingUp, BarChart3, Pencil } from 'lucide-react';
+import Papa from 'papaparse';
 import { generateId } from '../../lib/ids';
 import { formatDateShort, today } from '../../lib/dates';
 import { addDiaryEntry } from '../../lib/diary';
+import { toast } from 'sonner';
 import type { LedgerEntry, LedgerEntryType } from '../../types';
 
 const EXPENSE_CATEGORIES = ['Seeds', 'Fungicide', 'Herbicide', 'Insecticide', 'Pesticide', 'Fertilizer', 'Tools', 'Equipment', 'Labor', 'Irrigation', 'Soil/Media', 'Transport', 'Packaging', 'Other'];
@@ -19,9 +21,11 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 type LedgerTab = 'expense' | 'sales' | 'inventory' | 'pnl' | 'charts';
 
 export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
-  const entriesData = useLiveQuery(() => 
-    db.ledgerEntries.orderBy('date').reverse().toArray()
-  );
+  const entriesData = useLiveQuery(async () => {
+    const all = await db.ledgerEntries.toArray();
+    const { parseDate } = await import('../../lib/dates');
+    return all.sort((a,b)=> (parseDate(b.date)?.getTime()||0) - (parseDate(a.date)?.getTime()||0));
+  });
   const entries = entriesData ?? [];
   const isLoading = entriesData === undefined;
 
@@ -76,8 +80,13 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   }
 
   async function handleSave() {
-    if (!form.category || !form.amount) return;
+    if (!form.category || !form.amount) { toast.error('Category and amount are required'); return; }
+    const amt = parseFloat(form.amount);
+    if (isNaN(amt) || amt <= 0) { toast.error('Amount must be > 0'); return; }
+    if (form.quantity && (isNaN(parseFloat(form.quantity)) || parseFloat(form.quantity) < 0)) { toast.error('Quantity invalid'); return; }
+    if (form.type === 'inventory' && !form.unit) { toast.error('Unit required for inventory'); return; }
     setSaving(true);
+    try {
     const entryData: LedgerEntry = {
       id: editId || generateId('LED'),
       type: form.type,
@@ -109,6 +118,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
 
     // Auto-log inventory for expense categories Seeds, Fungicide, Herbicide, Pesticide
     if (form.type === 'expense' && AUTO_INVENTORY_CATEGORIES.includes(form.category)) {
+      const autoBatch = form.batch || `B${Date.now()}`;
       const invEntry: LedgerEntry = {
         id: generateId('LED'),
         type: 'inventory',
@@ -121,7 +131,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         buyer: '',
         paymentStatus: 'paid',
         expiryDate: form.expiryDate,
-        batch: form.batch || `B${Date.now()}`,
+        batch: autoBatch,
         cropName: '',
         purchaseLocation: form.purchaseLocation,
         notes: `Auto-inventory: ${form.purchaseLocation ? `Purchased at ${form.purchaseLocation}. ` : ''}${form.notes || ''}`,
@@ -130,7 +140,7 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
       // Check if similar inventory entry exists and update quantity instead
       const existing = await db.ledgerEntries
         .where('type').equals('inventory')
-        .and(e => e.category === form.category && e.batch === (form.batch || `B${Date.now()}`))
+        .and(e => e.category === form.category && e.batch === autoBatch)
         .toArray();
       if (existing.length > 0 && invEntry.category !== 'Seeds') {
         invEntry.quantity += existing[0].quantity;
@@ -147,16 +157,26 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         date: invEntry.date,
       });
     }
-    setSaving(false);
     setShowForm(false);
     setEditId(null);
     resetForm();
+    toast.success('Entry saved');
+    } catch (e) {
+      console.error('[ledger] save failed', { e });
+      toast.error('Could not save entry: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleBulkSave() {
-    const lines = bulkInput.split('\n').map(l => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      const parts = line.split('\t').map(p => p.trim());
+    // TSV split or Papa-parse CSV (handles quoted commas) — one shared path
+    const rows: string[][] = bulkInput.includes('\t')
+      ? bulkInput.split('\n').map(l => l.split('\t').map(p => p.trim())).filter(r => r.some(c => c !== ''))
+      : Papa.parse<string[]>(bulkInput.trim(), { skipEmptyLines: true }).data
+          .map(r => (Array.isArray(r) ? r : [r]).map(c => String(c ?? '').trim()));
+    const entries: LedgerEntry[] = [];
+    for (const parts of rows) {
       const [cat, val, desc, qty, unit, extra] = parts;
       if (!cat || !val) continue;
       const entry: LedgerEntry = {
@@ -166,18 +186,26 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
         category: cat,
         amount: tab === 'inventory' ? 0 : (parseFloat(val) || 0),
         quantity: parseFloat(tab === 'inventory' ? val : (qty || '0')) || 0,
-        unit: tab === 'inventory' ? '' : (unit || ''),
+        unit: tab === 'inventory' ? (unit || '') : (unit || ''),
         description: desc || '',
-        buyer: tab === 'sales' ? (desc || '') : '',
+        buyer: tab === 'sales' ? (extra || '') : '',
         paymentStatus: tab === 'sales' ? (extra || 'paid') : 'paid',
         expiryDate: '',
-        batch: tab === 'inventory' ? (qty || '') : '',
-        cropName: tab === 'sales' ? (qty || '') : '',
+        batch: tab === 'inventory' ? (extra || '') : (extra || ''),
+        cropName: '',
         purchaseLocation: tab === 'expense' ? (extra || '') : '',
         notes: '',
         updatedAt: Date.now(),
       };
-      await db.ledgerEntries.put(entry);
+      entries.push(entry);
+    }
+    try {
+      if (entries.length) await db.ledgerEntries.bulkAdd(entries);
+      toast.success(`Saved ${entries.length} entries`);
+    } catch (e) {
+      console.error('[ledger] bulk save failed', { count: entries.length, e });
+      toast.error('Bulk save failed: ' + (e instanceof Error ? e.message : String(e)));
+      return;
     }
     setBulkMode(false);
     setBulkInput('');
@@ -185,7 +213,12 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
 
   async function handleDelete(id: string) {
     if (window.confirm('Delete this entry?')) {
-      await db.ledgerEntries.delete(id);
+      try {
+        await db.ledgerEntries.delete(id);
+      } catch (e) {
+        console.error('[ledger] delete failed', { id, e });
+        toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+      }
     }
   }
 
@@ -198,10 +231,6 @@ export function FarmLedgerScreen({ onClose }: { onClose: () => void }) {
   const categories = tab === 'expense' ? EXPENSE_CATEGORIES
     : tab === 'sales' ? SALE_CATEGORIES
     : INVENTORY_CATEGORIES;
-
-  const currentEntries = tab === 'expense' ? expenses
-    : tab === 'sales' ? sales
-    : inventory;
 
   const TABS: { key: LedgerTab; label: string; icon: React.ReactNode }[] = [
     { key: 'expense', label: 'Expenses', icon: <DollarSign className="w-4 h-4" /> },

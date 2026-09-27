@@ -1,61 +1,30 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
 import { LandPlotPreview } from '../components/area/LandPlotPreview';
 import { useTodayReminders } from '../hooks/useReminders';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
-import { formatDateShort, today, parseDate, formatDateDisplay } from '../lib/dates';
+import { formatDateShort, today, parseDate, formatDateDisplay, daysBetween } from '../lib/dates';
 import { markReminderDone } from '../hooks/useReminders';
-import { CropForm } from '../components/crops/CropForm';
 import { PropForm } from '../components/props/PropForm';
-import { BottomSheet } from '../components/shared/BottomSheet';
-import { SuccessionGapReport } from '../components/reports/SuccessionGapReport';
-import { Bell, Calendar, Database, CheckCircle2, ChevronRight, LayoutDashboard, Sprout } from 'lucide-react';
+import { AddEntrySheet } from '../components/shared/AddEntrySheet';
+import { CheckCircle2, Sprout } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
-
-const TYPE_EMOJI: Record<string, string> = {
-  harvest: 'Ready',
-  transplant: 'Trans',
-  spray_fungus: 'Fung',
-  spray_pest: 'Pest',
-  next_batch_planting: 'Batch',
-  germination_check: 'Germ',
-  rooting_check: 'Root',
-  fert_application: 'Fert',
-};
-
-const TYPE_DOT: Record<string, string> = {
-  harvest: 'bg-red-500',
-  transplant: 'bg-blue-500',
-  spray_fungus: 'bg-purple-500',
-  spray_pest: 'bg-orange-500',
-  next_batch_planting: 'bg-amber-500',
-  germination_check: 'bg-amber-600',
-  rooting_check: 'bg-teal-500',
-  fert_application: 'bg-green-600',
-};
-
-const TYPE_TAG: Record<string, string> = {
-  harvest: 'bg-red-50 text-red-600',
-  transplant: 'bg-blue-50 text-blue-600',
-  spray_fungus: 'bg-purple-50 text-purple-600',
-  spray_pest: 'bg-orange-50 text-orange-600',
-  next_batch_planting: 'bg-amber-50 text-amber-600',
-  germination_check: 'bg-amber-50 text-amber-700',
-  rooting_check: 'bg-teal-50 text-teal-600',
-  fert_application: 'bg-green-50 text-green-700',
-};
+import { TYPE_EMOJI, TYPE_DOT, TYPE_TAG } from '../lib/reminderUi';
+import { ROUTES } from '../lib/routes';
 
 export function DashboardScreen() {
+  const navigate = useNavigate();
   const todayReminders = useTodayReminders() ?? [];
   const todayStr = formatDateShort(today());
 
-  const upcomingData = useLiveQuery(async () => {
-    const all = await db.reminders.where('sent').equals(0).toArray();
+const upcomingData = useLiveQuery(async () => {
+    const all = await db.reminders.toArray()
     return all
-      .filter(r => r.sendDate !== todayStr && parseDate(r.sendDate) && parseDate(r.sendDate)! > today())
+      .filter(r => !r.sent && r.sendDate && r.sendDate !== todayStr && parseDate(r.sendDate) && parseDate(r.sendDate)! > today())
       .sort((a, b) => (parseDate(a.sendDate)?.getTime() || 0) - (parseDate(b.sendDate)?.getTime() || 0))
-      .slice(0, 5);
+      .slice(0, 5)
   }, [todayStr]);
   const upcomingReminders = upcomingData ?? [];
   const upcomingLoading = upcomingData === undefined;
@@ -64,25 +33,32 @@ export function DashboardScreen() {
   const activeCropsCount = activeCropsData ?? 0;
   const countsLoading = activeCropsData === undefined;
 
-  const dbEntriesData = useLiveQuery(() => (
-    db.crops.count().then(c => db.propagations.count().then(p => db.reminders.count().then(r => db.activities.count().then(a => db.ledgerEntries.count().then(l => c + p + r + a + l)))))
-  ));
-  const dbEntriesCount = dbEntriesData ?? 0;
-
   const [showFAB, setShowFAB] = useState(false);
-  const [fabDate, setFabDate] = useState(today());
-  const [showCropForm, setShowCropForm] = useState(false);
   const [showPropForm, setShowPropForm] = useState(false);
-  const [showSuccession, setShowSuccession] = useState(false);
 
   useEffect(() => {
     const count = todayReminders.length;
     if (count > 0) {
       setAppBadge(count);
       const alertedKey = `alerted_${todayStr}`;
+      // keep only today + yesterday, clean older keys (prevent leak)
+      try {
+        for (let i=0; i<localStorage.length; i++) {
+          const k=localStorage.key(i);
+          if (k && k.startsWith('alerted_') && k!==alertedKey) {
+            // keep yesterday to avoid double alert after midnight, remove older
+            const dayPart=k.replace('alerted_','');
+            if (dayPart !== todayStr) {
+              // if not today, remove if older than 2 days parse attempt
+              const d=parseDate(dayPart);
+              if (!d || daysBetween(d, today())>1) { localStorage.removeItem(k); i--; }
+            }
+          }
+        }
+      } catch {}
       if (!localStorage.getItem(alertedKey)) {
         playAlert();
-        localStorage.setItem(alertedKey, '1');
+        try { localStorage.setItem(alertedKey, '1'); } catch {}
       }
     } else {
       clearAppBadge();
@@ -94,16 +70,48 @@ export function DashboardScreen() {
       <div className="px-4 space-y-6">
         <WeatherWidget />
 
-        {/* Today's Tasks */}
+        {/* Status badges */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate(ROUTES.CROPS)}
+            className="flex-1 bg-white border border-gray-200 rounded-2xl py-2.5 px-3 shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          >
+            <span className="text-lg" aria-hidden="true">🌱</span>
+            {countsLoading ? (
+              <span className="w-5 h-5 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="text-xl font-bold text-[#2d6a2d]">{activeCropsCount}</span>
+            )}
+            <span className="text-[11px] text-gray-500 font-medium">crops</span>
+          </button>
+          <button
+            onClick={() => navigate(ROUTES.REMINDERS)}
+            className="flex-1 bg-white border border-gray-200 rounded-2xl py-2.5 px-3 shadow-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          >
+            <span className="text-lg" aria-hidden="true">🔔</span>
+            {upcomingLoading ? (
+              <span className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <span className="text-xl font-bold text-amber-600">{todayReminders.length + upcomingReminders.length}</span>
+            )}
+            <span className="text-[11px] text-gray-500 font-medium">upcoming</span>
+          </button>
+        </div>
+
+        {/* Tasks — today pinned on top, then upcoming */}
         <section>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
-              Today — {formatDateDisplay(today())}
+              Tasks — {formatDateDisplay(today())}
             </h2>
           </div>
-          
+
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {todayReminders.length === 0 ? (
+            {upcomingLoading ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : todayReminders.length === 0 && upcomingReminders.length === 0 ? (
               <div className="p-8 text-center">
                 <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2 opacity-20" />
                 <p className="text-sm font-medium text-gray-400">All tasks completed for today</p>
@@ -111,8 +119,8 @@ export function DashboardScreen() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {todayReminders.map(r => (
-                  <div 
-                    key={r.id} 
+                  <div
+                    key={r.id}
                     className="p-4 flex items-center gap-3 active:bg-gray-50 transition-colors"
                     onClick={() => markReminderDone(r.id)}
                   >
@@ -127,61 +135,6 @@ export function DashboardScreen() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Overview Stats */}
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
-              Overview
-            </h2>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-              {countsLoading ? (
-                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin mx-auto" />
-              ) : (
-                <p className="text-3xl font-bold text-[#2d6a2d]">{activeCropsCount}</p>
-              )}
-              <p className="text-[11px] text-gray-500 font-medium mt-1">Active crops</p>
-            </div>
-            <button 
-              onClick={() => setShowSuccession(true)}
-              className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm active:scale-95 transition-transform group"
-            >
-              <div className="text-xl font-bold text-[#2d6a2d] group-hover:scale-110 transition-transform flex justify-center"><LayoutDashboard className="w-6 h-6" /></div>
-              <p className="text-[11px] text-gray-500 font-medium mt-1">Succession</p>
-            </button>
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 text-center shadow-sm">
-              {countsLoading ? (
-                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin mx-auto" />
-              ) : (
-                <p className="text-3xl font-bold text-[#2d6a2d]">{dbEntriesCount}</p>
-              )}
-              <p className="text-[11px] text-gray-500 font-medium mt-1">DB entries</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Upcoming */}
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
-              Upcoming
-            </h2>
-          </div>
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            {upcomingLoading ? (
-              <div className="flex flex-col items-center justify-center py-10">
-                <div className="w-8 h-8 border-2 border-[#2d6a2d] border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : upcomingReminders.length === 0 ? (
-              <div className="p-6 text-center text-sm text-gray-400 italic">No upcoming tasks scheduled</div>
-            ) : (
-              <div className="divide-y divide-gray-100">
                 {upcomingReminders.map(r => (
                   <div key={r.id} className="p-4 flex items-center gap-3 opacity-80">
                     <div className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[r.type] || 'bg-gray-400'}`} />
@@ -210,45 +163,22 @@ export function DashboardScreen() {
       {/* FAB */}
       <button
         onClick={() => setShowFAB(true)}
-        className="fixed bottom-20 right-4 w-14 h-14 bg-green-700 text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-40 hover:bg-green-800 active:scale-90 transition-all border-4 border-white"
+        aria-label="Quick add"
+        className="fixed right-4 w-14 h-14 bg-green-700 text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-40 hover:bg-green-800 active:scale-90 transition-all border-4 border-white"
+        style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <Sprout className="w-6 h-6" />
       </button>
 
-      {/* Quick Add Sheet */}
-      <BottomSheet open={showFAB} onClose={() => setShowFAB(false)} title="Quick Add Action" position="center">
-        <div className="pt-2 space-y-4">
-          <div className="flex gap-3">
-            <button
-              onClick={() => { setShowFAB(false); setShowCropForm(true); }}
-              className="flex-1 bg-green-50 border border-green-100 rounded-2xl p-6 text-center hover:bg-green-100 transition-colors"
-            >
-              <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-green-200">
-                <Sprout className="w-6 h-6" />
-              </div>
-              <p className="font-bold text-green-900">Track Crop</p>
-              <p className="text-[10px] text-green-700 uppercase font-bold mt-1">Start Logging</p>
-            </button>
-            <button
-              onClick={() => { setShowFAB(false); setShowPropForm(true); }}
-              className="flex-1 bg-blue-50 border border-blue-100 rounded-2xl p-6 text-center hover:bg-blue-100 transition-colors"
-            >
-              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-blue-200">
-                <Database className="w-6 h-6" />
-              </div>
-              <p className="font-bold text-blue-900">Propagation</p>
-              <p className="text-[10px] text-blue-700 uppercase font-bold mt-1">Cuttings/Seeds</p>
-            </button>
-          </div>
-        </div>
-      </BottomSheet>
+      {/* Quick Add Sheet (shared with crop list) */}
+      <AddEntrySheet
+        open={showFAB}
+        onClose={() => setShowFAB(false)}
+        onSelectCrop={() => { setShowFAB(false); navigate(ROUTES.CROP_CREATE); }}
+        onSelectPropagation={() => { setShowFAB(false); setShowPropForm(true); }}
+      />
 
-      <CropForm open={showCropForm} onClose={() => setShowCropForm(false)} date={fabDate} />
-      <PropForm open={showPropForm} onClose={() => setShowPropForm(false)} date={fabDate} />
-
-      <BottomSheet open={showSuccession} onClose={() => setShowSuccession(false)} title="Succession Gap Analysis" position="center">
-        <SuccessionGapReport />
-      </BottomSheet>
+      <PropForm open={showPropForm} onClose={() => setShowPropForm(false)} date={today()} />
     </div>
   );
 }

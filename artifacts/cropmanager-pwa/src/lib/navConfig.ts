@@ -51,6 +51,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Tracking',
     items: [
       { label: 'Diary', title: 'Diary', subtitle: 'Auto-logged timeline of all crop activities', icon: React.createElement(BookOpen, { className: 'w-6 h-6 text-amber-600' }), path: ROUTES.MORE_DIARY, iconColor: 'bg-amber-50' },
+      { label: 'Field Observations', title: 'Field Observations', subtitle: 'Notes + fruit tracking for untracked plants', icon: React.createElement('span', null, '👁️'), path: ROUTES.MORE_OBSERVATIONS, iconColor: 'bg-teal-50' },
     ],
   },
   {

@@ -205,6 +205,14 @@ export function CropsScreen() {
           ) : (
             <button onClick={() => setSelecting(true)} className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50">Archive</button>
           )}
+          {!selecting && (
+            <button
+              onClick={() => navigate(ROUTES.MORE_OBSERVATIONS)}
+              className="text-xs px-3 py-2 min-h-[36px] rounded border bg-white hover:bg-gray-50"
+              title="Field observations"
+              aria-label="Field observations"
+            >👁️</button>
+          )}
         </div>
         <span className="text-[11px] text-muted-foreground">
           {selecting ? `${selectedKeys.length} selected` : `${cropRows.length} crops · ${propRows.length} props`}

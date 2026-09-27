@@ -98,6 +98,8 @@ export interface ObservationLog {
   date: string;
   text: string;
   photos?: string[];
+  /** Free-text plant name for standalone field observations (no crop record). */
+  plantName?: string;
   updatedAt: number;
 }
 

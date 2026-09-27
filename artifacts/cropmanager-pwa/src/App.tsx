@@ -20,6 +20,7 @@ import { FertilizerDatabaseScreen } from './components/FertilizerDatabaseScreen'
 import { CropHistoryScreen } from './components/reports/CropHistory';
 import { CHCalculatorScreen } from './components/ch/CHCalculatorScreen';
 import { SuccessionGapReport } from './components/reports/SuccessionGapReport';
+import { FieldObservationsScreen } from './screens/FieldObservationsScreen';
 import { ActivityScreen } from './components/activity/ActivityScreen';
 import { FarmLedgerScreen } from './components/ledger/FarmLedgerScreen';
 import { TreatmentAppRatesScreen } from './components/treatment/TreatmentAppRatesScreen';
@@ -174,6 +175,7 @@ function AppContent() {
             <Route path={ROUTES.MORE_TREATMENT_RATES} element={<PanelPage><TreatmentAppRatesRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_AREA_MAPPER} element={<PanelPage><AreaMapperRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_DIARY} element={<PanelPage><DiaryScreen /></PanelPage>} />
+            <Route path={ROUTES.MORE_OBSERVATIONS} element={<PanelPage><FieldObservationsScreen /></PanelPage>} />
             <Route path={ROUTES.MORE_CALCULATOR} element={<PanelPage><FarmCalculatorScreen /></PanelPage>} />
             <Route path={ROUTES.MORE_POS} element={<PanelPage><POSScreen /></PanelPage>} />
           </Routes>

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
+import { useCrops } from '../hooks/useCrops';
+import type { Crop } from '../types';
 import { generateId } from '../lib/ids';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { addDiaryEntry } from '../lib/diary';
@@ -16,6 +18,18 @@ import { toast } from 'sonner';
  */
 export function FieldObservationsScreen() {
   const { settings } = useAppStore();
+
+  // Optional link to a tracked crop: entries attach to its record so they
+  // feed the same learning keys as in-crop logging. Empty = custom plant.
+  const [linkedCropId, setLinkedCropId] = useState('');
+  const [cropSearch, setCropSearch] = useState('');
+  const trackerCrops = useCrops('All') ?? [];
+  const linkedCrop: Crop | null = trackerCrops.find(c => c.id === linkedCropId) ?? null;
+  const cropMatches = cropSearch.trim()
+    ? trackerCrops
+        .filter(c => `${c.cropName} ${c.variety}`.toLowerCase().includes(cropSearch.trim().toLowerCase()))
+        .slice(0, 6)
+    : [];
 
   // Observation form
   const [obsPlant, setObsPlant] = useState('');
@@ -46,8 +60,8 @@ export function FieldObservationsScreen() {
       });
   }, []) ?? [];
 
-  // Learned maturity for whatever plant name is currently typed
-  const learnedKey = trackPlant.trim().toLowerCase();
+  // Learned maturity for the linked crop, else whatever plant name is typed
+  const learnedKey = linkedCrop ? linkedCrop.cropName.toLowerCase() : trackPlant.trim().toLowerCase();
   const fruitLearn = useLiveQuery(async () => {
     if (!learnedKey) return null;
     const all = await db.cropDbAdjustments.where('cropKey').equals(learnedKey).toArray().catch(() => []);
@@ -57,21 +71,21 @@ export function FieldObservationsScreen() {
   async function handleAddObservation() {
     if (!obsText.trim()) { toast.error('Write the observation first'); return; }
     const date = parseDate(obsDate) ?? today();
-    const plant = obsPlant.trim();
+    const plant = linkedCrop ? linkedCrop.cropName : obsPlant.trim();
     try {
       await db.observationLogs.add({
         id: generateId('DE' as never) as string,
-        cropId: '',
+        cropId: linkedCrop?.id ?? '',
         date: formatDateShort(date),
         text: obsText.trim(),
-        plantName: plant,
+        plantName: linkedCrop ? '' : plant,
         updatedAt: Date.now(),
       } as never);
       await addDiaryEntry({
         entryType: 'note',
-        cropId: '',
+        cropId: linkedCrop?.id ?? '',
         cropName: plant || 'Field note',
-        variety: '',
+        variety: linkedCrop?.variety ?? '',
         description: `Field observation: ${obsText.trim().slice(0, 40)}`,
         details: obsText.trim(),
         date: formatDateShort(date),
@@ -97,11 +111,13 @@ export function FieldObservationsScreen() {
 
   async function handleAddTracking() {
     const start = parseDate(trackDate) ?? today();
-    const plant = trackPlant.trim();
+    // Linked crop: entries attach to its record + learning keys; else free-text plant
+    const plant = linkedCrop ? linkedCrop.cropName : trackPlant.trim();
+    const cropId = linkedCrop?.id ?? '';
     try {
       await db.trackings.add({
         id: generateId('TR'),
-        cropId: '',
+        cropId,
         cropName: plant,
         tagNumber: trackTag.trim(),
         label: trackLabel.trim() || plant || 'Fruit',
@@ -114,9 +130,9 @@ export function FieldObservationsScreen() {
       } as never);
       await addDiaryEntry({
         entryType: 'note',
-        cropId: '',
+        cropId,
         cropName: plant || 'Field tracking',
-        variety: '',
+        variety: linkedCrop?.variety ?? '',
         description: `Tracking started${trackTag.trim() ? ` #${trackTag.trim()}` : ''}: ${trackLabel.trim() || plant || 'Fruit'}`,
         details: '',
         date: formatDateShort(start),
@@ -137,14 +153,16 @@ export function FieldObservationsScreen() {
       const elapsed = Math.max(0, daysBetween(start, end));
       const endStr = formatDateShort(end);
       await db.trackings.update(tid, { status: 'done', endDate: endStr, updatedAt: Date.now() } as never);
-      // Learn the pattern even for untracked plants: first sample sets the baseline
-      const key = (trackings.find(t => t.id === tid)?.cropName || '').toLowerCase() || 'field';
+      // Learn the pattern: keyed by crop name so linked trackings merge with
+      // that crop's own history; first sample sets the baseline
+      const rec = trackings.find(t => t.id === tid);
+      const key = (rec?.cropName || '').toLowerCase() || 'field';
       const adjustments = await db.cropDbAdjustments.toArray();
       const newAdj = logDeviation(key, 'fruit_maturity_days', elapsed, elapsed, '', adjustments, settings.learningThreshold);
       await db.cropDbAdjustments.put(newAdj as never);
       await addDiaryEntry({
         entryType: 'note',
-        cropId: '',
+        cropId: rec?.cropId ?? '',
         cropName: label,
         variety: '',
         description: `Tracking finished: ${label} matured in ${elapsed}d`,
@@ -173,12 +191,38 @@ export function FieldObservationsScreen() {
     <div className="min-h-screen bg-gray-50 pb-24 pt-2">
       <div className="max-w-md mx-auto px-4 space-y-4">
         <p className="text-[11px] text-muted-foreground">
-          For plants already growing that were never entered into the crop tracker. Entries here never mix with crop records.
+          For plants already growing that were never entered into the crop tracker. Link a tracked crop below and entries attach to its record and learning — otherwise they stay independent.
         </p>
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Linked Crop (optional)</p>
+          {linkedCrop ? (
+            <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <p className="text-sm font-semibold text-green-800 truncate">📎 {linkedCrop.cropName}{linkedCrop.variety ? ` (${linkedCrop.variety})` : ''}</p>
+              <button onClick={() => { setLinkedCropId(''); setCropSearch(''); }} className="text-xs text-muted-foreground font-semibold shrink-0">Unlink</button>
+            </div>
+          ) : (
+            <>
+              <input value={cropSearch} onChange={e => setCropSearch(e.target.value)} placeholder="Search tracker crops…" className="w-full border rounded-lg p-2 text-sm" />
+              {cropSearch.trim() && (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {cropMatches.length === 0 && <p className="text-xs text-muted-foreground">No matches — leave unlinked for a custom plant.</p>}
+                  {cropMatches.map(c => (
+                    <button key={c.id} onClick={() => { setLinkedCropId(c.id); setCropSearch(''); }} className="w-full text-left px-3 py-2 rounded-lg text-sm bg-gray-50 hover:bg-green-50 border border-gray-100 truncate">
+                      {c.cropName}{c.variety ? ` (${c.variety})` : ''} · {c.plantStage}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Observation Log</p>
-          <input value={obsPlant} onChange={e => setObsPlant(e.target.value)} placeholder="Plant name (optional)" className="w-full border rounded-lg p-2 text-sm" />
+          {!linkedCrop && (
+            <input value={obsPlant} onChange={e => setObsPlant(e.target.value)} placeholder="Plant name (optional)" className="w-full border rounded-lg p-2 text-sm" />
+          )}
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
             className="w-full border rounded-lg p-2 text-sm min-h-[80px]" />
           <input type="date" value={toInputDateStr(obsDate)} onChange={e => {
@@ -207,7 +251,9 @@ export function FieldObservationsScreen() {
           {fruitLearn && fruitLearn.sampleCount >= 2 && (
             <p className="text-[11px] bg-[#e8f5e8] text-[#2d6a2d] rounded-lg px-2 py-1.5 font-semibold">🧠 Learned maturity: ~{Math.round(fruitLearn.yourAverage)}d from {fruitLearn.sampleCount} tracked fruits</p>
           )}
-          <input value={trackPlant} onChange={e => setTrackPlant(e.target.value)} placeholder="Plant (e.g. Mango tree)" className="w-full border rounded-lg p-2 text-sm" />
+          {!linkedCrop && (
+            <input value={trackPlant} onChange={e => setTrackPlant(e.target.value)} placeholder="Plant (e.g. Mango tree)" className="w-full border rounded-lg p-2 text-sm" />
+          )}
           <div className="grid grid-cols-2 gap-2">
             <input value={trackLabel} onChange={e => setTrackLabel(e.target.value)} placeholder="Label (e.g. Fruit 1)" className="border rounded-lg p-2 text-sm" />
             <input value={trackTag} onChange={e => setTrackTag(e.target.value)} placeholder="Tag # (optional)" className="border rounded-lg p-2 text-sm" />

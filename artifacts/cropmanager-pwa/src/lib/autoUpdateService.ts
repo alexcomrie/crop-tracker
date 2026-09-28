@@ -10,7 +10,7 @@ import { resolveEffectiveCropData } from './personalCropDb';
 import { calculateHarvestDate, calculateTransplantDate } from './harvest';
 import { getPredictedHarvestDate } from './micro-crop/hybrid';
 import { formatDateStored, parseDate, addDays } from './dates';
-import { calcBatchOffset, calcNumBatches } from './continuous';
+import { calcNumBatches, resolveBatchOffset } from './continuous';
 import { generateCropReminders } from './reminders';
 import { autoAdjustTransplantSchedule, autoTransitionCrop } from './stages';
 
@@ -157,11 +157,9 @@ class AutoUpdateService {
         if (tDate) patch.transplantDateScheduled = formatDateStored(tDate);
         if (hDate) patch.harvestDateEstimated = formatDateStored(hDate);
 
-        // C-H logic tinygpt-enhanced (canonical math in lib/continuous.ts)
+        // C-H logic: self-tuning default (learned actuals > tinygpt > DB),
+        // stored harvestFrequency preserved as the fallback default
         if (c.isContinuous) {
-          const freqDays = c.harvestFrequency || 7;
-          let batchOffset: number;
-          // try micro-crop batch prediction
           let microBatch: number | null = null;
           try {
             const micro = microModelRow as { serialized?: Record<string, number[][]>; config?: unknown; itos?: string[] } | null;
@@ -174,10 +172,16 @@ class AutoUpdateService {
           } catch (e) {
             console.debug('[autoUpdate] micro batch fallback', { crop: c.cropName, e });
           }
-          if (microBatch && microBatch > 3 && microBatch < 60) batchOffset = microBatch;
-          else batchOffset = calcBatchOffset(cd, freqDays);
-          const numBatches = calcNumBatches(cd, batchOffset);
-          patch.batchOffset = batchOffset;
+          const resolved = resolveBatchOffset({
+            cropKey: c.cropName,
+            variety: c.variety,
+            cropData: cd,
+            adjustments,
+            microBatch,
+            fallbackFreq: c.harvestFrequency || 7,
+          });
+          const numBatches = calcNumBatches(cd, resolved.offset);
+          patch.batchOffset = resolved.offset;
           patch.numPlots = numBatches;
         }
 

@@ -258,6 +258,21 @@ export function CropDetailsScreen() {
     // personal DB
     const { upsertPersonalFromCrop } = await import('../lib/personalCropDb');
     await upsertPersonalFromCrop({ ...crop, harvestDateActual: harvestDate } as never, daysFromPlanting);
+    // C-H self-tune: actual harvest cadence feeds the learned batch offset
+    if (crop.isContinuous) {
+      const { medianHarvestGapDays } = await import('../lib/harvest');
+      const { logBatchOffset } = await import('../lib/learning');
+      const gap = medianHarvestGapDays(
+        [...harvestLogs.map(h => h.harvestDate), harvestDate]
+          .map(d => parseDate(d))
+          .filter((d): d is Date => d !== null)
+      );
+      if (gap !== null) {
+        const batchDbDefault = (cropData as unknown as { batch_offset_days?: number } | null)?.batch_offset_days ?? 7;
+        const batchAdj = logBatchOffset(crop.cropName, crop.variety, batchDbDefault, gap, adjustments, settings.learningThreshold);
+        await db.cropDbAdjustments.put(batchAdj as never);
+      }
+    }
     scheduleMicroTraining(cropDb as Record<string, unknown>);
     await addDiaryEntry({
       entryType: 'harvest',

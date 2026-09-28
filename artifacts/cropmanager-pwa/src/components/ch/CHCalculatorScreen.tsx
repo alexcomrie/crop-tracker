@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { getNonAliasCrops } from '../../lib/cropDb';
 import { MICRO_MODEL_ID } from '../../lib/micro-crop/index';
 import { loadModel, predictBatchOffsetDays } from '../../lib/micro-crop/inference';
+import { calcNumBatches, resolveBatchOffset, type BatchOffsetSource } from '../../lib/continuous';
 
 function todayISO(): string {
   return new Date().toISOString().split('T')[0];
@@ -25,7 +26,7 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
   const [selectedKey, setSelectedKey] = useState<string|null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<''|'single'|'multi'>('');
-  const [freqDays, setFreqDays] = useState(7);
+  const [customFreq, setCustomFreq] = useState<number | null>(null);
   const [plotArea, setPlotArea] = useState(400);
   const [startDate, setStartDate] = useState(todayISO());
 
@@ -56,6 +57,7 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
 
   function selectCrop(key: string) {
     setSelectedKey(key);
+    setCustomFreq(null);
     setStep('result');
   }
 
@@ -95,21 +97,22 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
         if (predicted && predicted > 3 && predicted < 60) microBatch = predicted;
       }
     } catch { microBatch = null; }
-    // Effective plan: foundation stays, learned data overrides when available
+    // Self-tuning default (learned actuals > tinygpt > foundation DB); a manual
+    // frequency choice always drives the plan — every button press recalculates.
     const effGrowDays = learnedGrowDays;
-    let batchOffset: number;
-    let batchSource: 'micro' | 'db' | 'calc';
-    if (microBatch) { batchOffset = microBatch; batchSource = 'micro'; }
-    else if (val.batch_offset_days && val.batch_offset_days > 0) { batchOffset = val.batch_offset_days; batchSource = 'db'; }
-    else if (!isMulti) { batchOffset = freqDays; batchSource = 'calc'; }
-    else {
-      const naturalOffset = Math.max(harvestDays - harvestIntv, harvestIntv);
-      batchOffset = Math.max(naturalOffset, freqDays);
-      batchSource = 'calc';
-    }
-    let numBatches: number;
-    if (!isMulti) numBatches = Math.ceil(effGrowDays / batchOffset);
-    else numBatches = Math.max(2, Math.ceil(harvestDays / batchOffset));
+    const suggested = resolveBatchOffset({
+      cropKey: selectedKey,
+      variety: '',
+      cropData: val,
+      adjustments: cropAdjustments,
+      microBatch,
+      fallbackFreq: 7,
+    });
+    const batchOffset = customFreq ?? suggested.offset;
+    const freqSource: BatchOffsetSource = customFreq != null ? 'custom' : suggested.source;
+    const numBatches = calcNumBatches({ ...val, growing_time_days: effGrowDays }, batchOffset);
+    // Multi-harvest gap check: interval longer than the harvest window leaves gaps
+    const hasGap = isMulti && batchOffset > harvestDays;
     const subplotArea  = Math.round((plotArea / numBatches) * 10) / 10;
     const cycleDays    = isMulti ? effGrowDays + harvestDays : effGrowDays;
     const startDateObj = new Date(startDate + 'T00:00:00');
@@ -131,8 +134,8 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
       }
       gridData.push(row);
     }
-    return { val, isMulti, growDays, effGrowDays, harvestWks, harvestDays, harvestIntv, batchOffset, batchSource, numBatches, subplotArea, waitWeeks, startDateObj, firstHarvestDate, GRID_WEEKS, gridData, learnedSamples, microBatch, growAdj };
-  }, [selectedKey, cropDb, freqDays, plotArea, startDate, personalEntry, cropAdjustments, microRow]);
+    return { val, isMulti, growDays, effGrowDays, harvestWks, harvestDays, harvestIntv, batchOffset, freqSource, hasGap, numBatches, subplotArea, waitWeeks, startDateObj, firstHarvestDate, GRID_WEEKS, gridData, learnedSamples, microBatch, growAdj, suggestedOffset: suggested.offset, suggestedSource: suggested.source };
+  }, [selectedKey, cropDb, customFreq, plotArea, startDate, personalEntry, cropAdjustments, microRow]);
 
   return (
     <div className="absolute inset-0 bg-[#f5f5f0] flex flex-col z-[60] animate-in slide-in-from-right duration-300 overflow-y-auto min-h-0">
@@ -189,11 +192,25 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
             <div className="text-[11px] font-semibold text-[#888] uppercase tracking-wide">Desired harvest frequency</div>
             <div className="flex gap-2 overflow-x-auto">
               {[7,14,21,28].map(d => (
-                <button key={d} onClick={() => setFreqDays(d)} className={`px-3 py-2 rounded-lg border text-[12px] font-medium ${freqDays===d ? 'bg-[#e8f5e8] border-[#2d6a2d] text-[#2d6a2d]' : 'bg-[#f5f5f0] border-[#e0e0e0] text-[#555]'}`}>
+                <button key={d} onClick={() => setCustomFreq(d)} className={`px-3 py-2 rounded-lg border text-[12px] font-medium ${result.batchOffset===d ? 'bg-[#e8f5e8] border-[#2d6a2d] text-[#2d6a2d]' : 'bg-[#f5f5f0] border-[#e0e0e0] text-[#555]'}`}>
                   {d===7?'Every week':d===14?'Every 2 wks':d===21?'Every 3 wks':'Monthly'}
                 </button>
               ))}
             </div>
+            <p className="text-[11px] text-[#888]">
+              {result.freqSource === 'learned' && '📊 Using your logged cadence — change it any time.'}
+              {result.freqSource === 'tinygpt' && '🧠 Using Tinygpt suggestion — change it any time.'}
+              {result.freqSource === 'database' && '📖 Using foundation suggestion — change it any time.'}
+              {result.freqSource === 'default' && 'Using weekly default — pick a frequency.'}
+              {result.freqSource === 'custom' && (
+                <>Your choice — <button onClick={() => setCustomFreq(null)} className="underline font-semibold">reset to suggested {result.suggestedOffset}d</button>.</>
+              )}
+            </p>
+            {result.hasGap && (
+              <p className="text-[12px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2 font-medium">
+                ⚠️ Gap risk: this crop only produces {result.harvestDays}d per plot, so intervals over {result.harvestDays}d leave weeks with nothing to harvest. Pick {result.harvestDays}d or less.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[11px] font-semibold text-[#888] uppercase">Plot area (sq ft)</label>
@@ -239,7 +256,7 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Planting method</span><span className="text-[13px] font-semibold">{result.val.planting_method || '—'}</span></div>
                 {result.val.transplant_days != null && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Transplant at</span><span className="text-[13px] font-semibold">{result.val.transplant_days} days</span></div>}
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Batch offset (DB)</span><span className="text-[13px] font-semibold">{result.val.batch_offset_days}</span></div>
-                <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Batch offset (used)</span><span className="text-[13px] font-semibold text-[#2d6a2d]">{result.batchOffset}{result.batchSource === 'micro' ? ' 🧠' : ''}</span></div>
+                <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Planting interval (used)</span><span className="text-[13px] font-semibold text-[#2d6a2d]">{result.batchOffset}d{result.freqSource === 'tinygpt' ? ' 🧠' : result.freqSource === 'learned' ? ' 📊' : ''}</span></div>
                 <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Growing time (learned)</span><span className="text-[13px] font-semibold">{result.learnedSamples >= 2 ? `${result.effGrowDays} days ×${result.learnedSamples}` : `— (${result.learnedSamples}/2 grows)`}</span></div>
                 {result.microBatch != null && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Tinygpt offset</span><span className="text-[13px] font-semibold">{result.microBatch}d</span></div>}
                 {result.growAdj && <div className="flex items-center justify-between"><span className="text-[12px] text-[#888]">Your average</span><span className="text-[13px] font-semibold">{result.growAdj.yourAverage}d ×{result.growAdj.sampleCount}</span></div>}
@@ -250,10 +267,11 @@ export function CHCalculatorScreen({ onClose }: { onClose: () => void }) {
             <div className="bg-white border rounded-[12px] overflow-hidden">
               <div className="px-4 py-3 border-b text-[13px] font-semibold">🧮 How the numbers work</div>
               <div className="p-3 space-y-2 text-[13px] text-[#555]">
+                <p>Planting interval always equals your chosen frequency: plant a batch every {result.batchOffset} days and, once the rotation fills, a batch matures every {result.batchOffset} days.</p>
                 {!result.isMulti ? (
-                  <p>You chose to harvest every {freqDays} days. Each new batch is planted every {result.batchOffset} days. With {result.growDays} days to grow, you need {result.numBatches} batches always in rotation.</p>
+                  <p>With {result.effGrowDays} days to grow, you need {result.numBatches} batches always in rotation.</p>
                 ) : (
-                  <p>Offset = harvest duration ({result.harvestDays}d) − harvest interval ({result.harvestIntv}d) = {result.harvestDays - result.harvestIntv}d. Adjusted to match your {freqDays}-day frequency → {result.batchOffset}d.</p>
+                  <p>Each plot produces for {result.harvestDays}d, so {result.numBatches} staggered plots keep supply continuous.</p>
                 )}
                 <p>Divide your {plotArea} sq ft into {result.numBatches} plots of ~{Math.round(result.subplotArea)} sq ft each. Plant one plot every {result.batchOffset} days. After {result.waitWeeks} weeks, Plot 1 is ready and you harvest it, then replant it immediately — the cycle repeats indefinitely.</p>
                 {result.isMulti && <p className="text-[12px] text-[#888]">For multi-harvest crops, each plot keeps producing for {result.harvestWks} weeks. When Plot 1 starts slowing down, Plot 2 is already in peak harvest — no gap in supply.</p>}

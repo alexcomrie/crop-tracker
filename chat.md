@@ -687,3 +687,11 @@ Analyzed all seven and recommended: remove (not add) duplicate back headers; new
 **Me:**
 
 Built update-time legacy migration (`src/lib/migrateLegacy.ts`, wired in `App.tsx` before the auto-update service): on startup it checks legacy IndexedDB databases (`CropManagerDB`, `_v2`, `_v3`), reads every known table via the native IndexedDB API, normalizes records to the current format (valid statuses, `parentCropId: ''`, boolean coercion, string `sendDate`, fallback ids), upserts with `bulkPut`, verifies row counts, then deletes legacy DBs. Runs once per device, never crashes startup. Updated doc.md, typecheck clean, build clean, pushed to GitHub main.
+
+**You:**
+
+i want you to do a full analysis of C-H calculator to understand its core logic and do a full overhaul, do some web search if necessary but overhaul as you see fit, also selecting the desired harvest frequency i see no recalculation when selecting the different frequency, also like the crop DB which self tune from actual data i want the C-H calculator to self tune using the tinygpt
+
+**Me:**
+
+Diagnosed the dead control (DB-offset and micro precedence plus max() swallowing small values, no prefill) and overhauled around frequency-always-wins per extension succession guidance. New resolveBatchOffset (learned > tinygpt > foundation > fallback) with source reporting; calculator prefills + live recalcs + gap warnings; logBatchOffset/medianHarvestGapDays self-tune loop fed by harvest logs on continuous crops; create wizard frequency UI; auto-update unified. Details appended to doc.md. Typecheck + build clean, pushed to GitHub main.

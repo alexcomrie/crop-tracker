@@ -32,7 +32,7 @@ export function CropCreateScreen() {
   const [trayColors, setTrayColors] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const [isContinuous, setIsContinuous] = useState(false);
-  const [freqDays] = useState(7);
+  const [freqDays, setFreqDays] = useState(7);
   const [plotArea, setPlotArea] = useState(400);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,7 +49,8 @@ export function CropCreateScreen() {
   const chResult = useMemo(() => {
     if (!selectedCropData || !isContinuous) return null;
     const growDays = selectedCropData.growing_time_days || 60;
-    const batchOffset = calcBatchOffset(selectedCropData, freqDays);
+    // Frequency always drives the plan; DB offset only prefilled the control
+    const batchOffset = calcBatchOffset(freqDays);
     const numBatches = calcNumBatches(selectedCropData, batchOffset);
     const subplotArea = Math.round((plotArea / numBatches) * 10) / 10;
     const upcomingBatches = Array.from({ length: numBatches }).map((_, b) => {
@@ -166,6 +167,7 @@ export function CropCreateScreen() {
                   <button key={k} onClick={()=>{
                     setCropKey(k);
                     if(data && (data.number_of_weeks_harvest??0)>1) setIsContinuous(true); else setIsContinuous(false);
+                    if (data && data.batch_offset_days && data.batch_offset_days > 0) setFreqDays(data.batch_offset_days);
                   }} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${cropKey===k?'bg-green-100 font-semibold':'bg-gray-50 hover:bg-green-50'}`}>
                     {data?.display_name ?? k}
                   </button>
@@ -230,6 +232,16 @@ export function CropCreateScreen() {
             </div>
             {isContinuous && chResult && (
               <div className="space-y-2">
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase">Harvest frequency</label>
+                  <div className="flex gap-2 overflow-x-auto">
+                    {[7,14,21,28].map(d => (
+                      <button key={d} onClick={()=>setFreqDays(d)} className={`px-3 py-2 rounded-lg border text-[12px] font-medium shrink-0 ${freqDays===d ? 'bg-green-50 border-green-600 text-green-700' : 'bg-white border-gray-300 text-gray-700'}`}>
+                        {d===7?'Weekly':d===14?'2 wks':d===21?'3 wks':'Monthly'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div>
                   <label className="text-[11px] font-semibold text-gray-500 uppercase">Total plot area (sq ft)</label>
                   <Input type="number" min={1} value={String(plotArea)} onChange={e=>setPlotArea(Math.max(1, parseInt(e.target.value || '0', 10) || 0))} />

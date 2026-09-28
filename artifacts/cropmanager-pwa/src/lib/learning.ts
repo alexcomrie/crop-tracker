@@ -4,7 +4,7 @@ import { formatDateShort, today } from './dates';
 import { buildDocsFromDexie } from './micro-crop/dataset';
 import { trainFromDocs } from './micro-crop/trainer';
 import { saveMicroModel, loadMicroModel } from './micro-crop/store';
-import { MICRO_TRAIN_MIN_DOCS } from './micro-crop/index';
+import { MICRO_TRAIN_MIN_DOCS, SCALAR_CUSTOM_SAMPLES } from './micro-crop/index';
 import db from '../db/db';
 
 export function logDeviation(
@@ -44,6 +44,31 @@ export function logDeviation(
     lastUpdated: now,
     updatedAt: Date.now(),
   };
+}
+
+/**
+ * Batch-cadence learning for continuous harvest: same scalar engine as
+ * logDeviation, but for the `batch_offset` field. Call with the median gap
+ * between a crop's actual harvests (or plantings); after `threshold` samples
+ * the learned cadence overrides database/micro defaults everywhere.
+ */
+export function logBatchOffset(
+  cropKey: string,
+  variety: string,
+  dbDefault: number,
+  actualOffsetDays: number,
+  adjustments: CropDbAdjustment[],
+  threshold = SCALAR_CUSTOM_SAMPLES
+): CropDbAdjustment {
+  return logDeviation(
+    cropKey,
+    'batch_offset',
+    dbDefault > 0 ? dbDefault : 7,
+    Math.max(1, Math.round(actualOffsetDays)),
+    variety,
+    adjustments,
+    threshold
+  );
 }
 
 export function updatePropDatabase(

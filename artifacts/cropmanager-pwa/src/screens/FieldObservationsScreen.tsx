@@ -10,6 +10,7 @@ import { logDeviation } from '../lib/learning';
 import { foundationFruitDefault, getPersonalCropData, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { formatDateShort, parseDate, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
 import { toast } from 'sonner';
+import type { TrackingEntry } from '../types';
 
 /**
  * Independent field observations + growth tracking for plants that were
@@ -61,6 +62,12 @@ export function FieldObservationsScreen() {
         return (parseDate(b.startDate)?.getTime() ?? 0) - (parseDate(a.startDate)?.getTime() ?? 0);
       });
   }, []) ?? [];
+  const trackingEntries = useLiveQuery(async () => {
+    const all = await db.trackingEntries.toArray().catch((): TrackingEntry[] => []);
+    return all.filter(e => !e.cropId);
+  }, []) ?? [];
+  const [editingObsId, setEditingObsId] = useState<string | null>(null);
+  const [editObsText, setEditObsText] = useState('');
 
   // Identity for learning: foundation name when picked, else typed plant
   const identityName = foundationName || trackPlant.trim();
@@ -108,6 +115,64 @@ export function FieldObservationsScreen() {
       await db.observationLogs.delete(id);
     } catch (e) {
       console.error('[field-obs] delete observation failed', { id, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveObservationEdit(oid: string) {
+    if (!editObsText.trim()) { toast.error('Observation cannot be empty'); return; }
+    try {
+      await db.observationLogs.update(oid, { text: editObsText.trim(), updatedAt: Date.now() } as never);
+      setEditingObsId(null);
+      toast.success('Observation updated');
+    } catch (e) {
+      console.error('[field-obs] edit observation failed', { id: oid, e });
+      toast.error('Could not update observation: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleFailTracking(tid: string) {
+    if (!window.confirm('Mark this tracking as failed? It will stop and auto-delete after 30 days.')) return;
+    try {
+      await db.trackings.update(tid, { status: 'failed', endDate: formatDateShort(today()), updatedAt: Date.now() } as never);
+      toast.success('Tracking stopped — failed entries auto-delete after 30 days');
+    } catch (e) {
+      console.error('[field-obs] fail tracking failed', { id: tid, e });
+      toast.error('Could not stop tracking: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveTrackingEdit(tid: string, patch: { label: string; tagNumber: string; startDate: string; notes: string }) {
+    try {
+      await db.trackings.update(tid, { ...patch, updatedAt: Date.now() } as never);
+      toast.success('Tracking updated');
+    } catch (e) {
+      console.error('[field-obs] edit tracking failed', { id: tid, e });
+      toast.error('Could not update tracking: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleAddTrackingEntry(trackingId: string, text: string) {
+    try {
+      await db.trackingEntries.add({
+        id: generateId('TR'),
+        trackingId,
+        cropId: '',
+        date: formatDateShort(today()),
+        text,
+        updatedAt: Date.now(),
+      } as never);
+    } catch (e) {
+      console.error('[field-obs] add journal entry failed', { trackingId, e });
+      toast.error('Could not save entry: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteTrackingEntry(entryId: string) {
+    try {
+      await db.trackingEntries.delete(entryId);
+    } catch (e) {
+      console.error('[field-obs] delete journal entry failed', { id: entryId, e });
       toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
@@ -180,8 +245,10 @@ export function FieldObservationsScreen() {
   }
 
   async function handleDeleteTracking(tid: string) {
-    if (!window.confirm('Delete this tracking?')) return;
+    if (!window.confirm('Delete this tracking and its journal?')) return;
     try {
+      const entries = await db.trackingEntries.where('trackingId').equals(tid).toArray().catch(() => []);
+      await Promise.all(entries.map(e => db.trackingEntries.delete(e.id)));
       await db.trackings.delete(tid);
       toast.success('Tracking deleted');
     } catch (e) {
@@ -194,7 +261,7 @@ export function FieldObservationsScreen() {
     <div className="min-h-screen bg-gray-50 pb-24 pt-2">
       <div className="max-w-md mx-auto px-4 space-y-4">
         <p className="text-[11px] text-muted-foreground">
-          For plants already growing that were never entered into the crop tracker. Link a tracked crop below and entries attach to its record and learning — otherwise they stay independent.
+          For plants already growing that were never entered into the crop tracker. Pick a foundation crop below and finishes update its personal database — otherwise entries stay independent under a custom plant name.
         </p>
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
@@ -241,10 +308,28 @@ export function FieldObservationsScreen() {
             <div key={o.id} className="bg-white rounded-xl border border-gray-100 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">{o.date}</p>
-                <button onClick={() => handleDeleteObservation(o.id)} aria-label="Delete observation" className="text-xs text-red-500 font-semibold shrink-0">Delete</button>
+                <span className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => { setEditingObsId(o.id); setEditObsText(o.text); }}
+                    aria-label="Edit observation"
+                    title="Edit"
+                    className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm"
+                  >✎</button>
+                  <button onClick={() => handleDeleteObservation(o.id)} aria-label="Delete observation" className="text-xs text-red-500 font-semibold">Delete</button>
+                </span>
               </div>
               {o.plantName && <p className="text-xs font-semibold text-green-700 mt-0.5">🌱 {o.plantName}</p>}
-              <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+              {editingObsId === o.id ? (
+                <>
+                  <textarea value={editObsText} onChange={e => setEditObsText(e.target.value)} className="w-full mt-1 border rounded-lg p-2 text-sm min-h-[80px]" />
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => handleSaveObservationEdit(o.id)} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>
+                    <button onClick={() => setEditingObsId(null)} className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg py-1.5">Cancel</button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+              )}
             </div>
           ))}
         </div>
@@ -272,11 +357,49 @@ export function FieldObservationsScreen() {
         </div>
 
         <div className="space-y-1.5">
-          {trackings.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No field trackings yet</p>}
-          {trackings.map(t => (
-            <TrackingCard key={t.id} tracking={t} onFinish={handleFinishTracking} onDelete={handleDeleteTracking} />
-          ))}
+          {trackings.filter(t => t.status === 'active').length === 0 && trackings.length === 0 && (
+            <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No field trackings yet</p>
+          )}
+          {trackings
+            .filter(t => t.status === 'active')
+            .map(t => (
+              <TrackingCard
+                key={t.id}
+                tracking={t}
+                entries={trackingEntries.filter(e => e.trackingId === t.id)}
+                onFinish={handleFinishTracking}
+                onFail={handleFailTracking}
+                onDelete={handleDeleteTracking}
+                onSaveEdit={handleSaveTrackingEdit}
+                onAddEntry={handleAddTrackingEntry}
+                onDeleteEntry={handleDeleteTrackingEntry}
+              />
+            ))}
         </div>
+        {(() => {
+          const done = trackings.filter(t => t.status !== 'active');
+          if (done.length === 0) return null;
+          return (
+            <details className="bg-white rounded-xl border border-gray-100">
+              <summary className="p-3 text-xs font-bold uppercase tracking-widest text-gray-500 cursor-pointer">Completed ({done.length})</summary>
+              <div className="px-3 pb-3 space-y-1.5">
+                {done.map(t => (
+                  <TrackingCard
+                    key={t.id}
+                    tracking={t}
+                    entries={[]}
+                    onFinish={handleFinishTracking}
+                    onFail={handleFailTracking}
+                    onDelete={handleDeleteTracking}
+                    onSaveEdit={handleSaveTrackingEdit}
+                    onAddEntry={handleAddTrackingEntry}
+                    onDeleteEntry={handleDeleteTrackingEntry}
+                  />
+                ))}
+              </div>
+            </details>
+          );
+        })()}
       </div>
     </div>
   );

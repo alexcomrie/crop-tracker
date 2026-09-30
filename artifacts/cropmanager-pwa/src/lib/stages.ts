@@ -102,7 +102,7 @@ export function processStageChange(
   crop: Crop,
   newStage: string,
   date: Date,
-  cropData: CropData,
+  cropData: CropData | null,
   adjustments: CropDbAdjustment[],
   existingHarvestLogs: HarvestLog[] = [],
   threshold = 3
@@ -140,7 +140,7 @@ export function processStageChange(
   if (normalized === 'Germinated') {
     updatedCrop.germinationDate = dateStr;
     if (planted) updatedCrop.daysSeedGerm = daysBetween(planted, date);
-    const transplantDays = getAdjustedValue(key, 'transplant_days', cropData.transplant_days ?? 0, crop.variety, adjustments, threshold);
+    const transplantDays = getAdjustedValue(key, 'transplant_days', cropData?.transplant_days ?? 0, crop.variety, adjustments, threshold);
     if (transplantDays > 0) updatedCrop.transplantDateScheduled = formatDateStored(addDays(date, transplantDays));
     const harvestDate = calculateHarvestDate({ ...updatedCrop } as Crop, cropData, adjustments, threshold);
     if (harvestDate) updatedCrop.harvestDateEstimated = formatDateStored(harvestDate);

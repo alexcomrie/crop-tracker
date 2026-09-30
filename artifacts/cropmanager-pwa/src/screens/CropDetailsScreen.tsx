@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
-import { resolveCropData } from '../lib/cropDb';
+import { resolveCropData, getNonAliasCrops } from '../lib/cropDb';
 import { getEffectiveCropData, getPersonalCropData, foundationFruitDefault, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { parseDate, formatDateShort, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
 import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, getValidNextStages, processStageChange } from '../lib/stages';
@@ -13,6 +13,7 @@ import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES } from '../lib/routes';
+import type { TrackingEntry } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight } from 'lucide-react';
 
 export function CropDetailsScreen() {
@@ -26,6 +27,17 @@ export function CropDetailsScreen() {
   const treatmentLogs = useLiveQuery(() => id ? db.treatmentLogs.where('cropId').equals(id).sortBy('date') : [], [id]) ?? [];
   const observationLogs = useLiveQuery(() => id ? db.observationLogs.where('cropId').equals(id).sortBy('date') : [], [id]) ?? [];
   const trackings = useLiveQuery(() => id ? db.trackings.where('cropId').equals(id).toArray() : [], [id]) ?? [];
+  const trackingEntries = useLiveQuery(async () => {
+    if (!id) return [];
+    const all = await db.trackingEntries.toArray().catch((): TrackingEntry[] => []);
+    return all.filter(e => e.cropId === id);
+  }, [id]) ?? [];
+  const [editingObsId, setEditingObsId] = useState<string | null>(null);
+  const [editObsText, setEditObsText] = useState('');
+  const [foundationSearch, setFoundationSearch] = useState('');
+  // Sync identity for learning: foundation mapping if set, else the tracker name.
+  // (Wizard-created crops are already foundation-aligned; this fixes legacy/custom names.)
+  const syncKey = crop?.foundationKey || crop?.cropName || '';
   const personal = useLiveQuery(() => id && crop ? db.personalCropDb.get(crop.cropName.toLowerCase()) : undefined, [crop?.cropName]);
 
   const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'>('stages');
@@ -38,10 +50,16 @@ export function CropDetailsScreen() {
   const [trackNotes, setTrackNotes] = useState('');
   // Personal fruit-maturity record for this crop (auto-filled from finished trackings)
   const personalFruit = useLiveQuery(
-    () => (crop ? getPersonalCropData(crop.cropName) : Promise.resolve(null)),
-    [crop?.cropName]
+    () => (syncKey ? getPersonalCropData(syncKey) : Promise.resolve(null)),
+    [syncKey]
   ) ?? null;
-  const fruitDefault = crop ? foundationFruitDefault(crop.cropName) : null;
+  const fruitDefault = syncKey ? foundationFruitDefault(syncKey) : null;
+  const foundationCrops = React.useMemo(() => getNonAliasCrops(cropDb), [cropDb]);
+  const foundationMatches = foundationSearch.trim()
+    ? foundationCrops
+        .filter(c => c.key.includes(foundationSearch.trim().toLowerCase()) || c.entry.display_name.toLowerCase().includes(foundationSearch.trim().toLowerCase()))
+        .slice(0, 6)
+    : [];
   const [harvestQty, setHarvestQty] = useState('');
   const [harvestNotes, setHarvestNotes] = useState('');
   const [harvestDate, setHarvestDate] = useState(formatDateShort(today()));
@@ -193,9 +211,9 @@ export function CropDetailsScreen() {
       // app can assign expected maturity from real data going forward
       const adjustments = await db.cropDbAdjustments.toArray();
       const dbDefault = (cropData as unknown as { growing_time_days?: number } | null)?.growing_time_days ?? 60;
-      const newAdj = logDeviation(crop.cropName, 'fruit_maturity_days', dbDefault, elapsed, crop.variety, adjustments, settings.learningThreshold);
+      const newAdj = logDeviation(syncKey, 'fruit_maturity_days', dbDefault, elapsed, crop.variety, adjustments, settings.learningThreshold);
       await db.cropDbAdjustments.put(newAdj as never);
-      await upsertPersonalFruitMaturity(crop.cropName, elapsed);
+      await upsertPersonalFruitMaturity(syncKey, elapsed);
       await addDiaryEntry({
         entryType: 'note',
         cropId: crop.id,
@@ -212,14 +230,85 @@ export function CropDetailsScreen() {
     }
   }
 
-  async function handleDeleteTracking(tid: string) {
-    if (!window.confirm('Delete this tracking?')) return;
+  async function handleFailTracking(tid: string) {
+    if (!crop) return;
+    if (!window.confirm('Mark this tracking as failed? It will stop and auto-delete after 30 days.')) return;
     try {
+      await db.trackings.update(tid, { status: 'failed', endDate: formatDateShort(today()), updatedAt: Date.now() } as never);
+      await addDiaryEntry({
+        entryType: 'note',
+        cropId: crop.id,
+        cropName: crop.cropName,
+        variety: crop.variety,
+        description: 'Tracking marked as failed',
+        details: '',
+        date: formatDateShort(today()),
+      });
+      toast.success('Tracking stopped — failed entries auto-delete after 30 days');
+    } catch (e) {
+      console.error('[details] fail tracking failed', { id: tid, e });
+      toast.error('Could not stop tracking: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteTracking(tid: string) {
+    if (!window.confirm('Delete this tracking and its journal?')) return;
+    try {
+      const entries = await db.trackingEntries.where('trackingId').equals(tid).toArray().catch(() => []);
+      await Promise.all(entries.map(e => db.trackingEntries.delete(e.id)));
       await db.trackings.delete(tid);
       toast.success('Tracking deleted');
     } catch (e) {
       console.error('[details] delete tracking failed', { id: tid, e });
       toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveTrackingEdit(tid: string, patch: { label: string; tagNumber: string; startDate: string; notes: string }) {
+    try {
+      await db.trackings.update(tid, { ...patch, updatedAt: Date.now() } as never);
+      toast.success('Tracking updated');
+    } catch (e) {
+      console.error('[details] edit tracking failed', { id: tid, e });
+      toast.error('Could not update tracking: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleAddTrackingEntry(trackingId: string, text: string) {
+    if (!crop) return;
+    try {
+      await db.trackingEntries.add({
+        id: generateId('TR'),
+        trackingId,
+        cropId: crop.id,
+        date: formatDateShort(today()),
+        text,
+        updatedAt: Date.now(),
+      } as never);
+    } catch (e) {
+      console.error('[details] add journal entry failed', { trackingId, e });
+      toast.error('Could not save entry: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteTrackingEntry(entryId: string) {
+    try {
+      await db.trackingEntries.delete(entryId);
+    } catch (e) {
+      console.error('[details] delete journal entry failed', { id: entryId, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveObservationEdit(oid: string) {
+    if (!editObsText.trim()) { toast.error('Observation cannot be empty'); return; }
+    try {
+      await db.observationLogs.update(oid, { text: editObsText.trim(), updatedAt: Date.now() } as never);
+      setEditingObsId(null);
+      toast.success('Observation updated');
+    } catch (e) {
+      console.error('[details] edit observation failed', { id: oid, e });
+      toast.error('Could not update observation: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
 
@@ -496,6 +585,53 @@ export function CropDetailsScreen() {
 
         {activeSheet === 'observations' && (
           <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Sync Crop</p>
+              <p className="text-[10px] text-muted-foreground">Learning keys follow this name. Wizard crops are already aligned — remap legacy or custom names here, or type a custom plant name below.</p>
+              {crop.foundationKey ? (
+                <div className="flex items-center justify-between gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <p className="text-sm font-semibold text-green-800 truncate">📎 {crop.foundationKey}</p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await db.crops.update(crop.id, { foundationKey: '', updatedAt: Date.now() } as never);
+                        setFoundationSearch('');
+                        toast.success('Sync cleared — using tracker name');
+                      } catch (e) {
+                        toast.error('Could not update: ' + (e instanceof Error ? e.message : String(e)));
+                      }
+                    }}
+                    className="text-xs text-muted-foreground font-semibold shrink-0"
+                  >Clear</button>
+                </div>
+              ) : (
+                <>
+                  <input value={foundationSearch} onChange={e => setFoundationSearch(e.target.value)} placeholder="Search foundation names…" className="w-full border rounded-lg p-2 text-sm" />
+                  {foundationSearch.trim() && (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {foundationMatches.length === 0 && <p className="text-xs text-muted-foreground">No matches — observations stay under “{crop.cropName}”.</p>}
+                      {foundationMatches.map(c => (
+                        <button
+                          key={c.key}
+                          onClick={async () => {
+                            try {
+                              await db.crops.update(crop.id, { foundationKey: c.entry.display_name, updatedAt: Date.now() } as never);
+                              setFoundationSearch('');
+                              toast.success(`Synced to ${c.entry.display_name}`);
+                            } catch (e) {
+                              toast.error('Could not update: ' + (e instanceof Error ? e.message : String(e)));
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm bg-gray-50 hover:bg-green-50 border border-gray-100 truncate"
+                        >
+                          {c.entry.display_name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Observation Log</p>
               <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
@@ -506,8 +642,26 @@ export function CropDetailsScreen() {
               {observationLogs.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No observations yet</p>}
               {[...observationLogs].reverse().map(o => (
                 <div key={o.id} className="bg-white rounded-xl border border-gray-100 p-3">
-                  <p className="text-xs text-muted-foreground">{o.date}</p>
-                  <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">{o.date}</p>
+                    <button
+                      onClick={() => { setEditingObsId(o.id); setEditObsText(o.text); }}
+                      aria-label="Edit observation"
+                      title="Edit"
+                      className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm shrink-0"
+                    >✎</button>
+                  </div>
+                  {editingObsId === o.id ? (
+                    <>
+                      <textarea value={editObsText} onChange={e => setEditObsText(e.target.value)} className="w-full mt-1 border rounded-lg p-2 text-sm min-h-[80px]" />
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => handleSaveObservationEdit(o.id)} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>
+                        <button onClick={() => setEditingObsId(null)} className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg py-1.5">Cancel</button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -531,19 +685,48 @@ export function CropDetailsScreen() {
             </div>
             <div className="space-y-1.5">
               {[...trackings]
-                .sort((a, b) => {
-                  if (a.status !== b.status) return a.status === 'active' ? -1 : 1;
-                  return (parseDate(b.startDate)?.getTime() ?? 0) - (parseDate(a.startDate)?.getTime() ?? 0);
-                })
+                .filter(t => t.status === 'active')
+                .sort((a, b) => (parseDate(b.startDate)?.getTime() ?? 0) - (parseDate(a.startDate)?.getTime() ?? 0))
                 .map(t => (
                   <TrackingCard
                     key={t.id}
                     tracking={t}
+                    entries={trackingEntries.filter(e => e.trackingId === t.id)}
                     onFinish={handleFinishTracking}
+                    onFail={handleFailTracking}
                     onDelete={handleDeleteTracking}
+                    onSaveEdit={handleSaveTrackingEdit}
+                    onAddEntry={handleAddTrackingEntry}
+                    onDeleteEntry={handleDeleteTrackingEntry}
                   />
                 ))}
             </div>
+            {(() => {
+              const done = trackings.filter(t => t.status !== 'active');
+              if (done.length === 0) return null;
+              return (
+                <details className="bg-white rounded-xl border border-gray-100">
+                  <summary className="p-3 text-xs font-bold uppercase tracking-widest text-gray-500 cursor-pointer">Completed ({done.length})</summary>
+                  <div className="px-3 pb-3 space-y-1.5">
+                    {done
+                      .sort((a, b) => (parseDate(b.endDate || b.startDate)?.getTime() ?? 0) - (parseDate(a.endDate || a.startDate)?.getTime() ?? 0))
+                      .map(t => (
+                        <TrackingCard
+                          key={t.id}
+                          tracking={t}
+                          entries={[]}
+                          onFinish={handleFinishTracking}
+                          onFail={handleFailTracking}
+                          onDelete={handleDeleteTracking}
+                          onSaveEdit={handleSaveTrackingEdit}
+                          onAddEntry={handleAddTrackingEntry}
+                          onDeleteEntry={handleDeleteTrackingEntry}
+                        />
+                      ))}
+                  </div>
+                </details>
+              );
+            })()}
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Notes</p>
               <textarea defaultValue={crop.notes} placeholder="Observation notes..." id="crop-notes-obs" className="w-full mt-2 border rounded-lg p-2 text-sm min-h-[80px]" />

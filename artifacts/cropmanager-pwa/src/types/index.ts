@@ -116,8 +116,18 @@ export interface Tracking {
   startDate: string;
   targetDays: number;
   notes: string;
-  status: 'active' | 'done';
+  status: 'active' | 'done' | 'failed';
   endDate: string;
+  updatedAt: number;
+}
+
+/** Timestamped journal entries logged against an in-progress tracking. */
+export interface TrackingEntry {
+  id: string;
+  trackingId: string;
+  cropId: string;
+  date: string;
+  text: string;
   updatedAt: number;
 }
 
@@ -168,6 +178,8 @@ export interface Crop {
   nextFertilizerDate: string;
   status: string;
   archivedFrom?: string;
+  /** Foundation DB key this tracker crop syncs learning with (defaults to cropName). */
+  foundationKey?: string;
   notes: string;
   daysSeedGerm: number;
   daysGermTransplant: number;

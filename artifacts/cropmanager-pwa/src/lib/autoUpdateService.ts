@@ -233,6 +233,21 @@ class AutoUpdateService {
         }
       }
 
+      // Expire failed trackings (+ their journal) 30d after they stopped
+      try {
+        const failCutoff = Date.now() - 30 * 86400000;
+        const failed = await db.trackings.where('status').equals('failed').toArray().catch(() => []);
+        for (const t of failed) {
+          if ((t.updatedAt ?? 0) < failCutoff) {
+            const entries = await db.trackingEntries.where('trackingId').equals(t.id).toArray().catch(() => []);
+            await Promise.all(entries.map(e => db.trackingEntries.delete(e.id)));
+            await db.trackings.delete(t.id);
+          }
+        }
+      } catch (e) {
+        console.warn('[autoUpdate] failed-tracking expiry failed', e);
+      }
+
       // Expire Deleted → real delete after 3d (migrated from CropsScreen)
       const threshold = Date.now() - 3 * 86400000;
       const toDelete = await db.crops.where('status').equals('Deleted').toArray();

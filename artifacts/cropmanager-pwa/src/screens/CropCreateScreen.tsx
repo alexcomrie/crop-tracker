@@ -74,7 +74,7 @@ export function CropCreateScreen() {
       const cropData = resolveCropData(cropDb, cropKey);
       let notesStr = notes;
       if (trayColors.length) notesStr = `🎨 Tray: ${trayColors.join(', ')}${notes ? '\n' + notes : ''}`;
-      // Only seed-started crops ever transplant — direct/pot methods stay blank
+      // Direct Ground is planted in place — every other method may transplant
       const transplantDate = cropData && needsTransplant(method)
         ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety)
         : null;

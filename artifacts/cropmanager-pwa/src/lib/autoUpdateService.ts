@@ -151,8 +151,8 @@ class AutoUpdateService {
         }
         if (!hDate) hDate = calculateHarvestDate(c, cd, adjustments);
 
-        // Only seed-started crops ever transplant — clear any stale scheduled
-        // date left over on direct/pot crops so estimates fall back to plantingDate
+        // Direct Ground never transplants — clear any stale scheduled date so
+        // estimates fall back to plantingDate
         const tDate = needsTransplant(c.plantingMethod)
           ? calculateTransplantDate(planted, c.germinationDate ? parseDate(c.germinationDate) : null, cd, adjustments, c.cropName.toLowerCase(), c.variety)
           : null;

@@ -78,7 +78,7 @@ export function generateCropReminders(
     ));
   }
 
-  // Transplant reminder (only Seed Tray / Seed Bed ever transplant)
+  // Transplant reminder (every method except Direct Ground)
   const transplantDate = needsTransplant(crop.plantingMethod)
     ? calculateTransplantDate(planted, null, cropData, adjustments, key, crop.variety, threshold)
     : null;

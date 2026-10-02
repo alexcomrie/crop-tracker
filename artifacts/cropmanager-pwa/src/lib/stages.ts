@@ -48,12 +48,12 @@ export function getStageSequence(_cropData: CropData | null): string[] {
 }
 
 /**
- * Only seed-started crops ever transplant. Pots/containers stay in their pot;
- * direct-sown methods (beds, ground, cuttings, etc.) are already planted in
- * place — so the transplant stage, schedule, and reminders don't apply.
+ * Every planting method can transplant except Direct Ground, which is already
+ * planted in place — so the transplant stage, schedule, and reminders are
+ * skipped only for Direct Ground.
  */
 export function needsTransplant(plantingMethod?: string): boolean {
-  return plantingMethod === 'Seed Tray' || plantingMethod === 'Seed Bed';
+  return plantingMethod !== 'Direct Ground';
 }
 
 export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string): string[] {
@@ -73,12 +73,17 @@ export function getValidNextStages(currentStage: string, cropData: CropData | nu
   }
 
   // Seedling special: tray/bed requires up-potted or transplanted before vegetative.
-  // Direct/pot methods never transplant, so the option is not offered at all.
-  if (normalized === 'Seedling' && needsTransplant(plantingMethod)) {
-    // Up-potted / Transplanted are not stages but actions - we still expose as selectable
-    // to record the action; they keep stage as Seedling but set flags.
-    if (!result.includes('Up-planted')) result.push('Up-planted');
-    if (!result.includes('Transplanted')) result.push('Transplanted');
+  // Up-potted / Transplanted are not stages but actions - we still expose as selectable
+  // to record the action; they keep stage as Seedling but set flags.
+  const isTrayOrBed = plantingMethod === 'Seed Tray' || plantingMethod === 'Seed Bed';
+  if (normalized === 'Seedling') {
+    if (isTrayOrBed) {
+      if (!result.includes('Up-planted')) result.push('Up-planted');
+      if (!result.includes('Transplanted')) result.push('Transplanted');
+    } else if (needsTransplant(plantingMethod)) {
+      // All other methods except Direct Ground keep the transplant option
+      if (!result.includes('Transplanted')) result.push('Transplanted');
+    }
   }
   if (normalized === 'Up-planted') {
     if (!result.includes('Transplanted')) result.push('Transplanted');
@@ -209,8 +214,8 @@ export function calcExpectedStage(crop: Crop, cropData: CropData | null): string
     return 'Seedling';
   }
 
-  // Seedling gating Condition #3
-  const isTrayOrBed = needsTransplant(crop.plantingMethod);
+  // Seedling gating Condition #3 (tray/bed must move before going vegetative)
+  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
   if (normalizeStage(crop.plantStage) === 'Seedling') {
     if (isTrayOrBed && !crop.transplantDateActual) {
       // need transplant before vegetative
@@ -286,7 +291,7 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
   if (expectedStage === normalizedCurrent) return false;
   if (crop.status === 'Harvested' || crop.status === 'Deleted') return false;
 
-  const isTrayOrBed = needsTransplant(crop.plantingMethod);
+  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
   const needsUpPottedOrTransplant = isTrayOrBed && normalizedCurrent === 'Seedling' && !crop.transplantDateActual;
   if (needsUpPottedOrTransplant) return false;
 

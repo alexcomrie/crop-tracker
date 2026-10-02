@@ -2,6 +2,7 @@ import type { Crop, Propagation, Reminder, CropData, CropDbAdjustment, PropDbAdj
 import { generateId } from './ids';
 import { parseDate, addDays, formatDateShort, daysBetween } from './dates';
 import { getAdjustedValue, calculateHarvestDate, calculateTransplantDate } from './harvest';
+import { needsTransplant } from './stages';
 import { calcSprayDates } from './sprays';
 import { getRootingDays } from './propagation';
 
@@ -77,8 +78,10 @@ export function generateCropReminders(
     ));
   }
 
-  // Transplant reminder (only if transplant method)
-  const transplantDate = calculateTransplantDate(planted, null, cropData, adjustments, key, crop.variety, threshold);
+  // Transplant reminder (only Seed Tray / Seed Bed ever transplant)
+  const transplantDate = needsTransplant(crop.plantingMethod)
+    ? calculateTransplantDate(planted, null, cropData, adjustments, key, crop.variety, threshold)
+    : null;
   if (transplantDate) {
     const tRemDate = addDays(transplantDate, -1);
     reminders.push(makeReminder(

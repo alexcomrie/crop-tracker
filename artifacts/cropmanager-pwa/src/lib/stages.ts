@@ -47,6 +47,15 @@ export function getStageSequence(_cropData: CropData | null): string[] {
   return [...CANONICAL_STAGES];
 }
 
+/**
+ * Only seed-started crops ever transplant. Pots/containers stay in their pot;
+ * direct-sown methods (beds, ground, cuttings, etc.) are already planted in
+ * place — so the transplant stage, schedule, and reminders don't apply.
+ */
+export function needsTransplant(plantingMethod?: string): boolean {
+  return plantingMethod === 'Seed Tray' || plantingMethod === 'Seed Bed';
+}
+
 export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string): string[] {
   const normalized = normalizeStage(currentStage);
   const seq = getStageSequence(cropData);
@@ -63,20 +72,13 @@ export function getValidNextStages(currentStage: string, cropData: CropData | nu
     result.push(next);
   }
 
-  // Seedling special: tray/bed requires up-potted or transplanted before vegetative
-  if (normalized === 'Seedling') {
-    const isTrayOrBed = plantingMethod === 'Seed Tray' || plantingMethod === 'Seed Bed';
+  // Seedling special: tray/bed requires up-potted or transplanted before vegetative.
+  // Direct/pot methods never transplant, so the option is not offered at all.
+  if (normalized === 'Seedling' && needsTransplant(plantingMethod)) {
     // Up-potted / Transplanted are not stages but actions - we still expose as selectable
     // to record the action; they keep stage as Seedling but set flags.
-    if (isTrayOrBed) {
-      if (!result.includes('Up-planted')) result.push('Up-planted');
-      if (!result.includes('Transplanted')) result.push('Transplanted');
-    } else {
-      // direct methods: transplant is optional but allowed
-      if (cropData?.transplant_days && cropData.transplant_days > 0) {
-        if (!result.includes('Transplanted')) result.push('Transplanted');
-      }
-    }
+    if (!result.includes('Up-planted')) result.push('Up-planted');
+    if (!result.includes('Transplanted')) result.push('Transplanted');
   }
   if (normalized === 'Up-planted') {
     if (!result.includes('Transplanted')) result.push('Transplanted');
@@ -208,7 +210,7 @@ export function calcExpectedStage(crop: Crop, cropData: CropData | null): string
   }
 
   // Seedling gating Condition #3
-  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
+  const isTrayOrBed = needsTransplant(crop.plantingMethod);
   if (normalizeStage(crop.plantStage) === 'Seedling') {
     if (isTrayOrBed && !crop.transplantDateActual) {
       // need transplant before vegetative
@@ -226,11 +228,6 @@ export function calcExpectedStage(crop: Crop, cropData: CropData | null): string
     // Direct sown without transplant: after 7+15=22 days since germ approx
     if (daysSinceGerm < 21) return 'Seedling';
     return 'Vegetative Early';
-  }
-
-  // If still before transplant but should be vegetative, handle vegetative progression
-  if (crop.plantStage === 'Seedling' && !isTrayOrBed) {
-    // already handled above
   }
 
   // Vegetative & Flowering progression proportional to remaining days
@@ -289,7 +286,7 @@ export async function autoTransitionCrop(crop: Crop, cropData: CropData, db: any
   if (expectedStage === normalizedCurrent) return false;
   if (crop.status === 'Harvested' || crop.status === 'Deleted') return false;
 
-  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
+  const isTrayOrBed = needsTransplant(crop.plantingMethod);
   const needsUpPottedOrTransplant = isTrayOrBed && normalizedCurrent === 'Seedling' && !crop.transplantDateActual;
   if (needsUpPottedOrTransplant) return false;
 
@@ -347,6 +344,7 @@ export async function promoteNextBatch(harvestedCrop: Crop, db: any) {
 }
 
 export function autoAdjustTransplantSchedule(crop: Crop, cropData: CropData | null): Crop | null {
+  if (!needsTransplant(crop.plantingMethod)) return null;
   if (!crop.transplantDateScheduled || crop.transplantDateActual) return null;
   const sched = parseDate(crop.transplantDateScheduled);
   const now = today();

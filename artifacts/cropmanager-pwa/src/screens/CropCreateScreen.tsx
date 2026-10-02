@@ -5,6 +5,7 @@ import { resolveCropData } from '../lib/cropDb';
 import { generateId } from '../lib/ids';
 import { formatDateShort, today, toIsoDateStr } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
+import { needsTransplant } from '../lib/stages';
 import { generateCropReminders } from '../lib/reminders';
 import { calcSprayDates, formatSprayDates } from '../lib/sprays';
 import { addDiaryEntry } from '../lib/diary';
@@ -73,7 +74,10 @@ export function CropCreateScreen() {
       const cropData = resolveCropData(cropDb, cropKey);
       let notesStr = notes;
       if (trayColors.length) notesStr = `🎨 Tray: ${trayColors.join(', ')}${notes ? '\n' + notes : ''}`;
-      const transplantDate = cropData ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety) : null;
+      // Only seed-started crops ever transplant — direct/pot methods stay blank
+      const transplantDate = cropData && needsTransplant(method)
+        ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety)
+        : null;
       const baseCrop: any = {
         id, cropName: cropData?.display_name ?? cropKey, variety: variety ?? '',
         plantingMethod: method, plantStage: 'Seed',

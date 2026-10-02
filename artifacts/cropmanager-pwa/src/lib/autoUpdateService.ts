@@ -12,7 +12,7 @@ import { getPredictedHarvestDate } from './micro-crop/hybrid';
 import { formatDateStored, parseDate, addDays } from './dates';
 import { calcNumBatches, resolveBatchOffset } from './continuous';
 import { generateCropReminders } from './reminders';
-import { autoAdjustTransplantSchedule, autoTransitionCrop } from './stages';
+import { autoAdjustTransplantSchedule, autoTransitionCrop, needsTransplant } from './stages';
 
 const TEXT_REFRESH_MS = 5 * 60 * 1000;
 const TRANSPLANT_BUMP_MS = 60 * 1000;
@@ -151,10 +151,15 @@ class AutoUpdateService {
         }
         if (!hDate) hDate = calculateHarvestDate(c, cd, adjustments);
 
-        const tDate = calculateTransplantDate(planted, c.germinationDate ? parseDate(c.germinationDate) : null, cd, adjustments, c.cropName.toLowerCase(), c.variety);
+        // Only seed-started crops ever transplant — clear any stale scheduled
+        // date left over on direct/pot crops so estimates fall back to plantingDate
+        const tDate = needsTransplant(c.plantingMethod)
+          ? calculateTransplantDate(planted, c.germinationDate ? parseDate(c.germinationDate) : null, cd, adjustments, c.cropName.toLowerCase(), c.variety)
+          : null;
 
         const patch: Record<string, unknown> = { updatedAt: Date.now() };
         if (tDate) patch.transplantDateScheduled = formatDateStored(tDate);
+        else if (!needsTransplant(c.plantingMethod) && c.transplantDateScheduled) patch.transplantDateScheduled = '';
         if (hDate) patch.harvestDateEstimated = formatDateStored(hDate);
 
         // C-H logic: self-tuning default (learned actuals > tinygpt > DB),

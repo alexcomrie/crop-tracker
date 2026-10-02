@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Tracking, TrackingEntry } from '../../types';
-import { parseDate, daysBetween, today } from '../../lib/dates';
+import { parseDate, daysBetween, today, formatDateShort } from '../../lib/dates';
 import { DateInput } from '../shared/DateInput';
 
 interface TrackingCardProps {
@@ -10,7 +10,7 @@ interface TrackingCardProps {
   onFail: (id: string) => void;
   onDelete: (id: string) => void;
   onSaveEdit: (id: string, patch: { label: string; tagNumber: string; startDate: string; notes: string }) => void;
-  onAddEntry: (trackingId: string, text: string) => void;
+  onAddEntry: (trackingId: string, text: string, dateStr: string) => void;
   onDeleteEntry: (entryId: string) => void;
 }
 
@@ -22,6 +22,7 @@ export function TrackingCard({ tracking: t, entries, onFinish, onFail, onDelete,
   const [editDate, setEditDate] = useState(t.startDate);
   const [editNotes, setEditNotes] = useState(t.notes);
   const [entryText, setEntryText] = useState('');
+  const [entryDate, setEntryDate] = useState(formatDateShort(today()));
 
   const start = parseDate(t.startDate);
   const end = t.status !== 'active' && t.endDate ? (parseDate(t.endDate) ?? today()) : today();
@@ -92,13 +93,16 @@ export function TrackingCard({ tracking: t, entries, onFinish, onFail, onDelete,
           )}
 
           {isActive && (
-            <div className="flex gap-2 mt-2">
-              <input value={entryText} onChange={e => setEntryText(e.target.value)} placeholder="Log what's happening…" className="flex-1 border rounded-lg p-2 text-xs" />
-              <button
-                onClick={() => { if (entryText.trim()) { onAddEntry(t.id, entryText.trim()); setEntryText(''); } }}
-                disabled={!entryText.trim()}
-                className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
-              >Add</button>
+            <div className="mt-2 space-y-2">
+              <DateInput value={entryDate} onChange={setEntryDate} ariaLabel="Update date" />
+              <div className="flex gap-2">
+                <input value={entryText} onChange={e => setEntryText(e.target.value)} placeholder="Log what's happening…" className="flex-1 border rounded-lg p-2 text-xs" />
+                <button
+                  onClick={() => { if (entryText.trim()) { onAddEntry(t.id, entryText.trim(), entryDate); setEntryText(''); setEntryDate(formatDateShort(today())); } }}
+                  disabled={!entryText.trim()}
+                  className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
+                >Add</button>
+              </div>
             </div>
           )}
 

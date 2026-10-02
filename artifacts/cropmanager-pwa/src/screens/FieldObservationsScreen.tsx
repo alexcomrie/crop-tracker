@@ -72,6 +72,7 @@ export function FieldObservationsScreen() {
     return all.filter(e => !e.cropId);
   }, []) ?? [];
   const [obsEntryText, setObsEntryText] = useState<Record<string, string>>({});
+  const [obsEntryDate, setObsEntryDate] = useState<Record<string, string>>({});
   const [editingObsId, setEditingObsId] = useState<string | null>(null);
   const [editObsText, setEditObsText] = useState('');
 
@@ -119,11 +120,12 @@ export function FieldObservationsScreen() {
     const text = (obsEntryText[observationId] ?? '').trim();
     if (!text) return;
     try {
+      const onDate = parseDate(obsEntryDate[observationId] ?? '') ?? today();
       await db.observationEntries.add({
         id: generateId('DE' as never) as string,
         observationId,
         cropId: '',
-        date: formatDateShort(today()),
+        date: formatDateShort(onDate),
         text,
         updatedAt: Date.now(),
       } as never);
@@ -194,13 +196,14 @@ export function FieldObservationsScreen() {
     }
   }
 
-  async function handleAddTrackingEntry(trackingId: string, text: string) {
+  async function handleAddTrackingEntry(trackingId: string, text: string, dateStr: string) {
     try {
+      const onDate = parseDate(dateStr) ?? today();
       await db.trackingEntries.add({
         id: generateId('TR'),
         trackingId,
         cropId: '',
-        date: formatDateShort(today()),
+        date: formatDateShort(onDate),
         text,
         updatedAt: Date.now(),
       } as never);
@@ -381,16 +384,22 @@ export function FieldObservationsScreen() {
                     </div>
                   )}
                   <div className="flex gap-2 mt-2">
+                    <DateInput
+                      value={obsEntryDate[o.id] ?? formatDateShort(today())}
+                      onChange={v => setObsEntryDate(prev => ({ ...prev, [o.id]: v }))}
+                      ariaLabel="Update date"
+                      className="border rounded-lg p-2 text-xs w-[128px] shrink-0 min-h-[36px] bg-white"
+                    />
                     <input
                       value={obsEntryText[o.id] ?? ''}
                       onChange={e => setObsEntryText(prev => ({ ...prev, [o.id]: e.target.value }))}
                       placeholder="Log an update…"
-                      className="flex-1 border rounded-lg p-2 text-xs"
+                      className="flex-1 border rounded-lg p-2 text-xs min-w-0"
                     />
                     <button
                       onClick={() => handleAddObservationEntry(o.id)}
                       disabled={!(obsEntryText[o.id] ?? '').trim()}
-                      className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
+                      className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40 shrink-0"
                     >Add</button>
                   </div>
                 </>

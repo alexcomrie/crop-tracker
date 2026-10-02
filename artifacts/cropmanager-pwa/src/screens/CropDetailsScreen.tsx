@@ -45,6 +45,7 @@ export function CropDetailsScreen() {
   const [editTreatNotes, setEditTreatNotes] = useState('');
   const [editTreatDate, setEditTreatDate] = useState('');
   const [obsEntryText, setObsEntryText] = useState<Record<string, string>>({});
+  const [obsEntryDate, setObsEntryDate] = useState<Record<string, string>>({});
   const observationEntries = useLiveQuery(async () => {
     if (!id) return [];
     const all = await db.observationEntries.toArray().catch((): ObservationEntry[] => []);
@@ -290,14 +291,16 @@ export function CropDetailsScreen() {
     }
   }
 
-  async function handleAddTrackingEntry(trackingId: string, text: string) {
+  async function handleAddTrackingEntry(trackingId: string, text: string, dateStr: string) {
     if (!crop) return;
     try {
+      // Entry date defaults to today but is backdatable for missed days
+      const onDate = parseDate(dateStr) ?? today();
       await db.trackingEntries.add({
         id: generateId('TR'),
         trackingId,
         cropId: crop.id,
-        date: formatDateShort(today()),
+        date: formatDateShort(onDate),
         text,
         updatedAt: Date.now(),
       } as never);
@@ -321,11 +324,13 @@ export function CropDetailsScreen() {
     const text = (obsEntryText[observationId] ?? '').trim();
     if (!text) return;
     try {
+      // Entry date defaults to today but is backdatable for missed days
+      const onDate = parseDate(obsEntryDate[observationId] ?? '') ?? today();
       await db.observationEntries.add({
         id: generateId('DE' as never) as string,
         observationId,
         cropId: crop.id,
-        date: formatDateShort(today()),
+        date: formatDateShort(onDate),
         text,
         updatedAt: Date.now(),
       } as never);
@@ -815,16 +820,22 @@ export function CropDetailsScreen() {
                         </div>
                       )}
                       <div className="flex gap-2 mt-2">
+                        <DateInput
+                          value={obsEntryDate[o.id] ?? formatDateShort(today())}
+                          onChange={v => setObsEntryDate(prev => ({ ...prev, [o.id]: v }))}
+                          ariaLabel="Update date"
+                          className="border rounded-lg p-2 text-xs w-[128px] shrink-0 min-h-[36px] bg-white"
+                        />
                         <input
                           value={obsEntryText[o.id] ?? ''}
                           onChange={e => setObsEntryText(prev => ({ ...prev, [o.id]: e.target.value }))}
                           placeholder="Log an update…"
-                          className="flex-1 border rounded-lg p-2 text-xs"
+                          className="flex-1 border rounded-lg p-2 text-xs min-w-0"
                         />
                         <button
                           onClick={() => handleAddObservationEntry(o.id)}
                           disabled={!(obsEntryText[o.id] ?? '').trim()}
-                          className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
+                          className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40 shrink-0"
                         >Add</button>
                       </div>
                     </>

@@ -131,6 +131,16 @@ export interface TrackingEntry {
   updatedAt: number;
 }
 
+/** Follow-up entries logged against an observation (what happened since). */
+export interface ObservationEntry {
+  id: string;
+  observationId: string;
+  cropId: string;
+  date: string;
+  text: string;
+  updatedAt: number;
+}
+
 export interface PersonalCropData {
   key: string;
   displayName: string;

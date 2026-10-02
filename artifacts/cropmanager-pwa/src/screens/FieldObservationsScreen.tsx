@@ -4,13 +4,14 @@ import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
 import { getNonAliasCrops } from '../lib/cropDb';
 import { generateId } from '../lib/ids';
+import { DateInput } from '../components/shared/DateInput';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { addDiaryEntry } from '../lib/diary';
 import { logDeviation } from '../lib/learning';
 import { foundationFruitDefault, getPersonalCropData, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
-import { formatDateShort, parseDate, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
+import { formatDateShort, parseDate, daysBetween, today } from '../lib/dates';
 import { toast } from 'sonner';
-import type { TrackingEntry } from '../types';
+import type { TrackingEntry, ObservationEntry } from '../types';
 
 /**
  * Independent field observations + growth tracking for plants that were
@@ -66,6 +67,11 @@ export function FieldObservationsScreen() {
     const all = await db.trackingEntries.toArray().catch((): TrackingEntry[] => []);
     return all.filter(e => !e.cropId);
   }, []) ?? [];
+  const observationEntries = useLiveQuery(async () => {
+    const all = await db.observationEntries.toArray().catch((): ObservationEntry[] => []);
+    return all.filter(e => !e.cropId);
+  }, []) ?? [];
+  const [obsEntryText, setObsEntryText] = useState<Record<string, string>>({});
   const [editingObsId, setEditingObsId] = useState<string | null>(null);
   const [editObsText, setEditObsText] = useState('');
 
@@ -109,10 +115,46 @@ export function FieldObservationsScreen() {
     }
   }
 
-  async function handleDeleteObservation(id: string) {
-    if (!window.confirm('Delete this observation?')) return;
+  async function handleAddObservationEntry(observationId: string) {
+    const text = (obsEntryText[observationId] ?? '').trim();
+    if (!text) return;
     try {
+      await db.observationEntries.add({
+        id: generateId('DE' as never) as string,
+        observationId,
+        cropId: '',
+        date: formatDateShort(today()),
+        text,
+        updatedAt: Date.now(),
+      } as never);
+      setObsEntryText(prev => {
+        const next = { ...prev };
+        delete next[observationId];
+        return next;
+      });
+    } catch (e) {
+      console.error('[field-obs] add observation update failed', { observationId, e });
+      toast.error('Could not save update: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteObservationEntry(entryId: string) {
+    try {
+      await db.observationEntries.delete(entryId);
+    } catch (e) {
+      console.error('[field-obs] delete observation update failed', { id: entryId, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteObservation(id: string) {
+    if (!window.confirm('Delete this observation and its updates?')) return;
+    try {
+      const entries = await db.observationEntries.where('observationId').equals(id).toArray().catch((): ObservationEntry[] => []);
+      await Promise.all(entries.map(e => db.observationEntries.delete(e.id)));
       await db.observationLogs.delete(id);
+      if (editingObsId === id) setEditingObsId(null);
+      toast.success('Observation deleted');
     } catch (e) {
       console.error('[field-obs] delete observation failed', { id, e });
       toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
@@ -296,9 +338,7 @@ export function FieldObservationsScreen() {
           )}
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
             className="w-full border rounded-lg p-2 text-sm min-h-[80px]" />
-          <input type="date" value={toInputDateStr(obsDate)} onChange={e => {
-            const v = fromInputDateStr(e.target.value); if (v) setObsDate(v);
-          }} className="w-full border rounded-lg p-2 text-sm" />
+          <DateInput value={obsDate} onChange={setObsDate} ariaLabel="Observation date" />
           <button onClick={handleAddObservation} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
         </div>
 
@@ -328,7 +368,32 @@ export function FieldObservationsScreen() {
                   </div>
                 </>
               ) : (
-                <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                <>
+                  <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                  {observationEntries.filter(u => u.observationId === o.id).length > 0 && (
+                    <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                      {observationEntries.filter(u => u.observationId === o.id).map(u => (
+                        <div key={u.id} className="flex items-start justify-between gap-2 text-xs">
+                          <p className="flex-1"><span className="text-muted-foreground font-semibold mr-1">{u.date}</span><span className="whitespace-pre-line">{u.text}</span></p>
+                          <button onClick={() => handleDeleteObservationEntry(u.id)} aria-label="Delete update" className="text-red-400 font-bold shrink-0">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    <input
+                      value={obsEntryText[o.id] ?? ''}
+                      onChange={e => setObsEntryText(prev => ({ ...prev, [o.id]: e.target.value }))}
+                      placeholder="Log an update…"
+                      className="flex-1 border rounded-lg p-2 text-xs"
+                    />
+                    <button
+                      onClick={() => handleAddObservationEntry(o.id)}
+                      disabled={!(obsEntryText[o.id] ?? '').trim()}
+                      className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
+                    >Add</button>
+                  </div>
+                </>
               )}
             </div>
           ))}
@@ -349,9 +414,7 @@ export function FieldObservationsScreen() {
             <input value={trackLabel} onChange={e => setTrackLabel(e.target.value)} placeholder="Label (e.g. Fruit 1)" className="border rounded-lg p-2 text-sm" />
             <input value={trackTag} onChange={e => setTrackTag(e.target.value)} placeholder="Tag # (optional)" className="border rounded-lg p-2 text-sm" />
           </div>
-          <input type="date" value={toInputDateStr(trackDate)} onChange={e => {
-            const v = fromInputDateStr(e.target.value); if (v) setTrackDate(v);
-          }} className="w-full border rounded-lg p-2 text-sm" />
+          <DateInput value={trackDate} onChange={setTrackDate} ariaLabel="Tracking start date" />
           <input value={trackNotes} onChange={e => setTrackNotes(e.target.value)} placeholder="Notes (optional)" className="w-full border rounded-lg p-2 text-sm" />
           <button onClick={handleAddTracking} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Start Tracking</button>
         </div>

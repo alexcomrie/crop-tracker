@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ShieldAlert, Plus, Calendar, Droplets, Trash2 } from 'lucide-react';
 import { generateId } from '../lib/ids';
-import { formatDateShort, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
+import { DateInput } from '../components/shared/DateInput';
+import { formatDateShort, today } from '../lib/dates';
 import { toast } from 'sonner';
 
 export function HerbicideScheduleScreen() {
@@ -84,7 +85,7 @@ export function HerbicideScheduleScreen() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Date Applied</label>
-                <Input type="date" value={toInputDateStr(date)} onChange={e => setDate(fromInputDateStr(e.target.value))} />
+                <DateInput value={date} onChange={setDate} ariaLabel="Date applied" />
               </div>
             </div>
             <div className="flex gap-2">

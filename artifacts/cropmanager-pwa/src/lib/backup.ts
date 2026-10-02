@@ -1,6 +1,6 @@
 import db from '../db/db';
 
-const BACKUP_VERSION = 8;
+const BACKUP_VERSION = 9;
 
 export async function exportJsonBackup(): Promise<string> {
   const [
@@ -8,7 +8,7 @@ export async function exportJsonBackup(): Promise<string> {
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
-    microModels, observationLogs, personalCropDb, trackings, trackingEntries,
+    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries,
   ] = await Promise.all([
     db.crops.toArray(),
     db.propagations.toArray(),
@@ -37,6 +37,7 @@ export async function exportJsonBackup(): Promise<string> {
     db.personalCropDb.toArray(),
     db.trackings.toArray(),
     db.trackingEntries.toArray(),
+    db.observationEntries.toArray(),
   ]);
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
@@ -45,7 +46,7 @@ export async function exportJsonBackup(): Promise<string> {
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
-    microModels, observationLogs, personalCropDb, trackings, trackingEntries,
+    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries,
   }, null, 2);
 }
 
@@ -60,7 +61,7 @@ const TABLE_NAMES = [
   'cropDbAdjustments', 'propDbAdjustments', 'batchPlantingLogs', 'cropSearchLogs',
   'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
   'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
-  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries',
+  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries',
 ] as const;
 
 function getTable(name: (typeof TABLE_NAMES)[number]) {
@@ -84,8 +85,8 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     throw new Error('Invalid backup payload');
   }
-  if (data.version !== undefined && ![6, 7, BACKUP_VERSION].includes(data.version)) {
-    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6, 7 or ${BACKUP_VERSION})`);
+  if (data.version !== undefined && ![6, 7, 8, BACKUP_VERSION].includes(data.version)) {
+    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6-8 or ${BACKUP_VERSION})`);
   }
   const counts: Record<string, number> = {};
   const tables = TABLE_NAMES.map(name => getTable(name)).filter((t): t is NonNullable<typeof t> => !!t);

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Tracking, TrackingEntry } from '../../types';
-import { parseDate, daysBetween, today, toInputDateStr, fromInputDateStr } from '../../lib/dates';
+import { parseDate, daysBetween, today } from '../../lib/dates';
+import { DateInput } from '../shared/DateInput';
 
 interface TrackingCardProps {
   tracking: Tracking;
@@ -59,9 +60,7 @@ export function TrackingCard({ tracking: t, entries, onFinish, onFail, onDelete,
             <input value={editLabel} onChange={e => setEditLabel(e.target.value)} placeholder="Label" className="border rounded-lg p-2 text-sm" />
             <input value={editTag} onChange={e => setEditTag(e.target.value)} placeholder="Tag #" className="border rounded-lg p-2 text-sm" />
           </div>
-          <input type="date" value={toInputDateStr(editDate)} onChange={e => {
-            const v = fromInputDateStr(e.target.value); if (v) setEditDate(v);
-          }} className="w-full border rounded-lg p-2 text-sm" />
+          <DateInput value={editDate} onChange={setEditDate} ariaLabel="Tracking start date" />
           <input value={editNotes} onChange={e => setEditNotes(e.target.value)} placeholder="Notes" className="w-full border rounded-lg p-2 text-sm" />
           <div className="flex gap-2">
             <button onClick={saveEdit} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>

@@ -5,15 +5,16 @@ import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData, getNonAliasCrops } from '../lib/cropDb';
 import { getEffectiveCropData, getPersonalCropData, foundationFruitDefault, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
-import { parseDate, formatDateShort, daysBetween, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
+import { parseDate, formatDateShort, daysBetween, today } from '../lib/dates';
 import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, getValidNextStages, processStageChange } from '../lib/stages';
 import { generateId } from '../lib/ids';
 import { TrackingCard } from '../components/observations/TrackingCard';
+import { DateInput } from '../components/shared/DateInput';
 import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES } from '../lib/routes';
-import type { TrackingEntry } from '../types';
+import type { TrackingEntry, ObservationEntry } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight } from 'lucide-react';
 
 export function CropDetailsScreen() {
@@ -34,6 +35,21 @@ export function CropDetailsScreen() {
   }, [id]) ?? [];
   const [editingObsId, setEditingObsId] = useState<string | null>(null);
   const [editObsText, setEditObsText] = useState('');
+  const [editObsDate, setEditObsDate] = useState('');
+  const [editingHarvestId, setEditingHarvestId] = useState<string | null>(null);
+  const [editHarvestDate, setEditHarvestDate] = useState('');
+  const [editHarvestNotes, setEditHarvestNotes] = useState('');
+  const [editingTreatId, setEditingTreatId] = useState<string | null>(null);
+  const [editTreatType, setEditTreatType] = useState('fertilizer');
+  const [editTreatProduct, setEditTreatProduct] = useState('');
+  const [editTreatNotes, setEditTreatNotes] = useState('');
+  const [editTreatDate, setEditTreatDate] = useState('');
+  const [obsEntryText, setObsEntryText] = useState<Record<string, string>>({});
+  const observationEntries = useLiveQuery(async () => {
+    if (!id) return [];
+    const all = await db.observationEntries.toArray().catch((): ObservationEntry[] => []);
+    return all.filter(e => e.cropId === id);
+  }, [id]) ?? [];
   const [foundationSearch, setFoundationSearch] = useState('');
   // Sync identity for learning: foundation mapping if set, else the tracker name.
   // (Wizard-created crops are already foundation-aligned; this fixes legacy/custom names.)
@@ -300,10 +316,126 @@ export function CropDetailsScreen() {
     }
   }
 
+  async function handleAddObservationEntry(observationId: string) {
+    if (!crop) return;
+    const text = (obsEntryText[observationId] ?? '').trim();
+    if (!text) return;
+    try {
+      await db.observationEntries.add({
+        id: generateId('DE' as never) as string,
+        observationId,
+        cropId: crop.id,
+        date: formatDateShort(today()),
+        text,
+        updatedAt: Date.now(),
+      } as never);
+      setObsEntryText(prev => {
+        const next = { ...prev };
+        delete next[observationId];
+        return next;
+      });
+    } catch (e) {
+      console.error('[details] add observation update failed', { observationId, e });
+      toast.error('Could not save update: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteObservationEntry(entryId: string) {
+    try {
+      await db.observationEntries.delete(entryId);
+    } catch (e) {
+      console.error('[details] delete observation update failed', { id: entryId, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteObservation(oid: string) {
+    if (!window.confirm('Delete this observation and its updates?')) return;
+    try {
+      const entries = await db.observationEntries.where('observationId').equals(oid).toArray().catch((): ObservationEntry[] => []);
+      await Promise.all(entries.map(e => db.observationEntries.delete(e.id)));
+      await db.observationLogs.delete(oid);
+      if (editingObsId === oid) setEditingObsId(null);
+      toast.success('Observation deleted');
+    } catch (e) {
+      console.error('[details] delete observation failed', { id: oid, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveHarvestEdit(hid: string) {
+    if (!crop || !editHarvestDate) { toast.error('Pick a harvest date first'); return; }
+    try {
+      const hDate = parseDate(editHarvestDate) ?? today();
+      const planted = parseDate(crop.plantingDate);
+      const daysFromPlanting = planted ? daysBetween(planted, hDate) : 0;
+      const est = parseDate(crop.harvestDateEstimated);
+      const deviation = est ? daysBetween(est, hDate) : 0;
+      await db.harvestLogs.update(hid, {
+        harvestDate: formatDateShort(hDate),
+        daysFromPlanting,
+        deviationFromDb: deviation,
+        notes: editHarvestNotes.trim(),
+        updatedAt: Date.now(),
+      } as never);
+      setEditingHarvestId(null);
+      toast.success('Harvest updated');
+    } catch (e) {
+      console.error('[details] edit harvest failed', { id: hid, e });
+      toast.error('Could not update harvest: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteHarvest(hid: string) {
+    if (!window.confirm('Delete this harvest log? Learned averages are not recomputed.')) return;
+    try {
+      await db.harvestLogs.delete(hid);
+      toast.success('Harvest deleted');
+    } catch (e) {
+      console.error('[details] delete harvest failed', { id: hid, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleSaveTreatmentEdit(tid: string) {
+    if (!crop || !editTreatProduct.trim()) { toast.error('Enter a product name first'); return; }
+    try {
+      const onDate = parseDate(editTreatDate) ?? today();
+      const planted = parseDate(crop.plantingDate);
+      await db.treatmentLogs.update(tid, {
+        date: formatDateShort(onDate),
+        daysFromPlanting: planted ? daysBetween(planted, onDate) : 0,
+        type: editTreatType,
+        product: editTreatProduct.trim(),
+        notes: editTreatNotes.trim(),
+        updatedAt: Date.now(),
+      } as never);
+      setEditingTreatId(null);
+      toast.success('Treatment updated');
+    } catch (e) {
+      console.error('[details] edit treatment failed', { id: tid, e });
+      toast.error('Could not update treatment: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function handleDeleteTreatment(tid: string) {
+    if (!window.confirm('Delete this treatment log?')) return;
+    try {
+      await db.treatmentLogs.delete(tid);
+      toast.success('Treatment deleted');
+    } catch (e) {
+      console.error('[details] delete treatment failed', { id: tid, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
   async function handleSaveObservationEdit(oid: string) {
     if (!editObsText.trim()) { toast.error('Observation cannot be empty'); return; }
     try {
-      await db.observationLogs.update(oid, { text: editObsText.trim(), updatedAt: Date.now() } as never);
+      // Never write undefined into the indexed date field
+      const patch: Record<string, unknown> = { text: editObsText.trim(), updatedAt: Date.now() };
+      if (editObsDate) patch['date'] = editObsDate;
+      await db.observationLogs.update(oid, patch as never);
       setEditingObsId(null);
       toast.success('Observation updated');
     } catch (e) {
@@ -507,10 +639,9 @@ export function CropDetailsScreen() {
                 ))}
               </div>
               <div className="flex items-center gap-2 mt-3">
-                <input type="date" className="border rounded-lg px-2 py-1.5 text-xs flex-1" value={toInputDateStr(stageDate)} onChange={e => {
-                  const v = fromInputDateStr(e.target.value);
-                  if (v) setStageDate(v);
-                }} />
+                <div className="flex-1">
+                  <DateInput value={stageDate} onChange={setStageDate} ariaLabel="Stage change date" className="border rounded-lg px-2 py-1.5 text-xs w-full min-h-[44px] bg-white" />
+                </div>
                 <span className="text-[11px] text-muted-foreground">{stageDate}</span>
               </div>
               <button disabled={!selectedStage || saving} onClick={handleStageChange}
@@ -640,30 +771,67 @@ export function CropDetailsScreen() {
             </div>
             <div className="space-y-1.5">
               {observationLogs.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No observations yet</p>}
-              {[...observationLogs].reverse().map(o => (
+              {[...observationLogs].reverse().map(o => {
+                const updates = observationEntries.filter(e => e.observationId === o.id);
+                return (
                 <div key={o.id} className="bg-white rounded-xl border border-gray-100 p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">{o.date}</p>
-                    <button
-                      onClick={() => { setEditingObsId(o.id); setEditObsText(o.text); }}
-                      aria-label="Edit observation"
-                      title="Edit"
-                      className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm shrink-0"
-                    >✎</button>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => { setEditingObsId(o.id); setEditObsText(o.text); setEditObsDate(o.date); }}
+                        aria-label="Edit observation"
+                        title="Edit"
+                        className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm"
+                      >✎</button>
+                      <button
+                        onClick={() => handleDeleteObservation(o.id)}
+                        aria-label="Delete observation"
+                        title="Delete"
+                        className="w-6 h-6 rounded-lg hover:bg-red-50 text-red-400 flex items-center justify-center text-sm"
+                      >×</button>
+                    </span>
                   </div>
                   {editingObsId === o.id ? (
                     <>
-                      <textarea value={editObsText} onChange={e => setEditObsText(e.target.value)} className="w-full mt-1 border rounded-lg p-2 text-sm min-h-[80px]" />
+                      <DateInput value={editObsDate} onChange={setEditObsDate} ariaLabel="Observation date" />
+                      <textarea value={editObsText} onChange={e => setEditObsText(e.target.value)} className="w-full mt-2 border rounded-lg p-2 text-sm min-h-[80px]" />
                       <div className="flex gap-2 mt-2">
                         <button onClick={() => handleSaveObservationEdit(o.id)} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>
                         <button onClick={() => setEditingObsId(null)} className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg py-1.5">Cancel</button>
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                    <>
+                      <p className="text-sm mt-1 whitespace-pre-line">{o.text}</p>
+                      {updates.length > 0 && (
+                        <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                          {updates.map(u => (
+                            <div key={u.id} className="flex items-start justify-between gap-2 text-xs">
+                              <p className="flex-1"><span className="text-muted-foreground font-semibold mr-1">{u.date}</span><span className="whitespace-pre-line">{u.text}</span></p>
+                              <button onClick={() => handleDeleteObservationEntry(u.id)} aria-label="Delete update" className="text-red-400 font-bold shrink-0">×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          value={obsEntryText[o.id] ?? ''}
+                          onChange={e => setObsEntryText(prev => ({ ...prev, [o.id]: e.target.value }))}
+                          placeholder="Log an update…"
+                          className="flex-1 border rounded-lg p-2 text-xs"
+                        />
+                        <button
+                          onClick={() => handleAddObservationEntry(o.id)}
+                          disabled={!(obsEntryText[o.id] ?? '').trim()}
+                          className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-3 disabled:opacity-40"
+                        >Add</button>
+                      </div>
+                    </>
                   )}
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Growth Tracking</p>
@@ -677,9 +845,7 @@ export function CropDetailsScreen() {
                 <input value={trackLabel} onChange={e=>setTrackLabel(e.target.value)} placeholder="Label (e.g. Watermelon)" className="border rounded-lg p-2 text-sm" />
                 <input value={trackTag} onChange={e=>setTrackTag(e.target.value)} placeholder="Tag # (optional)" className="border rounded-lg p-2 text-sm" />
               </div>
-              <input type="date" value={toInputDateStr(trackDate)} onChange={e=>{
-                const v=fromInputDateStr(e.target.value); if(v) setTrackDate(v);
-              }} className="w-full border rounded-lg p-2 text-sm" />
+              <DateInput value={trackDate} onChange={setTrackDate} ariaLabel="Tracking start date" />
               <input value={trackNotes} onChange={e=>setTrackNotes(e.target.value)} placeholder="Notes (optional)" className="w-full border rounded-lg p-2 text-sm" />
               <button onClick={handleAddTracking} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Start Tracking</button>
             </div>
@@ -755,22 +921,50 @@ export function CropDetailsScreen() {
                 ))}
               </div>
               <p className="text-[10px] text-muted-foreground">Select one or more — each gets its own log entry.</p>
-              <input type="date" value={toInputDateStr(treatmentDate)} onChange={e=>{
-                const v=fromInputDateStr(e.target.value); if(v) setTreatmentDate(v);
-              }} className="w-full border rounded-lg p-2 text-sm" />
+              <DateInput value={treatmentDate} onChange={setTreatmentDate} ariaLabel="Treatment date" />
               <input value={product} onChange={e => setProduct(e.target.value)} placeholder="Product name" className="w-full border rounded-lg p-2 text-sm" />
               <input value={treatmentNotes} onChange={e => setTreatmentNotes(e.target.value)} placeholder="Notes (optional)" className="w-full border rounded-lg p-2 text-sm" />
               <button onClick={handleTreatment} disabled={!product.trim() || treatmentTypes.length===0 || saving} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold disabled:opacity-40">Log Treatment{treatmentTypes.length>1?` (${treatmentTypes.length})`:''}</button>
             </div>
             <div className="space-y-1.5">
               {treatmentLogs.map(t => (
-                <div key={t.id} className="flex gap-2 bg-white rounded-xl border border-gray-100 p-3 text-sm">
-                  <span>{t.type === 'fungus' ? '🍄' : t.type === 'pest' ? '🐛' : '💧'}</span>
-                  <div className="flex-1">
-                    <p className="font-medium">{t.product}</p>
-                    <p className="text-xs text-muted-foreground">{t.date} · {t.daysFromPlanting}d</p>
-                    {t.notes && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{t.notes}</p>}
+                <div key={t.id} className="bg-white rounded-xl border border-gray-100 p-3 text-sm">
+                  <div className="flex gap-2">
+                    <span>{t.type === 'fungus' ? '🍄' : t.type === 'pest' ? '🐛' : '💧'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{t.product}</p>
+                      <p className="text-xs text-muted-foreground">{t.date} · {t.daysFromPlanting}d · <span className="capitalize">{t.type}</span></p>
+                      {t.notes && <p className="text-xs text-gray-600 mt-0.5 whitespace-pre-line">{t.notes}</p>}
+                    </div>
+                    <span className="flex items-start gap-1 shrink-0">
+                      <button
+                        onClick={() => { setEditingTreatId(t.id); setEditTreatType(t.type); setEditTreatProduct(t.product); setEditTreatNotes(t.notes ?? ''); setEditTreatDate(t.date); }}
+                        aria-label="Edit treatment" title="Edit"
+                        className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm"
+                      >✎</button>
+                      <button
+                        onClick={() => handleDeleteTreatment(t.id)}
+                        aria-label="Delete treatment" title="Delete"
+                        className="w-6 h-6 rounded-lg hover:bg-red-50 text-red-400 flex items-center justify-center text-sm"
+                      >×</button>
+                    </span>
                   </div>
+                  {editingTreatId === t.id && (
+                    <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
+                      <div className="flex gap-1">
+                        {(['fertilizer','pest','fungus'] as const).map(ty => (
+                          <button key={ty} onClick={() => setEditTreatType(ty)} className={`flex-1 py-1.5 rounded-lg text-xs capitalize font-semibold ${editTreatType===ty?'bg-green-700 text-white':'bg-gray-100'}`}>{ty}</button>
+                        ))}
+                      </div>
+                      <DateInput value={editTreatDate} onChange={setEditTreatDate} ariaLabel="Treatment date" />
+                      <input value={editTreatProduct} onChange={e => setEditTreatProduct(e.target.value)} placeholder="Product name" className="w-full border rounded-lg p-2 text-sm" />
+                      <input value={editTreatNotes} onChange={e => setEditTreatNotes(e.target.value)} placeholder="Notes (optional)" className="w-full border rounded-lg p-2 text-sm" />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveTreatmentEdit(t.id)} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>
+                        <button onClick={() => setEditingTreatId(null)} className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg py-1.5">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {treatmentLogs.length===0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No treatments</p>}
@@ -799,9 +993,7 @@ export function CropDetailsScreen() {
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Harvest Log (last on sheet)</p>
               <div className="mt-2 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <input type="date" value={toInputDateStr(harvestDate)} onChange={e=>{
-                    const v=fromInputDateStr(e.target.value); if(!v) return; setHarvestDate(v);
-                  }} className="border rounded-lg p-2 text-sm" />
+                  <DateInput value={harvestDate} onChange={setHarvestDate} ariaLabel="Harvest date" />
                   <input value={harvestQty} onChange={e=>setHarvestQty(e.target.value)} placeholder="Qty (e.g. 2kg)" className="border rounded-lg p-2 text-sm" />
                 </div>
                 <input value={harvestNotes} onChange={e=>setHarvestNotes(e.target.value)} placeholder="Notes" className="w-full border rounded-lg p-2 text-sm" />
@@ -811,12 +1003,36 @@ export function CropDetailsScreen() {
             <div className="space-y-1.5">
               {harvestLogs.length===0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No harvests yet</p>}
               {[...harvestLogs].sort((a,b)=>b.harvestNumber-a.harvestNumber).map(h=>(
-                <div key={h.id} className="bg-white rounded-xl border border-gray-100 p-3 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-semibold">Harvest #{h.harvestNumber}</p>
-                    <p className="text-xs text-muted-foreground">{h.harvestDate} · {h.daysFromPlanting}d {h.notes? `· ${h.notes}`:''}</p>
+                <div key={h.id} className="bg-white rounded-xl border border-gray-100 p-3">
+                  <div className="flex justify-between items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">Harvest #{h.harvestNumber}</p>
+                      <p className="text-xs text-muted-foreground">{h.harvestDate} · {h.daysFromPlanting}d {h.notes? `· ${h.notes}`:''}</p>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full shrink-0 ${h.deviationFromDb===0?'bg-gray-100':'bg-amber-50 text-amber-700'}`}>{h.deviationFromDb>0?`+${h.deviationFromDb}d`: `${h.deviationFromDb}d`}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => { setEditingHarvestId(h.id); setEditHarvestDate(h.harvestDate); setEditHarvestNotes(h.notes ?? ''); }}
+                        aria-label="Edit harvest" title="Edit"
+                        className="w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 flex items-center justify-center text-sm"
+                      >✎</button>
+                      <button
+                        onClick={() => handleDeleteHarvest(h.id)}
+                        aria-label="Delete harvest" title="Delete"
+                        className="w-6 h-6 rounded-lg hover:bg-red-50 text-red-400 flex items-center justify-center text-sm"
+                      >×</button>
+                    </span>
                   </div>
-                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${h.deviationFromDb===0?'bg-gray-100':'bg-amber-50 text-amber-700'}`}>{h.deviationFromDb>0?`+${h.deviationFromDb}d`: `${h.deviationFromDb}d`}</span>
+                  {editingHarvestId === h.id && (
+                    <div className="mt-2 space-y-2 border-t border-gray-100 pt-2">
+                      <DateInput value={editHarvestDate} onChange={setEditHarvestDate} ariaLabel="Harvest date" />
+                      <input value={editHarvestNotes} onChange={e=>setEditHarvestNotes(e.target.value)} placeholder="Qty / notes" className="w-full border rounded-lg p-2 text-sm" />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveHarvestEdit(h.id)} className="flex-1 text-xs font-semibold text-white bg-green-700 rounded-lg py-1.5">Save</button>
+                        <button onClick={() => setEditingHarvestId(null)} className="flex-1 text-xs font-semibold text-gray-600 bg-gray-100 rounded-lg py-1.5">Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -93,6 +93,9 @@ export function DataManagement() {
       db.microModels.clear(),
       db.observationLogs.clear(),
       db.personalCropDb.clear(),
+      db.trackings.clear(),
+      db.trackingEntries.clear(),
+      db.observationEntries.clear(),
     ]);
     setClearInput('');
     setShowClear(false);

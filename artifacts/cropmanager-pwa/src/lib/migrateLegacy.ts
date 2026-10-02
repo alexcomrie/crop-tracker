@@ -27,7 +27,7 @@ const TABLES = [
   'cropDbAdjustments', 'propDbAdjustments', 'batchPlantingLogs', 'cropSearchLogs',
   'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
   'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
-  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries',
+  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries',
 ] as const;
 
 type Row = Record<string, unknown>;

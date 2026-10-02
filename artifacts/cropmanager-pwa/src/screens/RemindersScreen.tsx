@@ -10,7 +10,8 @@ import { markReminderDone } from '../hooks/useReminders';
 import { EmptyState } from '../components/shared/EmptyState';
 import { toast } from 'sonner';
 import { generateId } from '../lib/ids';
-import { formatDateShort, parseDate, today, toInputDateStr, fromInputDateStr } from '../lib/dates';
+import { DateInput } from '../components/shared/DateInput';
+import { formatDateShort, parseDate, today } from '../lib/dates';
 
 
 const REM_TYPES = [
@@ -123,7 +124,7 @@ export function RemindersScreen() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Due Date</label>
-                  <Input type="date" value={toInputDateStr(date)} onChange={e => setDate(fromInputDateStr(e.target.value))} />
+                  <DateInput value={date} onChange={setDate} ariaLabel="Reminder due date" />
                 </div>
               </div>
               <div className="space-y-1.5">

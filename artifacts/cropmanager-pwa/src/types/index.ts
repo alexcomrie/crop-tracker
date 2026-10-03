@@ -141,6 +141,13 @@ export interface ObservationEntry {
   updatedAt: number;
 }
 
+/** Standalone quick notes (More screen note taker). */
+export interface QuickNote {
+  id: string;
+  text: string;
+  updatedAt: number;
+}
+
 export interface PersonalCropData {
   key: string;
   displayName: string;
@@ -156,6 +163,13 @@ export interface PersonalCropData {
   /** Fruit maturation days (event e.g. pollination → ripe), learnt from finished trackings. */
   fruitGrowthDays: number | null;
   fruitSampleCount: number;
+  /** Mirrored foundation reference data (auto-copied, refreshed when empty). */
+  varieties: string[];
+  diseases: string[];
+  pests: string[];
+  /** Spray days learnt from logged treatments (days-from-planting). */
+  fungusSprayDays: number[];
+  pestSprayDays: number[];
   updatedAt: number;
 }
 

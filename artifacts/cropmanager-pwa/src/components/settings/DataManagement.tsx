@@ -96,6 +96,7 @@ export function DataManagement() {
       db.trackings.clear(),
       db.trackingEntries.clear(),
       db.observationEntries.clear(),
+      db.quickNotes.clear(),
     ]);
     setClearInput('');
     setShowClear(false);

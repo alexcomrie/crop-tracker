@@ -6,7 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { resolveCropData, getNonAliasCrops } from '../lib/cropDb';
 import { getEffectiveCropData, getPersonalCropData, foundationFruitDefault, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { parseDate, formatDateShort, daysBetween, today } from '../lib/dates';
-import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, getValidNextStages, processStageChange } from '../lib/stages';
+import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, needsTransplant, processStageChange } from '../lib/stages';
 import { generateId } from '../lib/ids';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { DateInput } from '../components/shared/DateInput';
@@ -14,7 +14,7 @@ import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES } from '../lib/routes';
-import type { TrackingEntry, ObservationEntry } from '../types';
+import type { TrackingEntry, ObservationEntry, StageLog } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight } from 'lucide-react';
 
 export function CropDetailsScreen() {
@@ -60,6 +60,7 @@ export function CropDetailsScreen() {
   const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'>('stages');
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   const [selectedStage, setSelectedStage] = useState('');
+  const [stageMenuOpen, setStageMenuOpen] = useState(false);
   const [obsText, setObsText] = useState('');
   const [trackLabel, setTrackLabel] = useState('');
   const [trackTag, setTrackTag] = useState('');
@@ -85,6 +86,7 @@ export function CropDetailsScreen() {
   const [treatmentNotes, setTreatmentNotes] = useState('');
   const [product, setProduct] = useState('');
   const [saving, setSaving] = useState(false);
+  const [elapsedUnit, setElapsedUnit] = useState<'days' | 'weeks' | 'months'>('days');
 
   function toggleTreatmentType(t: string) {
     setTreatmentTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -121,7 +123,25 @@ export function CropDetailsScreen() {
     if ((CANONICAL_STAGES as readonly string[]).includes(sl.stageTo)) stageDateMap.set(sl.stageTo, sl.date);
   }
 
-  const validNext = getValidNextStages(crop.plantStage, cropData as never, crop.plantingMethod);
+  // Upcoming canonical stages only (past + current excluded); tray/bed seedling
+  // also offers the Up-planted / Transplanted recording actions.
+  const upcomingOptions: string[] = (() => {
+    const opts: string[] = [];
+    for (let i = currentIdx + 1; i < CANONICAL_STAGES.length; i++) {
+      opts.push(CANONICAL_STAGES[i] as string);
+    }
+    if (normalizedCurrent === 'Seedling' && needsTransplant(crop?.plantingMethod)) {
+      if (!opts.includes('Up-planted')) opts.push('Up-planted');
+      if (!opts.includes('Transplanted')) opts.push('Transplanted');
+    }
+    return opts;
+  })();
+
+  // Anchor date for the current stage (planting/germination history or last log)
+  function currentStageDate(): Date {
+    const s = stageDateMap.get(normalizedCurrent) ?? crop?.plantingDate ?? '';
+    return parseDate(s) ?? today();
+  }
 
   async function handleStageChange() {
     if (!crop || !selectedStage) return;
@@ -132,19 +152,51 @@ export function CropDetailsScreen() {
         db.cropDbAdjustments.toArray(),
         db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray(),
       ]);
-      const { updatedCrop, stageLog } = processStageChange(crop, selectedStage, dt, cropData as never, adjustments, existing);
-      await db.crops.put(updatedCrop as never);
-      await db.stageLogs.add(stageLog as never);
-      await addDiaryEntry({
-        entryType: 'stage_change',
-        cropId: crop.id,
-        cropName: crop.cropName,
-        variety: crop.variety,
-        description: `${crop.plantStage} → ${selectedStage}`,
-        details: selectedStage === 'Germinated' ? 'Manual germination confirmed' : '',
-      });
-      toast.success(`Stage → ${selectedStage}`);
+      const targetIdx = (CANONICAL_STAGES as readonly string[]).indexOf(selectedStage);
+      const isJump = targetIdx > currentIdx + 1;
+      if (!isJump) {
+        const { updatedCrop, stageLog } = processStageChange(crop, selectedStage, dt, cropData as never, adjustments, existing);
+        await db.crops.put(updatedCrop as never);
+        await db.stageLogs.add(stageLog as never);
+        await addDiaryEntry({
+          entryType: 'stage_change',
+          cropId: crop.id,
+          cropName: crop.cropName,
+          variety: crop.variety,
+          description: `${crop.plantStage} → ${selectedStage}`,
+          details: selectedStage === 'Germinated' ? 'Manual germination confirmed' : '',
+        });
+        toast.success(`Stage → ${selectedStage}`);
+      } else {
+        // Direct jump: walk every skipped canonical stage so history stays complete.
+        // Tinygpt backfills each missed stage with an interpolated date between
+        // the current stage date and the chosen date, then estimates the span.
+        const anchor = currentStageDate();
+        const spanMs = Math.max(0, dt.getTime() - anchor.getTime());
+        const path = (CANONICAL_STAGES as readonly string[]).slice(currentIdx + 1, targetIdx + 1);
+        let cur = crop;
+        const logs: StageLog[] = [];
+        path.forEach((stage, i) => {
+          const stepDate = new Date(anchor.getTime() + Math.round((spanMs * (i + 1)) / path.length));
+          const { updatedCrop, stageLog } = processStageChange(cur, stage, stepDate, cropData as never, adjustments, existing);
+          cur = updatedCrop;
+          logs.push({ ...stageLog, notes: i < path.length - 1 ? 'Auto-backfilled by Tinygpt' : stageLog.notes });
+        });
+        await db.crops.put(cur as never);
+        await db.stageLogs.bulkAdd(logs as never);
+        const skipped = path.slice(0, -1);
+        await addDiaryEntry({
+          entryType: 'stage_change',
+          cropId: crop.id,
+          cropName: crop.cropName,
+          variety: crop.variety,
+          description: `${crop.plantStage} → ${selectedStage} (jump)`,
+          details: skipped.length > 0 ? `Backfilled: ${skipped.join(' → ')} · ~${spanMs > 0 ? Math.max(1, Math.round(spanMs / 86400000 / path.length)) : 0}d per stage` : '',
+        });
+        toast.success(`Jumped → ${selectedStage} (+${skipped.length} backfilled)`);
+      }
       setSelectedStage('');
+      setStageMenuOpen(false);
     } catch (e) {
       console.error('[details] stage change failed', { id: crop.id, selectedStage, e });
       toast.error('Stage change failed: ' + (e instanceof Error ? e.message : String(e)));
@@ -542,6 +594,11 @@ export function CropDetailsScreen() {
         updatedAt: Date.now(),
       } as never);
     }
+    // Personal spray schedule learns from real application days (auto-saved)
+    const { upsertPersonalSprays } = await import('../lib/personalCropDb');
+    for (const t of treatmentTypes) {
+      await upsertPersonalSprays(crop.cropName, t, daysFromPlanting);
+    }
     await addDiaryEntry({
       entryType: 'treatment',
       cropId: crop.id,
@@ -632,16 +689,69 @@ export function CropDetailsScreen() {
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
         {activeSheet === 'stages' && (
           <div className="space-y-3">
+            {(() => {
+              const planted = parseDate(crop.plantingDate);
+              const elapsedDays = planted ? Math.max(0, daysBetween(planted, today())) : 0;
+              const totalDays = (cropData as unknown as { growing_time_days?: number } | null)?.growing_time_days ?? 90;
+              const progress = Math.min(100, Math.max(0, Math.round((elapsedDays / Math.max(1, totalDays)) * 100)));
+              const display = elapsedUnit === 'days'
+                ? `${elapsedDays}d`
+                : elapsedUnit === 'weeks'
+                  ? `${(elapsedDays / 7).toFixed(1)}w`
+                  : `${(elapsedDays / 30.44).toFixed(1)}mo`;
+              return (
+                <div className="bg-white rounded-xl border border-gray-100 p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Age</p>
+                    <select
+                      value={elapsedUnit}
+                      onChange={e => setElapsedUnit(e.target.value as 'days' | 'weeks' | 'months')}
+                      aria-label="Elapsed time unit"
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white"
+                    >
+                      <option value="days">Days</option>
+                      <option value="weeks">Weeks</option>
+                      <option value="months">Months</option>
+                    </select>
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{display}</p>
+                  <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
+                    <div className="h-1.5 rounded-full transition-all" style={{ width: `${progress}%`, backgroundColor: '#2d6a2d' }} />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Day {elapsedDays} of ~{totalDays} · {progress}%</p>
+                </div>
+              );
+            })()}
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Stage Control</p>
-              <p className="text-[11px] text-muted-foreground mt-1">Current: <strong>{normalizedCurrent}</strong> · Tap to advance or regress. Seed → Germinated manual, Germinated→Seedling auto 7d, Seedling tray needs Up-potted/Transplant, Transplant→ Vegetative 2-2.5w auto.</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {validNext.map(s => (
-                  <button key={s} onClick={() => setSelectedStage(s)}
-                    className={`px-3 py-2 rounded-full text-xs border font-semibold ${selectedStage === s ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-200'}`}>
-                    {s}
-                  </button>
-                ))}
+              <p className="text-[11px] text-muted-foreground mt-1">Current: <strong>{normalizedCurrent}</strong> · Jump straight to any upcoming stage — missed ones are backfilled automatically.</p>
+              <div className="relative mt-3">
+                <button
+                  onClick={() => setStageMenuOpen(v => !v)}
+                  aria-label="Mark stages"
+                  className="px-4 py-2 rounded-full text-xs border font-semibold bg-green-700 text-white border-green-700"
+                >
+                  🏷 Mark stages{selectedStage ? `: ${selectedStage}` : ' ▾'}
+                </button>
+                {stageMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setStageMenuOpen(false)} />
+                    <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                      {upcomingOptions.length === 0 && (
+                        <p className="px-4 py-3 text-xs text-muted-foreground">No upcoming stages — crop is at the final stage.</p>
+                      )}
+                      {upcomingOptions.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => { setSelectedStage(s); setStageMenuOpen(false); }}
+                          className={`w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 ${selectedStage === s ? 'bg-green-50 font-semibold text-green-700' : 'text-gray-800'}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-2 mt-3">
                 <div className="flex-1">

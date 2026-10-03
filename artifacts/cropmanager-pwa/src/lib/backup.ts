@@ -8,7 +8,7 @@ export async function exportJsonBackup(): Promise<string> {
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
-    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries,
+    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries, quickNotes,
   ] = await Promise.all([
     db.crops.toArray(),
     db.propagations.toArray(),
@@ -38,6 +38,7 @@ export async function exportJsonBackup(): Promise<string> {
     db.trackings.toArray(),
     db.trackingEntries.toArray(),
     db.observationEntries.toArray(),
+    db.quickNotes.toArray(),
   ]);
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
@@ -46,7 +47,7 @@ export async function exportJsonBackup(): Promise<string> {
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
-    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries,
+    microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries, quickNotes,
   }, null, 2);
 }
 
@@ -61,7 +62,7 @@ const TABLE_NAMES = [
   'cropDbAdjustments', 'propDbAdjustments', 'batchPlantingLogs', 'cropSearchLogs',
   'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
   'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
-  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries',
+  'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries', 'quickNotes',
 ] as const;
 
 function getTable(name: (typeof TABLE_NAMES)[number]) {

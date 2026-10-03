@@ -15,6 +15,120 @@ const PLANT_TYPES = [
   'Vine Crop', 'Root Crop', 'Grain', 'Legume', 'Herb', 'Bulb', 'Rhizome', 'Tuber'
 ];
 
+function LearnedBadge({ count }: { count: number }) {
+  if (count < 2) return null;
+  return <span className="ml-1 text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">🧠 ×{count}</span>;
+}
+
+/** Read-only personal profile in the exact foundation section layout. Auto-saved by the app — never hand-edited. */
+function PersonalDetailView({ personal: r }: { personal: any }) {
+  const num = (label: string, value: number | null | undefined, samples?: number) => (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-bold text-gray-500 uppercase">{label}{samples !== undefined && samples >= 2 ? <LearnedBadge count={samples} /> : null}</label>
+      <p className="text-sm font-semibold">{value ?? '—'}{typeof value === 'number' ? 'd' : ''}</p>
+    </div>
+  );
+  return (
+    <div className="max-w-3xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl md:text-2xl font-bold">{r.displayName}</h2>
+        <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-1 rounded-full">🧠 Personal · auto-saved</span>
+      </div>
+
+      <section className="bg-white rounded-xl border p-4 space-y-4 shadow-sm">
+        <h3 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Basic Info</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Display Name</label>
+            <p className="text-sm font-semibold">{r.displayName}</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Plant Type</label>
+            <p className="text-sm font-semibold">{r.plantType}</p>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-gray-500 uppercase">Varieties (seen in tracker)</label>
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(r.varieties ?? []).map((v: string) => (
+              <Badge key={v} variant="secondary" className="bg-green-50 text-green-700 border-none font-medium px-2 py-0.5 text-[10px]">{v}</Badge>
+            ))}
+            {(r.varieties ?? []).length === 0 && <p className="text-xs text-muted-foreground">—</p>}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl border p-4 space-y-4 shadow-sm">
+        <h3 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Timing & Harvest</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {num('Grow Days', r.growingTimeDays, r.sampleCount)}
+          {num('Fruit Maturity', r.fruitGrowthDays, r.fruitSampleCount)}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Harvest Interval (d)</label>
+            <p className="text-sm font-semibold">{r.harvestInterval}d</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Batch Offset</label>
+            <p className="text-sm font-semibold">{r.batchOffsetDays}d</p>
+          </div>
+          {num('Transplant (d)', r.transplantDays)}
+          {num('Grow from TP (d)', r.growingFromTransplant)}
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-gray-500 uppercase">Germ Window</label>
+            <p className="text-sm font-semibold">{r.germinationMin}–{r.germinationMax}d</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl border p-4 space-y-4 shadow-sm">
+        <h3 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Spray Schedule (Days)</h3>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-red-600 uppercase">Fungus Spray Days</label>
+            <div className="flex flex-wrap gap-2">
+              {(r.fungusSprayDays ?? []).map((d: number) => (
+                <Badge key={d} variant="secondary" className="bg-red-50 text-red-700 border-none px-2 py-1 text-[10px]">Day {d}</Badge>
+              ))}
+              {(r.fungusSprayDays ?? []).length === 0 && <p className="text-xs text-muted-foreground">No fungus treatments logged yet</p>}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-amber-600 uppercase">Pest Spray Days</label>
+            <div className="flex flex-wrap gap-2">
+              {(r.pestSprayDays ?? []).map((d: number) => (
+                <Badge key={d} variant="secondary" className="bg-amber-50 text-amber-700 border-none px-2 py-1 text-[10px]">Day {d}</Badge>
+              ))}
+              {(r.pestSprayDays ?? []).length === 0 && <p className="text-xs text-muted-foreground">No pest treatments logged yet</p>}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <section className="bg-white rounded-xl border p-4 space-y-3 shadow-sm">
+          <h3 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Diseases</h3>
+          <div className="flex flex-wrap gap-1">
+            {(r.diseases ?? []).map((d: string) => (
+              <Badge key={d} className="bg-gray-100 text-gray-700 border-none text-[10px]">{d}</Badge>
+            ))}
+            {(r.diseases ?? []).length === 0 && <p className="text-xs text-muted-foreground">—</p>}
+          </div>
+        </section>
+        <section className="bg-white rounded-xl border p-4 space-y-3 shadow-sm">
+          <h3 className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Pests</h3>
+          <div className="flex flex-wrap gap-1">
+            {(r.pests ?? []).map((p: string) => (
+              <Badge key={p} className="bg-gray-100 text-gray-700 border-none text-[10px]">{p}</Badge>
+            ))}
+            {(r.pests ?? []).length === 0 && <p className="text-xs text-muted-foreground">—</p>}
+          </div>
+        </section>
+      </div>
+      <div className="h-10" />
+    </div>
+  );
+}
+
 export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
   const [db, setDb] = useState<CropDatabase | null>(null);
   const { setCropDb } = useAppStore();
@@ -26,6 +140,10 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
   const [newKey, setNewKey] = useState('');
   const [tab, setTab] = useState<'foundation'|'personal'>('personal');
   const personalList = useLiveQuery(() => dexieDb.personalCropDb.toArray(), []) ?? [];
+  const [selectedPersonalKey, setSelectedPersonalKey] = useState<string | null>(null);
+  const selectedPersonal = selectedPersonalKey
+    ? personalList.find((r: any) => r.key === selectedPersonalKey) ?? null
+    : null;
 
   useEffect(() => {
     loadCropDatabase().then(data => {
@@ -125,8 +243,8 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
       <header className="flex flex-col border-b shrink-0">
         <div className="flex items-center justify-between p-4 pb-2">
           <div className="flex items-center gap-3">
-            <button onClick={selectedKey ? () => setSelectedKey(null) : onClose} className="p-1 hover:bg-gray-100 rounded-full">
-              {selectedKey ? (
+            <button onClick={(selectedKey || selectedPersonalKey) ? () => { setSelectedKey(null); setSelectedPersonalKey(null); } : onClose} className="p-1 hover:bg-gray-100 rounded-full">
+              {(selectedKey || selectedPersonalKey) ? (
                 <>
                   <ArrowLeft className="w-6 h-6 md:hidden" />
                   <ChevronLeft className="w-6 h-6 hidden md:block" />
@@ -136,7 +254,7 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
               )}
             </button>
             <h2 className="font-bold text-lg">
-              {selectedKey && !isAlias(selectedEntry) ? (selectedEntry as CropData).display_name : 'Crop Database'}
+              {tab === 'personal' && selectedPersonal ? selectedPersonal.displayName : selectedKey && !isAlias(selectedEntry) ? (selectedEntry as CropData).display_name : 'Crop Database'}
             </h2>
           </div>
           <div className="flex gap-2">
@@ -163,7 +281,7 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className={`${selectedKey ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r flex-col h-full`}>
+        <div className={`${(selectedKey || selectedPersonalKey) ? 'hidden md:flex' : 'flex'} w-full md:w-64 border-r flex-col h-full`}>
           <div className="p-3 border-b space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -193,10 +311,14 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
             {tab==='personal' ? (
               <>
                 {personalList.filter((r:any)=> r.key.includes(searchQuery.toLowerCase()) || r.displayName.toLowerCase().includes(searchQuery.toLowerCase())).map((r:any)=>(
-                  <div key={r.key} className="p-2 rounded-lg border bg-green-50 border-green-200">
+                  <button
+                    key={r.key}
+                    onClick={() => setSelectedPersonalKey(r.key)}
+                    className={`w-full text-left p-2 rounded-lg border transition-colors ${selectedPersonalKey === r.key ? 'bg-green-50 text-green-700 border-green-200' : 'bg-green-50/50 border-green-100 hover:bg-green-50'}`}
+                  >
                     <p className="text-sm font-bold truncate">{r.displayName}</p>
                     <p className="text-[10px] text-gray-600">{r.growingTimeDays}d · {r.plantType} · ×{r.sampleCount}</p>
-                  </div>
+                  </button>
                 ))}
                 {personalList.length===0 && <p className="text-xs text-muted-foreground p-2">No personal data yet — add crops to build.</p>}
               </>
@@ -235,13 +357,17 @@ export function CropDatabaseScreen({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Editor */}
-        <div className={`${selectedKey ? 'flex' : 'hidden md:block'} flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 flex-col ${tab==='personal' ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div className={`${(selectedKey || selectedPersonalKey) ? 'flex' : 'hidden md:flex'} flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 flex-col`}>
           {tab==='personal' ? (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4 text-xl">🧠</div>
-              <p className="text-sm font-semibold">Personal DB — built by tinygpt</p>
-              <p className="text-xs mt-1">Adds crops to learn your timing.</p>
-            </div>
+            !selectedPersonal ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4 text-xl">🧠</div>
+                <p className="text-sm font-semibold">Personal DB — built by tinygpt</p>
+                <p className="text-xs mt-1">Select a crop to view its learnt profile.</p>
+              </div>
+            ) : (
+              <PersonalDetailView personal={selectedPersonal} />
+            )
           ) : !selectedKey ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-400">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-3xl">🌱</div>

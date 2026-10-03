@@ -5,7 +5,7 @@ import type {
   BatchPlantingLog, CropSearchLog, LedgerEntry, FarmArea, FarmLand,
   DiaryEntry, PosSale, PosCustomer, PosSettings, PosInventoryItem,
   PosOrder, PosHeldReceipt, ObservationLog, PersonalCropData, Tracking,
-  TrackingEntry, ObservationEntry
+  TrackingEntry, ObservationEntry, QuickNote
 } from '../types';
 
 export class CropManagerDB extends Dexie {
@@ -47,6 +47,7 @@ export class CropManagerDB extends Dexie {
   trackings!: Table<Tracking>;
   trackingEntries!: Table<TrackingEntry>;
   observationEntries!: Table<ObservationEntry>;
+  quickNotes!: Table<QuickNote>;
 
   constructor() {
     // v4: removed ALL boolean/nullable fields from indexes (IndexedDB rejects booleans/null as keys).
@@ -168,6 +169,7 @@ export class CropManagerDB extends Dexie {
       trackings: 'id, cropId, status, startDate, updatedAt',
       trackingEntries: 'id, trackingId, date, updatedAt',
       observationEntries: 'id, observationId, date, updatedAt',
+      quickNotes: 'id, updatedAt',
     });
   }
 }

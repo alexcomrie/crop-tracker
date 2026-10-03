@@ -13,9 +13,38 @@ interface CropCardProps {
   selected?: boolean;
   onToggle?: () => void;
   kind?: 'crop' | 'propagation';
+  onLongPress?: () => void;
 }
 
-export function CropCard({ crop, cropData, onClick, selectMode, selected, onToggle, kind = 'crop' }: CropCardProps) {
+export function CropCard({ crop, cropData, onClick, selectMode, selected, onToggle, kind = 'crop', onLongPress }: CropCardProps) {
+  const pressTimer = React.useRef<number | null>(null);
+  const pressFired = React.useRef(false);
+
+  function cancelPress() {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }
+
+  function startPress() {
+    if (!onLongPress || selectMode) return;
+    pressFired.current = false;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => {
+      pressTimer.current = null;
+      pressFired.current = true;
+      onLongPress();
+    }, 500);
+  }
+
+  function handleClick() {
+    if (pressFired.current) {
+      pressFired.current = false;
+      return;
+    }
+    onClick();
+  }
   const harvestLogs = useLiveQuery(() =>
     db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray()
   , [crop.id]);
@@ -32,8 +61,15 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border py-3 px-3 cursor-pointer active:scale-[0.98] transition-all ${selected ? 'border-green-600 ring-1 ring-green-600' : 'border-gray-100'}`}
-      onClick={onClick}
+      className={`bg-white rounded-xl shadow-sm border py-3 px-3 cursor-pointer active:scale-[0.98] transition-all select-none ${selected ? 'border-green-600 ring-1 ring-green-600' : 'border-gray-100'}`}
+      onClick={handleClick}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchMove={cancelPress}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onContextMenu={e => { if (onLongPress && !selectMode) e.preventDefault(); }}
     >
       <div className="flex items-center justify-between gap-2">
         {selectMode && (

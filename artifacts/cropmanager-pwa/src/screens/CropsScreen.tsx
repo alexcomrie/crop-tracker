@@ -39,6 +39,7 @@ export function CropsScreen() {
   const [showPropForm, setShowPropForm] = useState(false);
   const [editProp, setEditProp] = useState<Propagation | undefined>(undefined);
   const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
+  const [actionTarget, setActionTarget] = useState<{ kind: Kind; id: string } | null>(null);
   const { cropDb } = useAppStore();
   const navigate = useNavigate();
   const cropsData = useCrops('All');
@@ -73,6 +74,22 @@ export function CropsScreen() {
   function cancelSelecting() {
     setSelecting(false);
     setSelectedKeys([]);
+  }
+
+  async function handleDeleteCrop(id: string) {
+    if (!window.confirm('Delete this crop and all its logs?')) return;
+    try {
+      await db.crops.delete(id);
+      await db.stageLogs.where('trackingId').equals(id).delete();
+      await db.harvestLogs.where('cropTrackingId').equals(id).delete();
+      await db.observationLogs.where('cropId').equals(id).delete();
+      await db.reminders.where('trackingId').equals(id).delete();
+      setActionTarget(null);
+      toast.success('Crop deleted');
+    } catch (e) {
+      console.error('[crops] delete failed', { id, e });
+      toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   async function archiveSelected() {
@@ -244,6 +261,7 @@ export function CropsScreen() {
                     selected={selectedKeys.includes(selKey)}
                     onToggle={() => toggleSelect(selKey)}
                     onClick={() => selecting ? toggleSelect(selKey) : navigate(cropDetailsPath(crop.id))}
+                    onLongPress={() => !selecting && setActionTarget({ kind: 'crop', id: crop.id })}
                   />
                 );
               }
@@ -259,6 +277,7 @@ export function CropsScreen() {
                   onToggle={() => toggleSelect(selKey)}
                   onClick={() => selecting ? toggleSelect(selKey) : setSelectedProp(prop)}
                   onAction={action => handlePropAction(prop, action)}
+                  onLongPress={() => !selecting && setActionTarget({ kind: 'propagation', id: prop.id })}
                 />
               );
             })}
@@ -308,6 +327,40 @@ export function CropsScreen() {
           onDelete={() => handleDeleteProp(selectedProp.id)}
         />
       )}
+      <BottomSheet open={actionTarget !== null} onClose={() => setActionTarget(null)} title={
+        actionTarget?.kind === 'crop'
+          ? (cropById.get(actionTarget.id)?.cropName ?? 'Crop')
+          : (propById.get(actionTarget?.id ?? '')?.plantName ?? 'Propagation')
+      }>
+        <div className="pt-2 space-y-2">
+          <button
+            onClick={() => {
+              if (!actionTarget) return;
+              if (actionTarget.kind === 'crop') {
+                navigate(`/crops/new?edit=${actionTarget.id}`);
+              } else {
+                const prop = propById.get(actionTarget.id);
+                if (prop) {
+                  setEditProp(prop);
+                  setShowPropForm(true);
+                }
+              }
+              setActionTarget(null);
+            }}
+            className="w-full bg-green-700 text-white rounded-xl py-3 text-sm font-semibold"
+          >✎ Edit</button>
+          <button
+            onClick={() => {
+              if (!actionTarget) return;
+              const target = actionTarget;
+              setActionTarget(null);
+              if (target.kind === 'crop') void handleDeleteCrop(target.id);
+              else void handleDeleteProp(target.id);
+            }}
+            className="w-full bg-red-50 text-red-600 border border-red-200 rounded-xl py-3 text-sm font-semibold"
+          >🗑 Delete</button>
+        </div>
+      </BottomSheet>
     </div>
   );
 }

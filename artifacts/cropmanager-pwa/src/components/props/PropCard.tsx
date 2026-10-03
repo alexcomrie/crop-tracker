@@ -9,6 +9,7 @@ interface PropCardProps {
   selectMode?: boolean;
   selected?: boolean;
   onToggle?: () => void;
+  onLongPress?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -19,7 +20,35 @@ const STATUS_COLORS: Record<string, string> = {
   Failed: '#e53935',
 };
 
-export function PropCard({ prop, onClick, onAction, selectMode, selected, onToggle }: PropCardProps) {
+export function PropCard({ prop, onClick, onAction, selectMode, selected, onToggle, onLongPress }: PropCardProps) {
+  const pressTimer = React.useRef<number | null>(null);
+  const pressFired = React.useRef(false);
+
+  function cancelPress() {
+    if (pressTimer.current !== null) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }
+
+  function startPress() {
+    if (!onLongPress || selectMode) return;
+    pressFired.current = false;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => {
+      pressTimer.current = null;
+      pressFired.current = true;
+      onLongPress();
+    }, 500);
+  }
+
+  function handleClick() {
+    if (pressFired.current) {
+      pressFired.current = false;
+      return;
+    }
+    onClick();
+  }
   const propDate = parseDate(prop.propagationDate);
   const daysOld = propDate ? daysBetween(propDate, today()) : 0;
   const rootingEnd = parseDate(prop.expectedRootingEnd);
@@ -27,8 +56,15 @@ export function PropCard({ prop, onClick, onAction, selectMode, selected, onTogg
 
   return (
     <div
-      className={`bg-white rounded-xl shadow-sm border py-3 px-3 cursor-pointer active:scale-[0.98] transition-all ${selected ? 'border-green-600 ring-1 ring-green-600' : 'border-gray-100'}`}
-      onClick={onClick}
+      className={`bg-white rounded-xl shadow-sm border py-3 px-3 cursor-pointer active:scale-[0.98] transition-all select-none ${selected ? 'border-green-600 ring-1 ring-green-600' : 'border-gray-100'}`}
+      onClick={handleClick}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchMove={cancelPress}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onContextMenu={e => { if (onLongPress && !selectMode) e.preventDefault(); }}
     >
       <div className="flex items-start justify-between mb-2 gap-2">
         {selectMode && (

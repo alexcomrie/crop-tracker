@@ -18,20 +18,7 @@ export async function upsertPersonalFromCrop(crop: Crop, harvestDays?: number) {
     if (planted && harvested) growingTime = daysBetween(planted, harvested);
   }
 
-  if (existing) {
-    // running average
-    const count = existing.sampleCount + (growingTime ? 1 : 0);
-    const avg = growingTime ? Math.round(((existing.growingTimeDays * existing.sampleCount) + growingTime) / count) : existing.growingTimeDays;
-    await db.personalCropDb.put({
-      ...existing,
-      growingTimeDays: avg || existing.growingTimeDays,
-      sampleCount: count,
-      updatedAt: now,
-    } as never);
-    return;
-  }
-
-  // create from foundation as baseline
+  // foundation baseline (also refreshes reference lists on old records)
   let foundation: CropData | null = null;
   try {
     const raw = localStorage.getItem('cropmanager_settings');
@@ -43,6 +30,29 @@ export async function upsertPersonalFromCrop(crop: Crop, harvestDays?: number) {
     console.warn('[personalCropDb] settings parse failed, using defaults', e);
   }
 
+  if (existing) {
+    // running average + merge tracker varieties + backfill any empty reference lists
+    const count = existing.sampleCount + (growingTime ? 1 : 0);
+    const avg = growingTime ? Math.round(((existing.growingTimeDays * existing.sampleCount) + growingTime) / count) : existing.growingTimeDays;
+    const varietySet = new Set(existing.varieties ?? []);
+    if (crop.variety) varietySet.add(crop.variety);
+    await db.personalCropDb.put({
+      ...existing,
+      growingTimeDays: avg || existing.growingTimeDays,
+      sampleCount: count,
+      varieties: [...varietySet],
+      diseases: (existing.diseases ?? []).length > 0 ? existing.diseases : (foundation?.diseases ?? []),
+      pests: (existing.pests ?? []).length > 0 ? existing.pests : (foundation?.pests ?? []),
+      fungusSprayDays: existing.fungusSprayDays ?? [],
+      pestSprayDays: existing.pestSprayDays ?? [],
+      fruitGrowthDays: existing.fruitGrowthDays ?? null,
+      fruitSampleCount: existing.fruitSampleCount ?? 0,
+      updatedAt: now,
+    } as never);
+    return;
+  }
+
+  // create from foundation as baseline
   const data: PersonalCropData = {
     key,
     displayName: crop.cropName,
@@ -57,6 +67,11 @@ export async function upsertPersonalFromCrop(crop: Crop, harvestDays?: number) {
     sampleCount: growingTime ? 1 : 0,
     fruitGrowthDays: null,
     fruitSampleCount: 0,
+    varieties: [...(foundation?.varieties ?? []), ...(crop.variety ? [crop.variety] : [])],
+    diseases: [...(foundation?.diseases ?? [])],
+    pests: [...(foundation?.pests ?? [])],
+    fungusSprayDays: [],
+    pestSprayDays: [],
     updatedAt: now,
   };
   await db.personalCropDb.put(data as never);
@@ -144,6 +159,11 @@ export async function upsertPersonalFruitMaturity(cropName: string, elapsedDays:
     sampleCount: 0,
     fruitGrowthDays: elapsed,
     fruitSampleCount: 1,
+    varieties: foundation ? [...foundation.varieties] : [],
+    diseases: foundation ? [...foundation.diseases] : [],
+    pests: foundation ? [...foundation.pests] : [],
+    fungusSprayDays: [],
+    pestSprayDays: [],
     updatedAt: now,
   };
   await db.personalCropDb.put(data as never);
@@ -164,10 +184,10 @@ export async function getEffectiveCropData(cropName: string, foundationDb: Recor
   const foundation = resolveCropData(foundationDb as never, cropName) as CropData | null;
   if (!personal) return foundation;
   if (!foundation) {
-    // synthesize CropData from personal
+    // synthesize CropData from personal (including learnt spray days)
     return {
       display_name: personal.displayName,
-      varieties: [],
+      varieties: personal.varieties ?? [],
       plant_type: personal.plantType,
       growing_time_days: personal.growingTimeDays,
       transplant_days: personal.transplantDays,
@@ -177,11 +197,11 @@ export async function getEffectiveCropData(cropName: string, foundationDb: Recor
       number_of_weeks_harvest: 1,
       germination_days_min: personal.germinationMin,
       germination_days_max: personal.germinationMax,
-      fungus_spray_days: [],
-      pest_spray_days: [],
+      fungus_spray_days: personal.fungusSprayDays ?? [],
+      pest_spray_days: personal.pestSprayDays ?? [],
       planting_method: 'Direct Bed',
-      diseases: [],
-      pests: [],
+      diseases: personal.diseases ?? [],
+      pests: personal.pests ?? [],
       consistent_harvest: false,
     } as CropData;
   }
@@ -190,4 +210,74 @@ export async function getEffectiveCropData(cropName: string, foundationDb: Recor
     return { ...foundation, growing_time_days: personal.growingTimeDays };
   }
   return foundation;
+}
+
+/**
+ * Feed a logged treatment into the personal spray schedule: records the
+ * days-from-planting for fungus/pest applications (deduped, capped).
+ * Called automatically whenever a treatment is logged.
+ */
+export async function upsertPersonalSprays(cropName: string, type: string, daysFromPlanting: number) {
+  if (type !== 'fungus' && type !== 'pest') return;
+  const key = cropName.toLowerCase().trim();
+  if (!key) return;
+  const now = Date.now();
+  const day = Math.max(0, Math.round(daysFromPlanting));
+  const existing = await db.personalCropDb.get(key).catch(() => null) as unknown as PersonalCropData | undefined;
+  const mergeDays = (current: number[] | undefined): number[] => {
+    const set = new Set(current ?? []);
+    set.add(day);
+    return [...set].sort((a, b) => a - b).slice(0, 12);
+  };
+  if (existing) {
+    await db.personalCropDb.put({
+      ...existing,
+      fungusSprayDays: type === 'fungus' ? mergeDays(existing.fungusSprayDays) : (existing.fungusSprayDays ?? []),
+      pestSprayDays: type === 'pest' ? mergeDays(existing.pestSprayDays) : (existing.pestSprayDays ?? []),
+      updatedAt: now,
+    } as never);
+    return;
+  }
+  await upsertPersonalFromCropLike(key, cropName.trim(), now, type, day);
+}
+
+async function upsertPersonalFromCropLike(
+  key: string,
+  displayName: string,
+  now: number,
+  sprayType: 'fungus' | 'pest',
+  day: number
+) {
+  let foundation: CropData | null = null;
+  try {
+    const raw = localStorage.getItem('cropmanager_settings');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      foundation = resolveCropData(parsed?.state?.cropDb ?? {}, displayName) as CropData | null;
+    }
+  } catch (e) {
+    console.warn('[personalCropDb] settings parse failed, using defaults', e);
+  }
+  const data: PersonalCropData = {
+    key,
+    displayName,
+    plantType: foundation?.plant_type ?? 'other',
+    growingTimeDays: foundation?.growing_time_days ?? 60,
+    transplantDays: foundation?.transplant_days ?? null,
+    growingFromTransplant: foundation?.growing_from_transplant ?? null,
+    harvestInterval: foundation?.harvest_interval ?? 7,
+    batchOffsetDays: foundation?.batch_offset_days ?? 7,
+    germinationMin: foundation?.germination_days_min ?? 5,
+    germinationMax: foundation?.germination_days_max ?? 10,
+    sampleCount: 0,
+    fruitGrowthDays: null,
+    fruitSampleCount: 0,
+    varieties: foundation ? [...foundation.varieties] : [],
+    diseases: foundation ? [...foundation.diseases] : [],
+    pests: foundation ? [...foundation.pests] : [],
+    fungusSprayDays: sprayType === 'fungus' ? [day] : [],
+    pestSprayDays: sprayType === 'pest' ? [day] : [],
+    updatedAt: now,
+  };
+  await db.personalCropDb.put(data as never);
 }

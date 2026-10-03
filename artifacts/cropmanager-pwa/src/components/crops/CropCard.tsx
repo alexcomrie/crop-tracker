@@ -4,6 +4,7 @@ import db from '../../db/db';
 import type { Crop, CropData } from '../../types';
 import { parseDate, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
+import { getPhiStatus } from '../../lib/phi';
 
 interface CropCardProps {
   crop: Crop;
@@ -48,6 +49,10 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
   const harvestLogs = useLiveQuery(() =>
     db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray()
   , [crop.id]);
+  const treatmentLogs = useLiveQuery(() =>
+    db.treatmentLogs.where('cropId').equals(crop.id).toArray()
+  , [crop.id]);
+  const phi = getPhiStatus(crop.plantStage, treatmentLogs ?? []);
 
   const planted = parseDate(crop.plantingDate);
   const harvestEst = parseDate(crop.harvestDateEstimated);
@@ -96,6 +101,14 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
           >
             {crop.plantStage}
           </span>
+          {phi && (
+            <span
+              title={`Pre-harvest interval: sprayed ${phi.sprayDate}, safe after ${phi.expiresDate}`}
+              className="text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none bg-red-600 text-white animate-pulse"
+            >
+              (PHI) {phi.daysLeft}d
+            </span>
+          )}
         </span>
       </div>
 

@@ -7,6 +7,7 @@ import { resolveCropData, getNonAliasCrops } from '../lib/cropDb';
 import { getEffectiveCropData, getPersonalCropData, foundationFruitDefault, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { parseDate, formatDateShort, daysBetween, today } from '../lib/dates';
 import { CANONICAL_STAGES, STAGE_COLORS, normalizeStage, needsTransplant, processStageChange } from '../lib/stages';
+import { getPhiStatus } from '../lib/phi';
 import { generateId } from '../lib/ids';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { DateInput } from '../components/shared/DateInput';
@@ -111,6 +112,7 @@ export function CropDetailsScreen() {
   const cropData = (effectiveData as never) ?? resolveCropData(cropDb, crop.cropName);
   const normalizedCurrent = normalizeStage(crop.plantStage);
   const currentIdx = CANONICAL_STAGES.indexOf(normalizedCurrent as never);
+  const phi = getPhiStatus(crop.plantStage, treatmentLogs);
 
   // Build milestone map with dates and deltas
   const stageDateMap = new Map<string, string>();
@@ -669,6 +671,12 @@ export function CropDetailsScreen() {
             <span className="text-muted-foreground">Est. harvest: <strong className="text-green-700">{crop.harvestDateEstimated || '—'}</strong></span>
             {personal && <span className="ml-auto bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">Personal ×{personal.sampleCount}</span>}
           </div>
+          {phi && (
+            <div className="mt-2 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-red-600 text-white animate-pulse shrink-0">(PHI) {phi.daysLeft}d</span>
+              <p className="text-[11px] text-red-800">Pre-harvest interval — sprayed {phi.sprayDate}. Safe to harvest after {phi.expiresDate}.</p>
+            </div>
+          )}
         </div>
         {/* Sheet tabs */}
         <div className="max-w-md mx-auto flex gap-1 px-2 overflow-x-auto scrollbar-hide">
@@ -1118,6 +1126,9 @@ export function CropDetailsScreen() {
                   <input value={harvestQty} onChange={e=>setHarvestQty(e.target.value)} placeholder="Qty (e.g. 2kg)" className="border rounded-lg p-2 text-sm" />
                 </div>
                 <input value={harvestNotes} onChange={e=>setHarvestNotes(e.target.value)} placeholder="Notes" className="w-full border rounded-lg p-2 text-sm" />
+                {phi && (
+                  <p className="text-[11px] bg-red-50 border border-red-200 text-red-800 rounded-lg px-2 py-1.5 font-semibold animate-pulse">⛔ (PHI) {phi.daysLeft}d left — sprayed {phi.sprayDate}, safe after {phi.expiresDate}.</p>
+                )}
                 <button onClick={handleLogHarvest} disabled={saving} className="w-full bg-amber-600 text-white rounded-lg py-2 text-sm font-semibold">Log Harvest</button>
               </div>
             </div>

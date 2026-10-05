@@ -514,18 +514,42 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
               {batchIds.length > 0 && waterNum > 0 && (
                 <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                   <h4 className="text-xs font-bold text-gray-600 uppercase">Tank Mix Results</h4>
-                  {batchIds.map(pid => {
-                    const pr = allProducts.find(x => x.id === pid);
-                    if (!pr) return null;
-                    const r = pr.rates[0]; if (!r) return null;
-                    const c = calc(r, waterNum, waterUnit, treatUnit);
+                  {(() => {
+                    const selected = batchIds.map(pid => allProducts.find(x => x.id === pid)).filter(Boolean);
+                    const areaN = selected.filter(p => isAreaBased(p!)).length;
+                    const mixed = areaN > 0 && areaN < selected.length;
                     return (
-                      <div key={pid} className="flex justify-between text-xs">
-                        <span>{pr.name}</span>
-                        <span className="font-semibold">{c ? `${fmt(c.min)}${c.min !== c.max ? `–${fmt(c.max)}` : ''} ${UNIT_LABELS[treatUnit] || treatUnit}` : 'N/A'}</span>
-                      </div>
+                      <>
+                        {mixed && (
+                          <p className="text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-2 py-1.5">
+                            Mixed units: {areaN} area-based (per ha) + {selected.length - areaN} volume-based. Rows that don't match the current water unit show — instead of a wrong number.
+                          </p>
+                        )}
+                        {selected.map(pr => {
+                          const r = pr!.rates[0]; if (!r) return null;
+                          // Each row uses its own rate basis; mismatched rows are
+                          // skipped rather than converted across area/volume.
+                          const rowArea = isAreaBased(pr!);
+                          const uiArea = waterUnit === 'ha';
+                          if (rowArea !== uiArea) {
+                            return (
+                              <div key={pr!.id} className="flex justify-between text-xs">
+                                <span>{pr!.name}</span>
+                                <span className="font-semibold text-gray-400" title={rowArea ? 'Area-based — switch water unit to ha' : 'Volume-based — switch water unit to gal/L'}>—</span>
+                              </div>
+                            );
+                          }
+                          const c = calc(r, waterNum, waterUnit, treatUnit);
+                          return (
+                            <div key={pr!.id} className="flex justify-between text-xs">
+                              <span>{pr!.name}</span>
+                              <span className="font-semibold">{c ? `${fmt(c.min)}${c.min !== c.max ? `–${fmt(c.max)}` : ''} ${UNIT_LABELS[treatUnit] || treatUnit}` : 'N/A'}</span>
+                            </div>
+                          );
+                        })}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               )}
             </div>

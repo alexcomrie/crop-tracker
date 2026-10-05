@@ -497,6 +497,8 @@ export interface PosInventoryItem {
   category: string;
   unit: string;
   unitPrice: number;
+  /** Units on hand. Undefined = untracked (legacy items). Decremented on sale. */
+  stockQty?: number;
   isActive: boolean;
   sourceCropId?: string;
   createdAt: number;

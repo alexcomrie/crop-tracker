@@ -81,6 +81,7 @@ export default function POSScreen() {
           items: cartItems.map(({ item }) => item),
           subtotal, discount: discountAmount, tax: taxAmount, total, paymentMethod,
           businessName: settings.businessName,
+          currency: settings.currency,
         });
         const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
         window.open(url, '_blank');
@@ -107,6 +108,7 @@ export default function POSScreen() {
         defaultPaymentMethod: 'cash', pointsRate: 1, pointsRedemptionRate: 100, testMode: false,
       };
 
+  const cur = settings.currency || '$';
   const printSettings: PrintSettings = {
     businessName: settings.businessName,
     businessAddress: settings.businessAddress,
@@ -114,6 +116,7 @@ export default function POSScreen() {
     businessEmail: settings.businessEmail,
     taxLabel: settings.taxLabel,
     taxRate: settings.taxRate,
+    currency: settings.currency,
     receiptFooter: settings.receiptFooter,
     logoDataUrl: settings.logoDataUrl,
     showLogo: settings.showLogo,
@@ -257,51 +260,107 @@ export default function POSScreen() {
 
     setSaving(true);
     try {
-      const sale: PosSale = {
-        id: generateId('SL'),
-        date: formatDateTime(new Date()),
-        items: cartItems.map(({ item }) => item),
-        subtotal,
-        tax: taxAmount,
-        taxRate: settings.taxRate,
-        discount: discountAmount,
-        discountType: discount ? discountType : 'fixed',
-        total,
-        amountPaid,
-        change,
-        paymentMethod,
-        customerId,
-        customerName: customerName || selectedCustomer?.name || '',
-        notes,
-        receiptNumber: nextReceiptNumber,
-        createdAt: Date.now(),
-      };
-      await db.posSales.add(sale);
+      const cartSnapshot = cartItems.map(({ item, inventoryId }) => ({ ...item, inventoryId }));
+      const totalQty = cartSnapshot.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
+      const units = [...new Set(cartSnapshot.map(i => i.unit).filter(Boolean))];
+      let receiptNumber = nextReceiptNumber;
 
-      // Update customer
-      if (selectedCustomer) {
-        const pointsEarned = Math.floor(total * (settings.pointsRate || 1));
-        const pointsUsed = redeemPoints ? Math.min(pointsToRedeem, selectedCustomer.pointsBalance) : 0;
-        await db.posCustomers.update(selectedCustomer.id, {
-          totalPurchases: (selectedCustomer.totalPurchases || 0) + total,
-          pointsBalance: (selectedCustomer.pointsBalance || 0) - pointsUsed + pointsEarned,
-          pointsLifetime: (selectedCustomer.pointsLifetime || 0) + pointsEarned,
-          lastPurchaseDate: formatDateShort(today()),
-          updatedAt: Date.now(),
-        });
-      }
+      // One transaction: receipt number is assigned inside, so two rapid
+      // checkouts (or two tabs) can never share a number; stock, customer
+      // and order updates commit together with the sale.
+      await db.transaction('rw', [db.posSales, db.posCustomers, db.posInventory, db.posOrders, db.ledgerEntries], async () => {
+        const last = await db.posSales.orderBy('receiptNumber').last();
+        receiptNumber = (last?.receiptNumber ?? 0) + 1;
 
-      // Mark order as delivered if fulfilling
-      if (fulfillOrder) {
-        await db.posOrders.update(fulfillOrder.id, {
-          status: 'delivered',
-          deliveredAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        setFulfillOrder(null);
-      }
+        // Stock check + decrement (only for tracked items; untracked sell freely)
+        const short: string[] = [];
+        for (const line of cartSnapshot) {
+          if (!line.inventoryId) continue;
+          const inv = await db.posInventory.get(line.inventoryId);
+          if (!inv || inv.stockQty === undefined || inv.stockQty === null) continue;
+          if (inv.stockQty < line.quantity) short.push(`${inv.name} (have ${inv.stockQty}, need ${line.quantity})`);
+        }
+        if (short.length > 0) throw new Error('Not enough stock: ' + short.join('; '));
 
-      // Record to diary and ledger (unless test mode)
+        const sale: PosSale = {
+          id: generateId('SL'),
+          date: formatDateTime(new Date()),
+          items: cartSnapshot.map(({ inventoryId: _drop, ...item }) => item),
+          subtotal,
+          tax: taxAmount,
+          taxRate: settings.taxRate,
+          discount: discountAmount,
+          discountType: discount ? discountType : 'fixed',
+          total,
+          amountPaid,
+          change,
+          paymentMethod,
+          customerId,
+          customerName: customerName || selectedCustomer?.name || '',
+          notes,
+          receiptNumber,
+          createdAt: Date.now(),
+        };
+        await db.posSales.add(sale);
+
+        for (const line of cartSnapshot) {
+          if (!line.inventoryId) continue;
+          const inv = await db.posInventory.get(line.inventoryId);
+          if (!inv || inv.stockQty === undefined || inv.stockQty === null) continue;
+          await db.posInventory.update(line.inventoryId, {
+            stockQty: Math.max(0, (inv.stockQty || 0) - line.quantity),
+            updatedAt: Date.now(),
+          });
+        }
+
+        // Update customer
+        if (selectedCustomer) {
+          const fresh = await db.posCustomers.get(selectedCustomer.id);
+          const pointsEarned = Math.floor(total * (settings.pointsRate || 1));
+          const pointsUsed = redeemPoints ? Math.min(pointsToRedeem, fresh?.pointsBalance ?? selectedCustomer.pointsBalance) : 0;
+          await db.posCustomers.update(selectedCustomer.id, {
+            totalPurchases: (fresh?.totalPurchases || 0) + total,
+            pointsBalance: (fresh?.pointsBalance || 0) - pointsUsed + pointsEarned,
+            pointsLifetime: (fresh?.pointsLifetime || 0) + pointsEarned,
+            lastPurchaseDate: formatDateShort(today()),
+            updatedAt: Date.now(),
+          });
+        }
+
+        // Mark order as delivered if fulfilling
+        if (fulfillOrder) {
+          await db.posOrders.update(fulfillOrder.id, {
+            status: 'delivered',
+            deliveredAt: Date.now(),
+            updatedAt: Date.now(),
+          });
+        }
+
+        // Ledger (unless test mode) — Σ quantity, real unit, receipt link
+        if (!settings.testMode) {
+          await db.ledgerEntries.add({
+            id: generateId('LED'),
+            type: 'sale',
+            date: sale.date,
+            category: fulfillOrder ? 'POS Order' : 'POS Sale',
+            amount: total,
+            quantity: totalQty,
+            unit: units.length === 1 ? units[0] : 'mixed',
+            description: `${fulfillOrder ? 'Invoice' : 'POS Sale'} #${String(receiptNumber).padStart(6, '0')}${customerName || selectedCustomer?.name ? ` - ${customerName || selectedCustomer?.name}` : ''} · receipt #${receiptNumber}`,
+            buyer: customerName || selectedCustomer?.name || '',
+            paymentStatus: 'paid',
+            expiryDate: '',
+            batch: '',
+            cropName: '',
+            purchaseLocation: '',
+            notes: `Payment: ${paymentMethod}`,
+            updatedAt: Date.now(),
+          } as never);
+        }
+      });
+      if (fulfillOrder) setFulfillOrder(null);
+
+      // Diary (own write, outside the sale transaction)
       if (!settings.testMode) {
         const entryDesc = fulfillOrder
           ? `Order DELIVERED: ${customerName || selectedCustomer?.name || ''}`
@@ -309,36 +368,23 @@ export default function POSScreen() {
         await addDiaryEntry({
           entryType: 'pos_sale',
           description: entryDesc,
-          details: `${cartItems.length} item(s), $${total.toFixed(2)} (Payment: ${paymentMethod})`,
-          date: sale.date,
-        });
-        await db.ledgerEntries.add({
-          id: generateId('LED'),
-          type: 'sale',
-          date: sale.date,
-          category: fulfillOrder ? 'POS Order' : 'POS Sale',
-          amount: total,
-          quantity: cartItems.length,
-          unit: 'items',
-          description: `${fulfillOrder ? 'Invoice' : 'POS Sale'} #${String(nextReceiptNumber).padStart(6, '0')}${customerName || selectedCustomer?.name ? ` - ${customerName || selectedCustomer?.name}` : ''}`,
-          buyer: customerName || selectedCustomer?.name || '',
-          paymentStatus: 'paid',
-          expiryDate: '',
-          batch: '',
-          cropName: '',
-          purchaseLocation: '',
-          notes: `Payment: ${paymentMethod}`,
-          updatedAt: Date.now(),
+          details: `${cartSnapshot.length} item(s), ${cur}${total.toFixed(2)} (Payment: ${paymentMethod})`,
+          date: formatDateShort(today()),
         });
       }
 
       // Print receipt (sale + ledger already committed above; print failure must not roll back)
       if (usePrint && printerConnected && bluetoothDevice) {
         try {
-          const receiptData = buildSaleReceipt({ ...sale, items: cartItems.map(({ item }) => item) }, printSettings);
+          const receiptData = buildSaleReceipt({
+            receiptNumber, date: formatDateTime(new Date()),
+            items: cartSnapshot.map(({ inventoryId: _drop2, ...item }) => item),
+            subtotal, discount: discountAmount, tax: taxAmount, total, amountPaid, change,
+            paymentMethod, customerName: customerName || selectedCustomer?.name || '',
+          }, printSettings);
           await printViaBluetooth(bluetoothDevice, receiptData);
         } catch (e) {
-          console.error('[pos] print failed (sale already saved)', { receiptNumber: nextReceiptNumber, e });
+          console.error('[pos] print failed (sale already saved)', { receiptNumber, e });
           toast.error('Print failed (sale was saved): ' + (e instanceof Error ? e.message : ''));
         }
       }
@@ -351,7 +397,7 @@ export default function POSScreen() {
         }
       }
 
-      toast.success(`Sale #${String(nextReceiptNumber).padStart(6, '0')} saved`);
+      toast.success(`Sale #${String(receiptNumber).padStart(6, '0')} saved`);
       clearCart();
       setShowCheckout(false);
     } catch (e) {
@@ -388,9 +434,13 @@ export default function POSScreen() {
   function handleFulfillOrder(order: PosOrder) {
     const newCart = new Map<string, { item: PosSaleItem; inventoryId: string }>();
     for (const item of order.items) {
-      newCart.set(item.productName, {
-        inventoryId: item.productName,
-        item: { productId: item.productName, productName: item.productName, quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice, total: item.total },
+      // Re-link to live inventory by name so stock decrements on checkout;
+      // fall back to a custom key when the item no longer exists.
+      const match = inventoryItems.find(i => i.name === item.productName);
+      const key = match ? match.id : `custom:${item.productName}`;
+      newCart.set(key, {
+        inventoryId: match ? match.id : '',
+        item: { productId: match ? match.id : item.productName, productName: item.productName, quantity: item.quantity, unit: match?.unit ?? item.unit, unitPrice: item.unitPrice, total: item.quantity * item.unitPrice },
       });
     }
     setCart(newCart);
@@ -532,7 +582,12 @@ export default function POSScreen() {
               <p className="font-semibold text-sm truncate">{item.name}</p>
               <p className="text-xs text-gray-500 mt-0.5">
                 {item.category && <span>{item.category} · </span>}
-                <span className="font-medium text-green-700">${item.unitPrice.toFixed(2)}</span> / {item.unit}
+                <span className="font-medium text-green-700">{cur}{item.unitPrice.toFixed(2)}</span> / {item.unit}
+                {item.stockQty !== undefined && item.stockQty !== null && (
+                  <span className={`ml-1 font-bold ${item.stockQty <= 0 ? 'text-red-600' : ''}`}>
+                    · {item.stockQty <= 0 ? 'out of stock' : `${item.stockQty} left`}
+                  </span>
+                )}
               </p>
             </button>
           ))}
@@ -551,7 +606,7 @@ export default function POSScreen() {
             <Gift className="w-5 h-5 text-amber-600" />
             <div className="flex-1">
               <p className="text-sm font-semibold text-amber-800">{selectedCustomer.pointsBalance} points available</p>
-              <p className="text-xs text-amber-600">{settings.pointsRedemptionRate} pts = ${(1 / settings.pointsRedemptionRate).toFixed(2)} discount</p>
+              <p className="text-xs text-amber-600">{settings.pointsRedemptionRate} pts = {cur}{(1 / settings.pointsRedemptionRate).toFixed(2)} discount</p>
             </div>
             {!redeemPoints && (
               <Button size="sm" variant="outline" className="border-amber-300 text-amber-700" onClick={() => setRedeemPoints(true)}>Redeem</Button>
@@ -571,7 +626,7 @@ export default function POSScreen() {
               <Button size="sm" variant="outline" onClick={() => setPointsToRedeem(selectedCustomer.pointsBalance)} className="whitespace-nowrap text-xs">Max ({selectedCustomer.pointsBalance})</Button>
             </div>
             {pointsToRedeem > 0 && (
-              <p className="text-xs text-amber-700">Discount: -${(pointsToRedeem / settings.pointsRedemptionRate).toFixed(2)}</p>
+              <p className="text-xs text-amber-700">Discount: -{cur}{(pointsToRedeem / settings.pointsRedemptionRate).toFixed(2)}</p>
             )}
           </div>
         )}
@@ -594,39 +649,39 @@ export default function POSScreen() {
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-gray-400">$</span>
+                    <span className="text-[10px] text-gray-400">{cur}</span>
                     <Input type="number" value={item.unitPrice || ''} onChange={e => updateCartItem(inventoryId, item.quantity, Number(e.target.value))} className="w-20 h-7 text-sm text-right" min={0} step={0.01} placeholder="Price" />
                   </div>
-                  <p className="text-xs font-semibold mt-0.5">${item.total.toFixed(2)}</p>
+                  <p className="text-xs font-semibold mt-0.5">{cur}{item.total.toFixed(2)}</p>
                 </div>
                 <button onClick={() => removeFromCart(inventoryId)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
               </div>
             ))}
             <div className="border-t pt-3 space-y-2">
               {settings.taxRate > 0 && (
-                <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between text-sm"><span>Subtotal</span><span className="font-semibold">{cur}{subtotal.toFixed(2)}</span></div>
               )}
               <div className="flex items-center gap-2">
                 <span className="text-sm">Discount</span>
                 <Select value={discountType} onValueChange={(v: 'percentage' | 'fixed') => setDiscountType(v)}>
                   <SelectTrigger className="h-7 w-24 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fixed">$</SelectItem>
+                    <SelectItem value="fixed">{cur}</SelectItem>
                     <SelectItem value="percentage">%</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input type="number" value={discount} onChange={e => setDiscount(Number(e.target.value))} className="w-20 h-7 text-sm" min={0} />
-                {discountAmount > 0 && <span className="text-xs text-red-500">-${discountAmount.toFixed(2)}</span>}
+                {discountAmount > 0 && <span className="text-xs text-red-500">-{cur}{discountAmount.toFixed(2)}</span>}
               </div>
               {pointsDiscountAmount > 0 && (
-                <div className="flex justify-between text-xs text-amber-600"><span>Points discount ({pointsToRedeem} pts)</span><span>-${pointsDiscountAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between text-xs text-amber-600"><span>Points discount ({pointsToRedeem} pts)</span><span>-{cur}{pointsDiscountAmount.toFixed(2)}</span></div>
               )}
               {settings.taxRate > 0 && (
-                <div className="flex justify-between text-sm"><span>{settings.taxLabel} ({settings.taxRate}%)</span><span className="font-semibold">${taxAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between text-sm"><span>{settings.taxLabel} ({settings.taxRate}%)</span><span className="font-semibold">{cur}{taxAmount.toFixed(2)}</span></div>
               )}
               <div className="flex justify-between text-base font-bold border-t pt-2">
                 <span>Total</span>
-                <span className="text-green-700">${total.toFixed(2)}</span>
+<span className="text-green-700">{cur}{total.toFixed(2)}</span>
               </div>
               {selectedCustomer && settings.pointsRate > 0 && (
                 <div className="flex items-center gap-1 text-xs text-gray-400">
@@ -638,7 +693,7 @@ export default function POSScreen() {
                   <Clock className="w-4 h-4 mr-1" /> Hold
                 </Button>
                 <Button onClick={() => { setShowCheckout(true); setAmountPaid(total); }} className="flex-1 bg-green-600 hover:bg-green-700 h-12 text-base font-bold">
-                  Checkout ${total.toFixed(2)}
+                  Checkout {cur}{total.toFixed(2)}
                 </Button>
               </div>
             </div>
@@ -653,7 +708,7 @@ export default function POSScreen() {
             <h2 className="font-bold text-lg">Checkout</h2>
             <div className="space-y-3">
               <div className="text-center">
-                <p className="text-3xl font-bold text-green-700">${total.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-green-700">{cur}{total.toFixed(2)}</p>
                 <p className="text-xs text-gray-500">{fulfillOrder ? 'Invoice' : 'Receipt'} #{String(nextReceiptNumber).padStart(6, '0')}</p>
               </div>
               <div className="flex gap-2">
@@ -664,10 +719,10 @@ export default function POSScreen() {
                 ))}
               </div>
               <div className="flex flex-col gap-1">
-                <Label>Amount Paid ($)</Label>
+                <Label>Amount Paid ({cur})</Label>
                 <Input type="number" value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} min={0} step={0.01} />
               </div>
-              {change > 0 && <p className="text-sm text-green-600 font-semibold text-center">Change: ${change.toFixed(2)}</p>}
+              {change > 0 && <p className="text-sm text-green-600 font-semibold text-center">Change: {cur}{change.toFixed(2)}</p>}
 
               {/* Delivery method */}
               <div>
@@ -714,7 +769,7 @@ export default function POSScreen() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowCheckout(false)} disabled={saving}>Cancel</Button>
               <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={handleCheckout} disabled={saving}>
-                {saving ? 'Saving...' : `Complete $${total.toFixed(2)}`}
+                {saving ? 'Saving...' : `Complete ${cur}${total.toFixed(2)}`}
               </Button>
             </div>
           </div>
@@ -733,7 +788,7 @@ export default function POSScreen() {
               <p className="text-xs text-gray-400">Leave blank for auto-name</p>
             </div>
             <div className="bg-gray-50 rounded-xl p-3 text-sm">
-              <p className="font-semibold">{cartItems.length} item(s) · ${total.toFixed(2)}</p>
+              <p className="font-semibold">{cartItems.length} item(s) · {cur}{total.toFixed(2)}</p>
               {customerName && <p className="text-xs text-gray-500">Customer: {customerName}</p>}
             </div>
             <div className="flex gap-2">
@@ -771,13 +826,13 @@ export default function POSScreen() {
               </p>
             ))}
             <p className="text-gray-400 text-xs">{'─'.repeat(settings.printCharPerLine || 32)}</p>
-            <p className="flex justify-between text-xs"><span>Subtotal:</span><span>${subtotal.toFixed(2)}</span></p>
-            {discountAmount > 0 && <p className="flex justify-between text-xs text-red-500"><span>Discount:</span><span>-${discountAmount.toFixed(2)}</span></p>}
+            <p className="flex justify-between text-xs"><span>Subtotal:</span><span>{cur}{subtotal.toFixed(2)}</span></p>
+            {discountAmount > 0 && <p className="flex justify-between text-xs text-red-500"><span>Discount:</span><span>-{cur}{discountAmount.toFixed(2)}</span></p>}
             {settings.showTax && settings.taxRate > 0 && (
-              <p className="flex justify-between text-xs"><span>{settings.taxLabel} ({settings.taxRate}%):</span><span>${taxAmount.toFixed(2)}</span></p>
+              <p className="flex justify-between text-xs"><span>{settings.taxLabel} ({settings.taxRate}%):</span><span>{cur}{taxAmount.toFixed(2)}</span></p>
             )}
             <p className="text-gray-400 text-xs">{'─'.repeat(settings.printCharPerLine || 32)}</p>
-            <p className="flex justify-between font-bold text-sm"><span>TOTAL:</span><span className="text-green-700">${total.toFixed(2)}</span></p>
+            <p className="flex justify-between font-bold text-sm"><span>TOTAL:</span><span className="text-green-700">{cur}{total.toFixed(2)}</span></p>
             <p className="text-xs text-gray-400">{'─'.repeat(settings.printCharPerLine || 32)}</p>
             {pointsDiscountAmount > 0 && (
               <p className="text-xs text-amber-600 text-center">Points redeemed: {pointsToRedeem}</p>

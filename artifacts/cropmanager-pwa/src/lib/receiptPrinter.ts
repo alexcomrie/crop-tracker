@@ -13,6 +13,7 @@ export interface PrintSettings {
   businessEmail: string;
   taxLabel: string;
   taxRate: number;
+  currency?: string;
   receiptFooter: string;
   logoDataUrl: string;
   showLogo: boolean;
@@ -140,27 +141,28 @@ export function buildSaleReceipt(
   lines.push({ divider: true });
   lines.push({ text: 'Item'.padEnd(16) + 'Qty'.padEnd(6) + 'Price'.padEnd(6) + 'Total' });
   lines.push({ divider: true });
+  const cur = settings.currency || '$';
   for (const item of sale.items) {
     const name = item.productName.length > 14 ? item.productName.slice(0, 13) + '.' : item.productName;
     const qty = `${item.quantity} ${item.unit}`;
-    const price = `$${item.unitPrice.toFixed(2)}`;
-    const total = `$${item.total.toFixed(2)}`;
+    const price = `${cur}${item.unitPrice.toFixed(2)}`;
+    const total = `${cur}${item.total.toFixed(2)}`;
     lines.push({ text: `${name.padEnd(16)}${qty.padEnd(6)}${price.padEnd(6)}${total}` });
   }
   lines.push({ divider: true });
-  lines.push({ text: `Subtotal:`.padEnd(22) + `$${sale.subtotal.toFixed(2)}`.padStart(10), bold: true });
+  lines.push({ text: `Subtotal:`.padEnd(22) + `${cur}${sale.subtotal.toFixed(2)}`.padStart(10), bold: true });
   if (sale.discount > 0) {
-    lines.push({ text: `Discount:`.padEnd(22) + `-$${sale.discount.toFixed(2)}`.padStart(10), bold: true });
+    lines.push({ text: `Discount:`.padEnd(22) + `-${cur}${sale.discount.toFixed(2)}`.padStart(10), bold: true });
   }
   if (settings.showTax && settings.taxRate > 0) {
-    lines.push({ text: `${settings.taxLabel} (${settings.taxRate}%):`.padEnd(22) + `$${sale.tax.toFixed(2)}`.padStart(10) });
+    lines.push({ text: `${settings.taxLabel} (${settings.taxRate}%):`.padEnd(22) + `${cur}${sale.tax.toFixed(2)}`.padStart(10) });
   }
   lines.push({ divider: true });
-  lines.push({ text: `TOTAL`.padEnd(22) + `$${sale.total.toFixed(2)}`.padStart(10), bold: true, double: true });
+  lines.push({ text: `TOTAL`.padEnd(22) + `${cur}${sale.total.toFixed(2)}`.padStart(10), bold: true, double: true });
   lines.push({ divider: true });
-  lines.push({ text: `Paid: $${sale.amountPaid.toFixed(2)} (${sale.paymentMethod})`, center: true });
+  lines.push({ text: `Paid: ${cur}${sale.amountPaid.toFixed(2)} (${sale.paymentMethod})`, center: true });
   if (sale.change > 0) {
-    lines.push({ text: `Change: $${sale.change.toFixed(2)}`, center: true });
+    lines.push({ text: `Change: ${cur}${sale.change.toFixed(2)}`, center: true });
   }
   lines.push({ divider: true });
   lines.push({ text: settings.receiptFooter, center: true });
@@ -181,9 +183,11 @@ export function buildSaleReceiptText(
     businessName: string;
     pointsEarned?: number;
     pointsRedeemed?: number;
+    currency?: string;
   },
   charPerLine: number = 32
 ): string {
+  const cur = sale.currency || '$';
   const sep = '─'.repeat(charPerLine);
   const lines: string[] = [];
   lines.push(sale.businessName);
@@ -197,16 +201,16 @@ export function buildSaleReceiptText(
   for (const item of sale.items) {
     const name = item.productName.length > 13 ? item.productName.slice(0, 12) + '.' : item.productName;
     const qty = `${item.quantity} ${item.unit}`;
-    const price = `$${item.unitPrice.toFixed(2)}`;
-    const total = `$${item.total.toFixed(2)}`;
+    const price = `${cur}${item.unitPrice.toFixed(2)}`;
+    const total = `${cur}${item.total.toFixed(2)}`;
     lines.push(`${name.padEnd(14)}${qty.padEnd(10)}${price.padEnd(6)}${total}`);
   }
   lines.push(sep);
-  lines.push(`Subtotal: $${sale.subtotal.toFixed(2)}`);
-  if (sale.discount > 0) lines.push(`Discount: -$${sale.discount.toFixed(2)}`);
-  if (sale.tax > 0) lines.push(`Tax: $${sale.tax.toFixed(2)}`);
+  lines.push(`Subtotal: ${cur}${sale.subtotal.toFixed(2)}`);
+  if (sale.discount > 0) lines.push(`Discount: -${cur}${sale.discount.toFixed(2)}`);
+  if (sale.tax > 0) lines.push(`Tax: ${cur}${sale.tax.toFixed(2)}`);
   lines.push(sep);
-  lines.push(`TOTAL: $${sale.total.toFixed(2)}`);
+  lines.push(`TOTAL: ${cur}${sale.total.toFixed(2)}`);
   lines.push(sep);
   lines.push(`Payment: ${sale.paymentMethod.toUpperCase()}`);
   if (sale.pointsEarned) lines.push(`Points earned: ${sale.pointsEarned}`);

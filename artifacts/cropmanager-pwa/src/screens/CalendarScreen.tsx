@@ -48,6 +48,16 @@ export function CalendarScreen() {
   const [viewMonth, setViewMonth] = useState(todayDate.getMonth());
   const [expandedDay, setExpandedDay] = useState<string | null>(todayStr);
   const [monthSelected, setMonthSelected] = useState<string | null>(null);
+  // Declutter: tap a kind to hide/show it everywhere (badges, counts, lists).
+  const [hiddenKinds, setHiddenKinds] = useState<Set<string>>(new Set());
+  const toggleKind = (kind: string) => {
+    setHiddenKinds(prev => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
+  };
 
   const activities = useLiveQuery(() => db.activities.toArray().catch(() => [])) ?? [];
   const treatmentLogs = useLiveQuery(() => db.treatmentLogs.toArray().catch(() => [])) ?? [];
@@ -64,7 +74,7 @@ export function CalendarScreen() {
     const events = buildFarmEvents({
       activities, treatmentLogs, harvestLogs, stageLogs, observationLogs,
       observationEntries, trackings, trackingEntries, ledgerEntries, reminders,
-    });
+    }).filter(e => !hiddenKinds.has(e.kind));
     const map = new Map<string, FarmEvent[]>();
     for (const e of events) {
       if (!e.date) continue;
@@ -73,7 +83,7 @@ export function CalendarScreen() {
       map.set(e.date, arr);
     }
     return map;
-  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, reminders]);
+  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, reminders, hiddenKinds]);
 
   const hasEvent = (dayStr: string) => (eventsByDate.get(dayStr)?.length ?? 0) > 0;
 
@@ -134,6 +144,22 @@ export function CalendarScreen() {
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
+        </div>
+        <div className="flex px-4 pb-2 gap-1.5 overflow-x-auto scrollbar-hide">
+          {[
+            { k: 'activity', l: '📋 Log' }, { k: 'treatment', l: '🧪 Sprays' },
+            { k: 'harvest', l: '🥬 Harvest' }, { k: 'stage', l: '🌱 Stages' },
+            { k: 'observation', l: '👁️ Notes' }, { k: 'tracking', l: '🍅 Track' },
+            { k: 'finance', l: '💰 Books' }, { k: 'reminder', l: '🔔 Reminders' },
+          ].map(f => {
+            const off = hiddenKinds.has(f.k);
+            return (
+              <button key={f.k} onClick={() => toggleKind(f.k)} title={off ? `Show ${f.l}` : `Hide ${f.l}`}
+                className={`shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${off ? 'bg-white text-gray-300 border-gray-200 line-through' : 'bg-gray-800 text-white border-gray-800'}`}>
+                {f.l}
+              </button>
+            );
+          })}
         </div>
       </div>
 

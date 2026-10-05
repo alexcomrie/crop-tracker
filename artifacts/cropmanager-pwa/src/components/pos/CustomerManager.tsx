@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { User, Plus, Pencil, Trash2, X, Search, Save } from 'lucide-react';
 import type { PosCustomer } from '../../types';
+import { usePosCurrency, fmtMoney } from '../../lib/pos';
 
 interface Props {
   onClose: () => void;
@@ -22,6 +23,7 @@ export function CustomerManager({ onClose, onSelect }: Props) {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
+  const cur = usePosCurrency();
 
   const customers = useLiveQuery(() => db.posCustomers.toArray(), []) ?? [];
 
@@ -155,7 +157,7 @@ export function CustomerManager({ onClose, onSelect }: Props) {
                   {c.email && <span>{c.email}</span>}
                 </p>
                 <div className="flex gap-3 mt-1 text-[10px] text-gray-400">
-                  {c.totalPurchases > 0 && <span>Purchases: ${c.totalPurchases.toFixed(2)}</span>}
+                  {c.totalPurchases > 0 && <span>Purchases: {fmtMoney(c.totalPurchases, cur)}</span>}
                   <span>Points: {c.pointsBalance}</span>
                 </div>
               </div>

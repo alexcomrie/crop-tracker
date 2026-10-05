@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { ClipboardList, Plus, Pencil, Trash2, Search, Save, User, FileText, ChevronLeft, CheckCircle, XCircle } from 'lucide-react';
 import type { PosOrder, PosOrderItem, PosCustomer } from '../../types';
 import { formatDateShort, formatDateTime, today } from '../../lib/dates';
+import { usePosCurrency, fmtMoney } from '../../lib/pos';
 import { toPng } from 'html-to-image';
 
 const UNITS = ['each', 'lb', 'kg', 'oz', 'dozen', 'half-dozen', 'bunch', 'box', 'crate', 'bag', 'tray', 'per plant', 'per head', 'liter', 'gallon', 'bottle'];
@@ -28,6 +29,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
   const [customerName, setCustomerName] = useState('');
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
+  const cur = usePosCurrency();
   const [showCustomers, setShowCustomers] = useState(false);
   const [orderItems, setOrderItems] = useState<{ id: string; name: string; unit: string; qty: number; price: number; total: number; isCustom: boolean }[]>([]);
   const [itemFormOpen, setItemFormOpen] = useState(false);
@@ -170,7 +172,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
         toast.success('Order updated');
       } else {
         await db.posOrders.add({ id: generateId('INV'), customerName: customerName || selectedCustomer!.name, customerId, items, total, notes, status: 'pending', createdAt: now, updatedAt: now });
-        await addDiaryEntry({ entryType: 'pos_sale', description: `Order created: ${customerName || selectedCustomer!.name}`, details: `${items.length} item(s), $${total.toFixed(2)}`, date: formatDateShort(today()) });
+        await addDiaryEntry({ entryType: 'pos_sale', description: `Order created: ${customerName || selectedCustomer!.name}`, details: `${items.length} item(s), ${cur}${total.toFixed(2)}`, date: formatDateShort(today()) });
         toast.success('Order saved');
       }
     } catch (e) {
@@ -185,7 +187,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
     if (!window.confirm(`Cancel order for ${order.customerName}?`)) return;
     try {
       await db.posOrders.update(order.id, { status: 'canceled', canceledAt: Date.now(), updatedAt: Date.now() });
-      await addDiaryEntry({ entryType: 'pos_sale', description: `Order CANCELED: ${order.customerName}`, details: `$${order.total.toFixed(2)}`, date: formatDateShort(today()) });
+      await addDiaryEntry({ entryType: 'pos_sale', description: `Order CANCELED: ${order.customerName}`, details: `${cur}${order.total.toFixed(2)}`, date: formatDateShort(today()) });
       toast.success('Order canceled');
     } catch (e) {
       console.error('[pos] order cancel failed', { id: order.id, e });
@@ -305,14 +307,14 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
                 <div key={idx} className="flex items-center gap-2 bg-white border rounded-xl px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.name}</p>
-                    <p className="text-xs text-gray-500">${item.price.toFixed(2)} / {item.unit}</p>
+                    <p className="text-xs text-gray-500">{fmtMoney(item.price, cur)} / {item.unit}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => updateItemQty(idx, item.qty - 1)} className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center text-xs">-</button>
                     <span className="text-sm font-semibold w-6 text-center">{item.qty}</span>
                     <button onClick={() => updateItemQty(idx, item.qty + 1)} className="w-5 h-5 rounded bg-gray-100 flex items-center justify-center text-xs">+</button>
                   </div>
-                  <p className="text-sm font-semibold w-16 text-right">${item.total.toFixed(2)}</p>
+                  <p className="text-sm font-semibold w-16 text-right">{fmtMoney(item.total, cur)}</p>
                   <button onClick={() => { setItemFormOpen(true); setEditItemIdx(idx); setItemName(item.name); setItemUnit(item.unit); setItemQty(item.qty); setItemPrice(item.price); }} className="p-1 text-blue-400"><Pencil className="w-3 h-3" /></button>
                   <button onClick={() => removeOrderItem(idx)} className="p-1 text-red-400"><Trash2 className="w-3 h-3" /></button>
                 </div>
@@ -321,7 +323,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
             </div>
 
             {orderItems.length > 0 && (
-              <div className="text-right font-bold text-lg">Total: ${orderTotal.toFixed(2)}</div>
+              <div className="text-right font-bold text-lg">Total: {fmtMoney(orderTotal, cur)}</div>
             )}
           </div>
 
@@ -355,11 +357,11 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
                   <p className="font-semibold">{order.customerName}</p>
                   <p className="text-xs text-gray-500">{formatDateShort(new Date(order.createdAt))} · {order.items.length} item(s)</p>
                 </div>
-                <p className="font-bold text-green-700">${order.total.toFixed(2)}</p>
+                <p className="font-bold text-green-700">{fmtMoney(order.total, cur)}</p>
               </div>
               <div className="text-xs text-gray-500 space-y-0.5">
                 {order.items.map((item, i) => (
-                  <p key={i}>{item.productName} × {item.quantity} {item.unit} — ${item.total.toFixed(2)}</p>
+                  <p key={i}>{item.productName} × {item.quantity} {item.unit} — {fmtMoney(item.total, cur)}</p>
                 ))}
               </div>
               {order.notes && <p className="text-xs text-gray-400 italic">📝 {order.notes}</p>}
@@ -408,13 +410,13 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
                     <td className="py-1">{item.productName}</td>
                     <td className="text-right py-1">{item.quantity}</td>
                     <td className="text-right py-1">{item.unit}</td>
-                    <td className="text-right py-1">${item.unitPrice.toFixed(2)}</td>
-                    <td className="text-right py-1">${item.total.toFixed(2)}</td>
+                    <td className="text-right py-1">{fmtMoney(item.unitPrice, cur)}</td>
+                    <td className="text-right py-1">{fmtMoney(item.total, cur)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="text-right font-bold text-sm mt-3">TOTAL: ${quoteTarget.total.toFixed(2)}</p>
+            <p className="text-right font-bold text-sm mt-3">TOTAL: {fmtMoney(quoteTarget.total, cur)}</p>
             {quoteTarget.notes && <p className="text-xs text-gray-500 mt-2">Notes: {quoteTarget.notes}</p>}
             <p className="text-center text-xs text-gray-400 mt-6">Thank you for your business!</p>
           </div>
@@ -441,13 +443,13 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
                     <td className="py-1">{item.productName}</td>
                     <td className="text-right py-1">{item.quantity}</td>
                     <td className="text-right py-1">{item.unit}</td>
-                    <td className="text-right py-1">${item.unitPrice.toFixed(2)}</td>
-                    <td className="text-right py-1">${item.total.toFixed(2)}</td>
+                    <td className="text-right py-1">{fmtMoney(item.unitPrice, cur)}</td>
+                    <td className="text-right py-1">{fmtMoney(item.total, cur)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="text-right font-bold text-sm mt-3">TOTAL: ${invoiceTarget.total.toFixed(2)}</p>
+            <p className="text-right font-bold text-sm mt-3">TOTAL: {fmtMoney(invoiceTarget.total, cur)}</p>
             {invoiceTarget.notes && <p className="text-xs text-gray-500 mt-2">Notes: {invoiceTarget.notes}</p>}
             <p className="text-center text-xs text-gray-400 mt-6">Thank you for your business!</p>
           </div>

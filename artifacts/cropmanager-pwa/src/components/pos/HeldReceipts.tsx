@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { PosHeldReceipt } from '../../types';
 import { formatDateShort } from '../../lib/dates';
+import { usePosCurrency, fmtMoney } from '../../lib/pos';
 
 interface Props {
   onBack: () => void;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function HeldReceipts({ onBack, onLoadReceipt }: Props) {
+  const cur = usePosCurrency();
   const heldReceipts = useLiveQuery(() => db.posHeldReceipts.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? [];
 
   async function handleDelete(id: string) {
@@ -49,7 +51,7 @@ export function HeldReceipts({ onBack, onLoadReceipt }: Props) {
                 <p className="font-semibold">{r.name}</p>
                 <p className="text-xs text-gray-500">{formatDateShort(new Date(r.createdAt))} · {r.cart.length} item(s)</p>
               </div>
-              <p className="font-bold text-green-700">${r.total.toFixed(2)}</p>
+              <p className="font-bold text-green-700">{fmtMoney(r.total, cur)}</p>
             </div>
             {r.customerName && <p className="text-xs text-gray-500">Customer: {r.customerName}</p>}
             <div className="flex gap-2 pt-1">

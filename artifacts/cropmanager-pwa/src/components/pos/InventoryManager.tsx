@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Package, Plus, Pencil, Trash2, X, Search, Sprout, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 import type { PosInventoryItem } from '../../types';
+import { usePosCurrency, fmtMoney } from '../../lib/pos';
 
 const UNITS = ['each', 'lb', 'kg', 'oz', 'dozen', 'half-dozen', 'bunch', 'box', 'crate', 'bag', 'tray', 'per plant', 'per head', 'liter', 'gallon', 'bottle'];
 
@@ -24,6 +25,8 @@ export function InventoryManager({ onClose }: Props) {
   const [category, setCategory] = useState('');
   const [unit, setUnit] = useState('each');
   const [unitPrice, setUnitPrice] = useState(0);
+  const [stockQty, setStockQty] = useState('');
+  const cur = usePosCurrency();
   const [showImportCrops, setShowImportCrops] = useState(false);
   const [cropSearch, setCropSearch] = useState('');
 
@@ -43,6 +46,7 @@ export function InventoryManager({ onClose }: Props) {
     setCategory('');
     setUnit('each');
     setUnitPrice(0);
+    setStockQty('');
     setEditItem(null);
     setShowForm(false);
   }
@@ -50,12 +54,13 @@ export function InventoryManager({ onClose }: Props) {
   async function handleSave() {
     if (!name) { toast.error('Item name is required'); return; }
     const now = Date.now();
+    const stock = stockQty.trim() === '' ? undefined : Math.max(0, Number(stockQty) || 0);
     try {
       if (editItem) {
-        await db.posInventory.update(editItem.id, { name, category, unit, unitPrice, updatedAt: now });
+        await db.posInventory.update(editItem.id, { name, category, unit, unitPrice, stockQty: stock, updatedAt: now });
         toast.success(`"${name}" updated`);
       } else {
-        await db.posInventory.add({ id: generateId('INV'), name, category, unit, unitPrice, isActive: true, createdAt: now, updatedAt: now });
+        await db.posInventory.add({ id: generateId('INV'), name, category, unit, unitPrice, stockQty: stock, isActive: true, createdAt: now, updatedAt: now });
         toast.success(`"${name}" added to inventory`);
       }
     } catch (e) {
@@ -121,6 +126,7 @@ export function InventoryManager({ onClose }: Props) {
     setCategory(item.category);
     setUnit(item.unit);
     setUnitPrice(item.unitPrice);
+    setStockQty(item.stockQty === undefined || item.stockQty === null ? '' : String(item.stockQty));
     setShowForm(true);
   }
 
@@ -182,10 +188,17 @@ export function InventoryManager({ onClose }: Props) {
                   </Select>
                 </div>
               </div>
-              <div className="flex flex-col gap-1">
-                <Label>Unit Price ($)</Label>
-                <Input type="number" value={unitPrice} onChange={e => setUnitPrice(Number(e.target.value))} min={0} step={0.01} placeholder="0.00" />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-1">
+                  <Label>Unit Price ({cur})</Label>
+                  <Input type="number" value={unitPrice} onChange={e => setUnitPrice(Number(e.target.value))} min={0} step={0.01} placeholder="0.00" />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label>Stock on hand</Label>
+                  <Input type="number" value={stockQty} onChange={e => setStockQty(e.target.value)} min={0} step={0.5} placeholder="Untracked" />
+                </div>
               </div>
+              <p className="text-[11px] text-gray-400">Leave stock blank to sell without tracking. Checkout decrements stock and blocks oversells.</p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={resetForm}>Cancel</Button>
@@ -218,8 +231,13 @@ export function InventoryManager({ onClose }: Props) {
                 <p className="font-semibold text-sm truncate">{item.name}</p>
                 <p className="text-xs text-gray-500">
                   {item.category && <span>{item.category} · </span>}
-                  ${item.unitPrice.toFixed(2)} / {item.unit}
+                  {fmtMoney(item.unitPrice, cur)} / {item.unit}
                 </p>
+                {item.stockQty !== undefined && item.stockQty !== null && (
+                  <p className={`text-[11px] font-semibold ${item.stockQty <= 0 ? 'text-red-600' : item.stockQty < 5 ? 'text-amber-600' : 'text-green-700'}`}>
+                    {item.stockQty <= 0 ? 'Out of stock' : `Stock: ${item.stockQty}`}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => handleToggleActive(item)} className="p-1.5 hover:bg-gray-100 rounded-lg" title={item.isActive ? 'Deactivate' : 'Activate'}>

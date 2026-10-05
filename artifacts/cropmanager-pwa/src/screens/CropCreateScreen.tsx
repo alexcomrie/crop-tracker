@@ -18,8 +18,10 @@ import { ROUTES } from '../lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const PLANTING_METHODS = ['Seed Tray','Seed Bed','Direct Bed','Direct Ground','Pot / Container','Cuttings','Division','Grafted','Hydroponic'];
+const PLANTING_METHODS = ['Seed Tray','Seed Bed','Direct Ground','Pot / Container','Cuttings','Division','Grafted','Hydroponic'];
 const TRAY_COLORS = ['Red','Orange','Yellow','Green','Blue','Purple','Pink','White'];
+const TRAY_CELLS = ['50', '75', '128', '200'];
+const POT_SIZES = ['XS', 'SML', 'MED', 'LARGE', 'XL', 'XXL'];
 
 export function CropCreateScreen() {
   const navigate = useNavigate();
@@ -32,6 +34,14 @@ export function CropCreateScreen() {
   const [customVariety, setCustomVariety] = useState('');
   const [method, setMethod] = useState('');
   const [trayColors, setTrayColors] = useState<string[]>([]);
+  const [trayCells, setTrayCells] = useState('');
+  const [trayCellsCustom, setTrayCellsCustom] = useState('');
+  const [trayCount, setTrayCount] = useState('');
+  const [potSize, setPotSize] = useState('');
+  const [potSizeCustom, setPotSizeCustom] = useState('');
+  const [potCount, setPotCount] = useState('');
+  const trayCellsFinal = trayCells === 'custom' ? trayCellsCustom.trim() : trayCells;
+  const potSizeFinal = potSize === 'custom' ? potSizeCustom.trim() : potSize;
   const [notes, setNotes] = useState('');
   const [isContinuous, setIsContinuous] = useState(false);
   const [freqDays, setFreqDays] = useState(7);
@@ -74,7 +84,17 @@ export function CropCreateScreen() {
       const now = Date.now();
       const cropData = resolveCropData(cropDb, cropKey);
       let notesStr = notes;
-      if (trayColors.length) notesStr = `🎨 Tray: ${trayColors.join(', ')}${notes ? '\n' + notes : ''}`;
+      const containerBits: string[] = [];
+      if (method === 'Seed Tray') {
+        if (trayCellsFinal) containerBits.push(`${trayCellsFinal}-cell`);
+        if (trayCount.trim()) containerBits.push(`x${trayCount.trim()} tray${trayCount.trim() === '1' ? '' : 's'}`);
+        if (trayColors.length) containerBits.push(`🎨 ${trayColors.join(', ')}`);
+      } else if (method === 'Pot / Container') {
+        if (potSizeFinal) containerBits.push(`size ${potSizeFinal}`);
+        if (potCount.trim()) containerBits.push(`x${potCount.trim()} pot${potCount.trim() === '1' ? '' : 's'}`);
+      }
+      if (containerBits.length) notesStr = `🧫 Container: ${containerBits.join(' · ')}${notes ? '\n' + notes : ''}`;
+      else if (trayColors.length) notesStr = `🎨 Tray: ${trayColors.join(', ')}${notes ? '\n' + notes : ''}`;
       // Direct Ground is planted in place — every other method may transplant
       const transplantDate = cropData && needsTransplant(method)
         ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety)
@@ -123,7 +143,7 @@ export function CropCreateScreen() {
         step = 'crops.add';
         await db.crops.add(baseCrop);
         step = 'diary.add';
-        await addDiaryEntry({ entryType: 'crop_created', cropId: id, cropName: baseCrop.cropName, variety, description: `New crop: ${baseCrop.cropName}`, details: `Method: ${method}` });
+        await addDiaryEntry({ entryType: 'crop_created', cropId: id, cropName: baseCrop.cropName, variety, description: `New crop: ${baseCrop.cropName}`, details: [`Method: ${method}`, containerBits.length ? `Container: ${containerBits.join(' · ')}` : ''].filter(Boolean).join(' · ') });
         step = 'personal.upsert';
         await upsertPersonalFromCrop(baseCrop);
       }
@@ -214,6 +234,46 @@ export function CropCreateScreen() {
               ))}
             </div>
             {locked && <p className="text-xs text-amber-600">Select a crop first</p>}
+            {method === 'Seed Tray' && !locked && (
+              <div className="space-y-2 rounded-lg border border-green-200 bg-green-50/50 p-3">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Tray cells per tray</p>
+                <div className="flex flex-wrap gap-2">
+                  {TRAY_CELLS.map(c => (
+                    <button key={c} onClick={() => { setTrayCells(c); setTrayCellsCustom(''); }}
+                      className={`px-3 py-1.5 rounded-full text-sm border ${trayCells === c ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`}>{c}</button>
+                  ))}
+                  <button onClick={() => setTrayCells('custom')}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${trayCells === 'custom' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`}>Manual</button>
+                </div>
+                {trayCells === 'custom' && (
+                  <Input placeholder="Cells per tray (e.g. 72)" inputMode="numeric" value={trayCellsCustom} onChange={e => setTrayCellsCustom(e.target.value)} />
+                )}
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase">Number of trays</label>
+                  <Input placeholder="e.g. 3" inputMode="numeric" value={trayCount} onChange={e => setTrayCount(e.target.value)} className="mt-1" />
+                </div>
+              </div>
+            )}
+            {method === 'Pot / Container' && !locked && (
+              <div className="space-y-2 rounded-lg border border-green-200 bg-green-50/50 p-3">
+                <p className="text-[11px] font-bold uppercase text-gray-500">Pot size</p>
+                <div className="flex flex-wrap gap-2">
+                  {POT_SIZES.map(s => (
+                    <button key={s} onClick={() => { setPotSize(s); setPotSizeCustom(''); }}
+                      className={`px-3 py-1.5 rounded-full text-sm border ${potSize === s ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`}>{s}</button>
+                  ))}
+                  <button onClick={() => setPotSize('custom')}
+                    className={`px-3 py-1.5 rounded-full text-sm border ${potSize === 'custom' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`}>Manual</button>
+                </div>
+                {potSize === 'custom' && (
+                  <Input placeholder="Pot size (e.g. 1 gal)" value={potSizeCustom} onChange={e => setPotSizeCustom(e.target.value)} />
+                )}
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase">Number of pots</label>
+                  <Input placeholder="e.g. 10" inputMode="numeric" value={potCount} onChange={e => setPotCount(e.target.value)} className="mt-1" />
+                </div>
+              </div>
+            )}
             <Button className="w-full" disabled={!method || locked} onClick={()=>setStep(method==='Seed Tray' || method==='Grafted' ? 4 : 5)}>Next</Button>
             <button onClick={()=>setStep(2)} className="w-full text-sm text-muted-foreground">← Back</button>
           </div>
@@ -286,6 +346,12 @@ export function CropCreateScreen() {
               <p><strong>Crop:</strong> {selectedCropData?.display_name ?? cropKey}</p>
               {variety && <p><strong>Variety:</strong> {variety}</p>}
               <p><strong>Method:</strong> {method}</p>
+              {method === 'Seed Tray' && (trayCellsFinal || trayCount.trim()) && (
+                <p><strong>Tray:</strong> {trayCellsFinal ? `${trayCellsFinal}-cell` : '—'}{trayCount.trim() ? ` × ${trayCount.trim()} tray${trayCount.trim() === '1' ? '' : 's'}` : ''}</p>
+              )}
+              {method === 'Pot / Container' && (potSizeFinal || potCount.trim()) && (
+                <p><strong>Pots:</strong> {potSizeFinal ? `size ${potSizeFinal}` : '—'}{potCount.trim() ? ` × ${potCount.trim()} pot${potCount.trim() === '1' ? '' : 's'}` : ''}</p>
+              )}
               <p><strong>Date:</strong> {formatDateShort(validPlantDate)}</p>
               {trayColors.length>0 && <p><strong>Tray:</strong> {trayColors.join(', ')}</p>}
               <p><strong>Continuous:</strong> {isContinuous?'Yes':'No'}</p>

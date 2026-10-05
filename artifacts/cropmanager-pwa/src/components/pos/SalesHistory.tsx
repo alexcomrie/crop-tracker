@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, Search, Trash2, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePosCurrency, fmtMoney } from '../../lib/pos';
 
 interface Props {
   onBack: () => void;
@@ -12,6 +13,7 @@ interface Props {
 
 export function SalesHistory({ onBack }: Props) {
   const [search, setSearch] = useState('');
+  const cur = usePosCurrency();
   const sales = useLiveQuery(() => db.posSales.orderBy('createdAt').reverse().limit(100).toArray(), []) ?? [];
 
   const filtered = search
@@ -55,13 +57,13 @@ export function SalesHistory({ onBack }: Props) {
                   <p className="text-xs text-gray-500">{sale.date}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-green-700">${sale.total.toFixed(2)}</p>
+                  <p className="font-bold text-green-700">{fmtMoney(sale.total, cur)}</p>
                   <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{sale.paymentMethod}</span>
                 </div>
               </div>
               <div className="text-xs text-gray-500 space-y-0.5">
                 {sale.items.slice(0, 3).map((item, i) => (
-                  <p key={i}>{item.quantity}× {item.productName} @ ${item.unitPrice.toFixed(2)}</p>
+                  <p key={i}>{item.quantity}× {item.productName} @ {fmtMoney(item.unitPrice, cur)}</p>
                 ))}
                 {sale.items.length > 3 && <p className="text-gray-400">+{sale.items.length - 3} more items</p>}
               </div>

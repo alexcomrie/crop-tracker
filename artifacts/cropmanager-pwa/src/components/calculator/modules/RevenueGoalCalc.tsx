@@ -25,10 +25,11 @@ export default function RevenueGoalCalc() {
   const [cropName, setCrop] = useState('');
   const [quantity, setQuantity] = useState(100);
 
+  const wasteSafe = Math.min(90, Math.max(0, wastePct));
   const forwardResult = useMemo(() => {
-    if (!pricePerUnit || !goal) return null;
+    if (!pricePerUnit || pricePerUnit <= 0 || !goal) return null;
     const unitsNeededToSell = goal / pricePerUnit;
-    const unitsToHarvest = unitsNeededToSell / (1 - wastePct / 100);
+    const unitsToHarvest = unitsNeededToSell / (1 - wasteSafe / 100);
     const lbsToHarvest = unitsToHarvest * (UNIT_LB[unit] ?? 1);
     return {
       unitsToSell: round(unitsNeededToSell),
@@ -38,7 +39,7 @@ export default function RevenueGoalCalc() {
       wasteUnits: round(unitsToHarvest - unitsNeededToSell),
       revenuePerLb: round(goal / lbsToHarvest, 4),
     };
-  }, [goal, pricePerUnit, unit, wastePct]);
+  }, [goal, pricePerUnit, unit, wasteSafe]);
 
   const reverseResult = useMemo(() => {
     if (!pricePerUnit || !quantity) return null;

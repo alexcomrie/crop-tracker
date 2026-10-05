@@ -140,20 +140,21 @@ export default function POSScreen() {
 
   const pointsDiscountAmount = useMemo(() => {
     if (!redeemPoints || !selectedCustomer || pointsToRedeem <= 0) return 0;
-    const maxRedeemable = selectedCustomer.pointsBalance;
+    if (!settings.pointsRedemptionRate || settings.pointsRedemptionRate <= 0) return 0;
+    const maxRedeemable = Math.max(0, selectedCustomer.pointsBalance);
     const actualPoints = Math.min(pointsToRedeem, maxRedeemable);
     return actualPoints / settings.pointsRedemptionRate;
   }, [redeemPoints, pointsToRedeem, selectedCustomer, settings.pointsRedemptionRate]);
 
   const discountAmount = useMemo(() => {
     let d = 0;
-    if (discountType === 'percentage') d = subtotal * (discount / 100);
-    else d = discount;
-    return d + pointsDiscountAmount;
+    if (discountType === 'percentage') d = subtotal * (Math.min(100, Math.max(0, discount)) / 100);
+    else d = Math.max(0, discount);
+    return Math.min(subtotal, d + pointsDiscountAmount);
   }, [subtotal, discount, discountType, pointsDiscountAmount]);
 
-  const taxAmount = useMemo(() => (subtotal - discountAmount) * (settings.taxRate / 100), [subtotal, discountAmount, settings.taxRate]);
-  const total = useMemo(() => subtotal - discountAmount + taxAmount, [subtotal, discountAmount, taxAmount]);
+  const taxAmount = useMemo(() => Math.max(0, subtotal - discountAmount) * (Math.max(0, settings.taxRate) / 100), [subtotal, discountAmount, settings.taxRate]);
+  const total = useMemo(() => Math.max(0, subtotal - discountAmount + taxAmount), [subtotal, discountAmount, taxAmount]);
   const change = useMemo(() => Math.max(0, amountPaid - total), [amountPaid, total]);
 
   function addToCart(invItem: typeof inventoryItems[0]) {
@@ -162,7 +163,8 @@ export default function POSScreen() {
       const key = invItem.id;
       const existing = next.get(key);
       if (existing) {
-        const qty = +(existing.item.quantity + 0.5).toFixed(1);
+        // Repeat taps add a whole unit; fractional steps live in the qty input.
+        const qty = +(existing.item.quantity + 1).toFixed(2);
         next.set(key, { ...existing, item: { ...existing.item, quantity: qty, total: qty * existing.item.unitPrice } });
       } else {
         next.set(key, {

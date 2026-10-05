@@ -15,7 +15,10 @@ export default function HarvestWindowCalc() {
   const [successionCount, setCount] = useState(3);
 
   const result = useMemo(() => {
-    const planted = new Date(plantDate);
+    // Parse yyyy-MM-dd as local time (new Date(str) is UTC midnight and
+    // shifts a day back in UTC-negative zones like Jamaica).
+    const [y, m, d] = plantDate.split('-').map(Number);
+    const planted = y && m && d ? new Date(y, m - 1, d) : new Date();
     const firstHarvest = addDays(planted, daysToMaturity);
     const lastHarvest = addDays(firstHarvest, harvestWindowDays);
     const successions = Array.from({ length: successionCount }, (_, i) => {

@@ -1,13 +1,36 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, Clock, Trash2 } from 'lucide-react';
-import { generateId } from '../../lib/ids';
+import { generateId, shortCropId } from '../../lib/ids';
 import { formatDateShort, today, addDays, parseDate } from '../../lib/dates';
 import { addDiaryEntry } from '../../lib/diary';
+import { buildFarmEvents, groupEventsByDate, type FarmEventKind } from '../../lib/farmEvents';
 import { toast } from 'sonner';
+
+const KIND_FILTERS: { id: 'all' | FarmEventKind; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'activity', label: 'Logged' },
+  { id: 'treatment', label: 'Sprays' },
+  { id: 'harvest', label: 'Harvests' },
+  { id: 'stage', label: 'Stages' },
+  { id: 'observation', label: 'Notes' },
+  { id: 'tracking', label: 'Tracking' },
+  { id: 'finance', label: 'Finance' },
+];
+
+const KIND_STYLE: Record<FarmEventKind, { icon: string; chip: string }> = {
+  activity: { icon: '📋', chip: 'bg-gray-100 text-gray-700' },
+  treatment: { icon: '💧', chip: 'bg-cyan-50 text-cyan-700' },
+  harvest: { icon: '🥬', chip: 'bg-amber-50 text-amber-700' },
+  stage: { icon: '🌱', chip: 'bg-green-50 text-green-700' },
+  observation: { icon: '👁️', chip: 'bg-teal-50 text-teal-700' },
+  tracking: { icon: '🍅', chip: 'bg-orange-50 text-orange-700' },
+  finance: { icon: '💰', chip: 'bg-emerald-50 text-emerald-700' },
+  reminder: { icon: '🔔', chip: 'bg-purple-50 text-purple-700' },
+};
 
 const ACTIVITY_TYPES = [
   { id: 'watering', label: 'Watering', icon: '💧' },
@@ -44,16 +67,34 @@ interface Activity {
 }
 
 export function ActivityScreen({ onClose }: { onClose: () => void }) {
-  const activitiesData = useLiveQuery(async () => {
-    const all = await db.activities.orderBy('updatedAt').reverse().limit(200).toArray();
-    return all.sort((a,b)=> (parseDate(b.date)?.getTime()||0) - (parseDate(a.date)?.getTime()||0));
-  });
-  const activities = activitiesData ?? [];
+  const activitiesData = useLiveQuery(() => db.activities.toArray().catch(() => []));
+  const treatmentLogs = useLiveQuery(() => db.treatmentLogs.toArray().catch(() => [])) ?? [];
+  const harvestLogs = useLiveQuery(() => db.harvestLogs.toArray().catch(() => [])) ?? [];
+  const stageLogs = useLiveQuery(() => db.stageLogs.toArray().catch(() => [])) ?? [];
+  const observationLogs = useLiveQuery(() => db.observationLogs.toArray().catch(() => [])) ?? [];
+  const observationEntries = useLiveQuery(() => db.observationEntries.toArray().catch(() => [])) ?? [];
+  const trackings = useLiveQuery(() => db.trackings.toArray().catch(() => [])) ?? [];
+  const trackingEntries = useLiveQuery(() => db.trackingEntries.toArray().catch(() => [])) ?? [];
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray().catch(() => [])) ?? [];
+  const activities = useMemo(() => [...(activitiesData ?? [])].sort(
+    (a, b) => (parseDate(b.date)?.getTime() || 0) - (parseDate(a.date)?.getTime() || 0)), [activitiesData]);
   const isLoadingActivities = activitiesData === undefined;
 
-  const crops = useLiveQuery(() => 
+  const crops = useLiveQuery(() =>
     db.crops.where('status').equals('Active').toArray()
   ) ?? [];
+  const allCrops = useLiveQuery(() => db.crops.toArray().catch(() => [])) ?? [];
+  const cropById = useMemo(() => new Map(allCrops.map(c => [c.id, c])), [allCrops]);
+
+  // Unified feed: everything the farm did, not just manual activity rows.
+  const [kindFilter, setKindFilter] = useState<'all' | FarmEventKind>('all');
+  const feedGroups = useMemo(() => {
+    const events = buildFarmEvents({
+      activities, treatmentLogs, harvestLogs, stageLogs,
+      observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries,
+    }).filter(e => kindFilter === 'all' || e.kind === kindFilter);
+    return groupEventsByDate(events).slice(0, 60);
+  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, kindFilter]);
 
   const [view, setView] = useState<'list' | 'form'>('list');
   const [form, setForm] = useState({
@@ -261,61 +302,72 @@ export function ActivityScreen({ onClose }: { onClose: () => void }) {
 
       {view === 'list' && (
         <div className="flex-1 overflow-y-auto p-4">
+          <p className="text-[11px] text-muted-foreground mb-2">Every logged farm event — manual activities plus sprays, harvests, stage changes, notes, tracking and ledger, newest first.</p>
+          <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+            {KIND_FILTERS.map(k => (
+              <button key={k.id} onClick={() => setKindFilter(k.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs border font-semibold ${kindFilter === k.id ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-300 text-gray-700'}`}>
+                {k.label}
+              </button>
+            ))}
+          </div>
           {isLoadingActivities ? (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : activities.length === 0 ? (
+          ) : feedGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
               <div className="text-4xl mb-2">📋</div>
-              <div className="text-sm font-medium">No activities logged yet.</div>
+              <div className="text-sm font-medium">Nothing here yet.</div>
               <div className="text-xs mt-1">Tap + New to record your first activity.</div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {activities.map(a => {
-                const typeIds = a.type.split(',').filter(Boolean);
-                const actTypes = typeIds.map(id => ACTIVITY_TYPES.find(t => t.id === id)).filter(Boolean);
-                return (
-                  <div key={a.id} className="bg-white border border-[#e0e0e0] rounded-[12px] p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{actTypes[0]?.icon || '📝'}</span>
-                        <div>
-                          <div className="font-semibold text-[14px]">
-                            {actTypes.map(t => t?.label).filter(Boolean).join(', ') || a.type}
+            <div className="space-y-4">
+              {feedGroups.map(g => (
+                <div key={g.date}>
+                  <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">{g.date} · {g.events.length}</p>
+                  <div className="space-y-2">
+                    {g.events.map(e => {
+                      const st = KIND_STYLE[e.kind];
+                      const cropsForEvent = (e.cropIds ?? []).map(cid => cropById.get(cid)).filter(Boolean);
+                      return (
+                        <div key={e.id} className="bg-white border border-[#e0e0e0] rounded-[12px] p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-base shrink-0">{st.icon}</span>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-[13px] truncate">{e.title}</p>
+                                <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />{formatActivityDate(e.date)}
+                                  <span className={`ml-1 px-1.5 py-0.5 rounded-full font-bold ${st.chip}`}>{e.kind}</span>
+                                </p>
+                              </div>
+                            </div>
+                            {e.source.table === 'activities' && (
+                              <button onClick={() => handleDelete(e.source.refId)} className="text-gray-400 hover:text-red-500 shrink-0">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
-                          <div className="text-[11px] text-gray-500 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {formatActivityDate(a.date)}
-                            {a.reminderDate && <span className="ml-2 text-blue-600">→ Reminder: {formatActivityDate(a.reminderDate)}</span>}
-                          </div>
+                          {e.subtitle && <p className="text-xs text-gray-600 mt-1 whitespace-pre-line">{e.subtitle}</p>}
+                          {(cropsForEvent.length > 0 || e.cropName) && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {cropsForEvent.map(c => (
+                                <span key={c!.id} className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full font-semibold">
+                                  {shortCropId(c!.id)} · {c!.cropName}
+                                </span>
+                              ))}
+                              {cropsForEvent.length === 0 && e.cropName && (
+                                <span className="text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{e.cropName}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <button 
-                        onClick={() => handleDelete(a.id)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {a.product && <div className="text-sm text-gray-600 mt-1">Product: {a.product}</div>}
-                    {a.notes && <div className="text-sm text-gray-500 mt-1">{a.notes}</div>}
-                    {a.cropIds.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {a.cropIds.map(cid => {
-                          const crop = crops.find(c => c.id === cid);
-                          return crop ? (
-                            <span key={cid} className="text-[10px] px-2 py-0.5 bg-green-50 text-green-700 rounded-full">
-                              {crop.cropName}
-                            </span>
-                          ) : null;
-                        })}
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>

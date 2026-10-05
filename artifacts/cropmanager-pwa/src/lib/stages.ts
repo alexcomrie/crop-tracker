@@ -48,12 +48,13 @@ export function getStageSequence(_cropData: CropData | null): string[] {
 }
 
 /**
- * Every planting method can transplant except Direct Ground, which is already
- * planted in place — so the transplant stage, schedule, and reminders are
- * skipped only for Direct Ground.
+ * Most planting methods can transplant. Direct Ground is planted in place,
+ * and Division splits are replanted directly as separate plants — so the
+ * transplant schedule and reminders are skipped for both.
+ * Cuttings/Grafted still root first, then may transplant from pot/tray.
  */
 export function needsTransplant(plantingMethod?: string): boolean {
-  return plantingMethod !== 'Direct Ground';
+  return plantingMethod !== 'Direct Ground' && plantingMethod !== 'Division';
 }
 
 export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string): string[] {

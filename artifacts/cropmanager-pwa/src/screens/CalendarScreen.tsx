@@ -2,12 +2,19 @@ import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { addDays, formatDateShort, today } from '../lib/dates';
+import { buildFarmEvents, type FarmEvent } from '../lib/farmEvents';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 type ViewMode = 'week' | 'month' | 'year';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const KIND_DOT: Record<string, string> = {
+  activity: 'bg-gray-400', treatment: 'bg-cyan-500', harvest: 'bg-amber-500',
+  stage: 'bg-green-500', observation: 'bg-teal-500', tracking: 'bg-orange-500',
+  finance: 'bg-emerald-500', reminder: 'bg-purple-500',
+};
 
 function getMonthDays(year: number, month: number): Date[] {
   const first = new Date(year, month, 1);
@@ -21,54 +28,71 @@ function getMonthDays(year: number, month: number): Date[] {
   return days;
 }
 
+function EventLine({ e }: { e: FarmEvent }) {
+  return (
+    <div className="flex items-center gap-2 text-xs py-0.5">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${KIND_DOT[e.kind] ?? 'bg-gray-400'}`} />
+      <span className="text-gray-700 truncate">{e.title}</span>
+      <span className="text-gray-400 shrink-0">[{e.kind}]</span>
+    </div>
+  );
+}
+
 export function CalendarScreen() {
   const [view, setView] = useState<ViewMode>('week');
   const todayDate = today();
   const todayStr = formatDateShort(todayDate);
 
-  // Week state
   const [weekOffset, setWeekOffset] = useState(0);
-  // Month/Year state
   const [viewYear, setViewYear] = useState(todayDate.getFullYear());
   const [viewMonth, setViewMonth] = useState(todayDate.getMonth());
+  const [expandedDay, setExpandedDay] = useState<string | null>(todayStr);
+  const [monthSelected, setMonthSelected] = useState<string | null>(null);
 
-  // Fetch all activities
-  const allActivities = useLiveQuery(() => db.activities.toArray());
-  const loading = allActivities === undefined;
-  const activities = allActivities ?? [];
+  const activities = useLiveQuery(() => db.activities.toArray().catch(() => [])) ?? [];
+  const treatmentLogs = useLiveQuery(() => db.treatmentLogs.toArray().catch(() => [])) ?? [];
+  const harvestLogs = useLiveQuery(() => db.harvestLogs.toArray().catch(() => [])) ?? [];
+  const stageLogs = useLiveQuery(() => db.stageLogs.toArray().catch(() => [])) ?? [];
+  const observationLogs = useLiveQuery(() => db.observationLogs.toArray().catch(() => [])) ?? [];
+  const observationEntries = useLiveQuery(() => db.observationEntries.toArray().catch(() => [])) ?? [];
+  const trackings = useLiveQuery(() => db.trackings.toArray().catch(() => [])) ?? [];
+  const trackingEntries = useLiveQuery(() => db.trackingEntries.toArray().catch(() => [])) ?? [];
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray().catch(() => [])) ?? [];
+  const reminders = useLiveQuery(() => db.reminders.toArray().catch(() => [])) ?? [];
 
-  // Build a Set of date strings that have activities + a date→activities
-  // lookup so day cells are O(1) instead of O(N) filter scans
-  const activityDates = useMemo(() => {
-    const set = new Set<string>();
-    for (const a of activities) {
-      if (a.date) set.add(a.date);
-    }
-    return set;
-  }, [activities]);
-  const activitiesByDate = useMemo(() => {
-    const map = new Map<string, typeof activities>();
-    for (const a of activities) {
-      if (!a.date) continue;
-      const arr = map.get(a.date) ?? [];
-      arr.push(a);
-      map.set(a.date, arr);
+  const eventsByDate = useMemo(() => {
+    const events = buildFarmEvents({
+      activities, treatmentLogs, harvestLogs, stageLogs, observationLogs,
+      observationEntries, trackings, trackingEntries, ledgerEntries, reminders,
+    });
+    const map = new Map<string, FarmEvent[]>();
+    for (const e of events) {
+      if (!e.date) continue;
+      const arr = map.get(e.date) ?? [];
+      arr.push(e);
+      map.set(e.date, arr);
     }
     return map;
-  }, [activities]);
+  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, reminders]);
 
-  // Week view data
-  const weekStart = useMemo(() => addDays(todayDate, weekOffset * 7), [weekOffset]);
-  const weekDays = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
-    [weekStart]
-  );
+  const hasEvent = (dayStr: string) => (eventsByDate.get(dayStr)?.length ?? 0) > 0;
+
+  const weekStart = useMemo(() => addDays(todayDate, weekOffset * 7), [weekOffset, todayDate]);
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekDayStrs = useMemo(() => weekDays.map(d => formatDateShort(d)), [weekDays]);
 
-  // Month view data
   const monthDays = useMemo(() => getMonthDays(viewYear, viewMonth), [viewYear, viewMonth]);
+  const monthEvents = useMemo(() => {
+    const list: { date: string; events: FarmEvent[] }[] = [];
+    for (const d of monthDays) {
+      if (d.getMonth() !== viewMonth) continue;
+      const key = formatDateShort(d);
+      const evs = eventsByDate.get(key);
+      if (evs?.length) list.push({ date: key, events: evs });
+    }
+    return list;
+  }, [monthDays, viewMonth, eventsByDate]);
 
-  // Navigation
   const goNext = () => {
     if (view === 'week') setWeekOffset(w => w + 1);
     else if (view === 'month') {
@@ -84,15 +108,19 @@ export function CalendarScreen() {
     } else setViewYear(y => y - 1);
   };
 
+  const jumpToMonth = (year: number, month: number) => {
+    setViewYear(year);
+    setViewMonth(month);
+    setMonthSelected(null);
+    setView('month');
+  };
+
   const viewTitle = view === 'week'
     ? `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getDate()} — ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`
-    : view === 'month'
-    ? `${MONTHS[viewMonth]} ${viewYear}`
-    : `${viewYear}`;
+    : view === 'month' ? `${MONTHS[viewMonth]} ${viewYear}` : `${viewYear}`;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24 pt-2">
-      {/* View Toggle + Navigation */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10">
         <div className="flex items-center justify-between px-4 py-2">
           <button onClick={goPrev} aria-label="Previous period" className="p-1.5 rounded-lg hover:bg-gray-100"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
@@ -101,56 +129,46 @@ export function CalendarScreen() {
         </div>
         <div className="flex px-4 pb-2 gap-1">
           {(['week', 'month', 'year'] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                view === v ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
+            <button key={v} onClick={() => setView(v)}
+              className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${view === v ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Week View */}
       {view === 'week' && (
         <div className="px-4 pt-3 space-y-2">
           {weekDays.map((day, i) => {
             const dayStr = weekDayStrs[i];
             const isToday = dayStr === todayStr;
-            const hasActivity = activityDates.has(dayStr);
+            const evs = eventsByDate.get(dayStr) ?? [];
+            const open = expandedDay === dayStr;
             return (
-              <div
-                key={dayStr}
-                className={`rounded-xl border p-3 ${isToday ? 'border-green-400 bg-green-50' : 'bg-white border-gray-100'}`}
-              >
+              <button key={dayStr} onClick={() => setExpandedDay(open ? null : dayStr)}
+                className={`w-full text-left rounded-xl border p-3 ${isToday ? 'border-green-400 bg-green-50' : 'bg-white border-gray-100'}`}>
                 <div className="flex items-center justify-between mb-1">
                   <p className={`font-semibold text-sm ${isToday ? 'text-green-700' : 'text-gray-800'}`}>
                     {DAYS_SHORT[day.getDay()]}, {MONTHS[day.getMonth()]} {day.getDate()}
                     {isToday && <span className="ml-2 text-xs bg-green-600 text-white px-1.5 rounded-full">Today</span>}
-                    {hasActivity && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 rounded-full">Activity</span>}
                   </p>
+                  <span className="text-[11px] text-muted-foreground">{evs.length === 0 ? 'no events' : `${evs.length} event${evs.length === 1 ? '' : 's'} ${open ? '▾' : '▸'}`}</span>
                 </div>
-                {hasActivity ? (
-                  <div className="space-y-1">
-                    {(activitiesByDate.get(dayStr) ?? []).map(a => (
-                      <div key={a.id} className="flex items-center gap-2 text-xs">
-                        <span className="text-gray-700">{a.type}: {a.product || a.notes}</span>
-                      </div>
-                    ))}
+                {open && (
+                  <div className="mt-1 border-t border-gray-100 pt-1.5">
+                    {evs.length === 0
+                      ? <p className="text-xs text-gray-400">Nothing logged — tap + in Crops or Activity to add.</p>
+                      : evs.slice(0, 8).map(e => <EventLine key={e.id} e={e} />)}
+                    {evs.length > 8 && <p className="text-[10px] text-gray-400">+{evs.length - 8} more</p>}
                   </div>
-                ) : (
-                  <p className="text-xs text-gray-400">No activities</p>
                 )}
-              </div>
+              </button>
             );
           })}
+          <p className="text-[10px] text-muted-foreground px-1">Tap a day to expand / collapse its events (auto-collapsed to prevent clutter).</p>
         </div>
       )}
 
-      {/* Month View */}
       {view === 'month' && (
         <div className="px-3 pt-3">
           <div className="grid grid-cols-7 gap-0.5">
@@ -161,74 +179,68 @@ export function CalendarScreen() {
               const dayStr = formatDateShort(day);
               const isToday = dayStr === todayStr;
               const isCurrentMonth = day.getMonth() === viewMonth;
-              const hasActivity = activityDates.has(dayStr);
+              const evs = eventsByDate.get(dayStr) ?? [];
+              const selected = monthSelected === dayStr;
               return (
-                <div
-                  key={i}
+                <button key={i} onClick={() => setMonthSelected(selected ? null : dayStr)}
                   className={`aspect-square rounded-lg flex flex-col items-center justify-center text-sm relative ${
-                    isToday ? 'bg-green-600 text-white font-bold' : isCurrentMonth ? 'text-gray-800' : 'text-gray-300'
-                  } ${!isToday && isCurrentMonth ? 'hover:bg-gray-50' : ''}`}
-                >
+                    isToday ? 'bg-green-600 text-white font-bold' : selected ? 'bg-green-100 font-bold text-green-800' : isCurrentMonth ? 'text-gray-800' : 'text-gray-300'
+                  } ${!isToday && isCurrentMonth ? 'hover:bg-gray-50' : ''}`}>
                   <span>{day.getDate()}</span>
-                  {hasActivity && (
-                    <span className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-green-500'}`} />
+                  {evs.length > 0 && (
+                    <span className={`absolute bottom-1 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${isToday ? 'bg-white text-green-700' : 'bg-green-600 text-white'}`}>
+                      {evs.length}
+                    </span>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
-          {/* Legend */}
           <div className="mt-4 flex items-center gap-4 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" /> Activity logged</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-2 px-1.5 rounded bg-green-600 text-white text-[10px] font-bold">16</span> Today</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-600" /> Day with events (badge = count)</span>
+          </div>
+          <div className="mt-3 space-y-3">
+            {(monthSelected ? monthEvents.filter(m => m.date === monthSelected) : monthEvents).map(m => (
+              <div key={m.date} className="bg-white rounded-xl border border-gray-100 p-3">
+                <p className="text-xs font-bold text-gray-700 mb-1">{m.date} · {m.events.length} event{m.events.length === 1 ? '' : 's'}</p>
+                {m.events.map(e => <EventLine key={e.id} e={e} />)}
+              </div>
+            ))}
+            {monthEvents.length === 0 && <p className="text-xs text-gray-400 text-center py-6">No events this month yet.</p>}
           </div>
         </div>
       )}
 
-      {/* Year View */}
       {view === 'year' && (
         <div className="px-3 pt-3">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             {Array.from({ length: 12 }, (_, m) => {
               const days = getMonthDays(viewYear, m);
-              const daysInMonth = days.filter(d => d.getMonth() === m);
-              const activityCount = daysInMonth.filter(d => activityDates.has(formatDateShort(d))).length;
+              const inMonth = days.filter(d => d.getMonth() === m);
+              const activeDays = inMonth.filter(d => hasEvent(formatDateShort(d)));
               return (
-                <div key={m} className="bg-white rounded-xl border border-gray-100 p-2">
-                  <p className="text-xs font-bold text-gray-700 mb-1">{MONTHS[m]}</p>
+                <button key={m} onClick={() => jumpToMonth(viewYear, m)} className="bg-white rounded-xl border border-gray-100 p-2 text-left hover:border-green-300">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-bold text-gray-700">{MONTHS[m]}</p>
+                    {activeDays.length > 0 && <span className="text-[9px] font-bold bg-green-600 text-white rounded-full px-1.5 py-0.5">{activeDays.length}d</span>}
+                  </div>
                   <div className="grid grid-cols-7 gap-0.5">
-                    {days.filter(d => d.getMonth() === m || (m === 0 && d.getMonth() === 11 && d.getFullYear() < viewYear) || (m === 11 && d.getMonth() === 0 && d.getFullYear() > viewYear)).slice(0, 35).map((day, i) => {
+                    {inMonth.slice(0, 35).map((day, i) => {
                       const dayStr = formatDateShort(day);
-                      const isCurrentMonth = day.getMonth() === m;
-                      const hasActivity = isCurrentMonth && activityDates.has(dayStr);
+                      const hot = hasEvent(dayStr);
                       const isToday = dayStr === todayStr;
                       return (
-                        <div
-                          key={i}
-                          className={`text-center text-[9px] leading-none py-0.5 rounded ${
-                            isToday ? 'bg-green-600 text-white font-bold' : isCurrentMonth ? 'text-gray-700' : 'text-gray-200'
-                          }`}
-                        >
+                        <div key={i}
+                          className={`text-center text-[9px] leading-none py-1 rounded ${isToday ? 'bg-green-600 text-white font-bold' : hot ? 'bg-green-100 text-green-800 font-bold' : 'text-gray-400'}`}>
                           {day.getDate()}
-                          {hasActivity && <span className="block w-1 h-1 mx-auto rounded-full bg-green-500 mt-0.5" />}
                         </div>
                       );
                     })}
                   </div>
-                  {activityCount > 0 && (
-                    <p className="text-[9px] text-green-600 font-medium mt-1">{activityCount} activity days</p>
-                  )}
-                </div>
+                  <p className="text-[9px] text-gray-400 mt-1">Tap to open {MONTHS[m]} →</p>
+                </button>
               );
             })}
-          </div>
-        </div>
-      )}
-
-      {loading && view === 'week' && (
-        <div className="px-4 text-center py-8">
-          <div className="animate-pulse space-y-3">
-            {[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-xl" />)}
           </div>
         </div>
       )}

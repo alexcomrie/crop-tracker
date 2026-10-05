@@ -14,6 +14,7 @@ export default function SeedCalc() {
   const [successionWeeks, setSucc] = useState(1);
 
   const result = useMemo(() => {
+    if (spacingCm <= 0 || germinationPct <= 0 || seedsPerPack <= 0) return null;
     const plantsPerRow = Math.ceil((bedLengthM * 100) / spacingCm);
     const plantsNeeded = plantsPerRow * rowCount * successionWeeks;
     const seedsNeeded = Math.ceil(plantsNeeded / (germinationPct / 100));
@@ -58,13 +59,19 @@ export default function SeedCalc() {
           <p className="text-xs text-gray-500">Number of planting rounds (e.g. 3 = stagger over 3 periods)</p>
         </div>
       </div>
-      <ResultCard label="Seeds to buy" value={`${num(result.seedsNeeded, 0)} seeds`} highlight sub={`${result.plantsNeeded} plants needed + germination buffer`} />
-      <ResultGrid>
-        <ResultCard label="Packs to buy" value={`${result.packsNeeded} pack${result.packsNeeded !== 1 ? 's' : ''}`} />
-        <ResultCard label="Seed cost" value={`$${num(result.totalCost, 2)}`} />
-        <ResultCard label="Plants per row" value={num(result.plantsPerRow, 0)} />
-        <ResultCard label="Total plants" value={num(result.plantsNeeded, 0)} />
-      </ResultGrid>
+      {!result ? (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">Enter a spacing, germination rate and pack size greater than zero.</p>
+      ) : (
+        <>
+          <ResultCard label="Seeds to buy" value={`${num(result.seedsNeeded, 0)} seeds`} highlight sub={`${result.plantsNeeded} plants needed + germination buffer`} />
+          <ResultGrid>
+            <ResultCard label="Packs to buy" value={`${result.packsNeeded} pack${result.packsNeeded !== 1 ? 's' : ''}`} />
+            <ResultCard label="Seed cost" value={`$${num(result.totalCost, 2)}`} />
+            <ResultCard label="Plants per row" value={num(result.plantsPerRow, 0)} />
+            <ResultCard label="Total plants" value={num(result.plantsNeeded, 0)} />
+          </ResultGrid>
+        </>
+      )}
     </CalcSection>
   );
 }

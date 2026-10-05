@@ -1,176 +1,131 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Sprout, ArrowRight, BugPlay, Beaker, Leaf, FlaskConical, CalendarDays, ClipboardList, DollarSign, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { Search, BookOpen, CalendarDays } from 'lucide-react';
 import db from '../../db/db';
-import { parseDate } from '../../lib/dates';
-import type { DiaryEntry, DiaryEntryType } from '../../types';
+import { parseDate, formatDateShort, today } from '../../lib/dates';
+import { buildFarmEvents, groupEventsByDate } from '../../lib/farmEvents';
+import { cropStatusLine, trackingStatusLine, storyForDay } from '../../lib/dailyStory';
 
-const ENTRY_ICONS: Record<DiaryEntryType, React.ReactNode> = {
-  crop_created: <Sprout className="w-4 h-4 text-green-600" />,
-  stage_change: <ArrowRight className="w-4 h-4 text-blue-500" />,
-  treatment: <BugPlay className="w-4 h-4 text-orange-500" />,
-  harvest: <Beaker className="w-4 h-4 text-purple-500" />,
-  note: <Leaf className="w-4 h-4 text-gray-500" />,
-  propagation_created: <FlaskConical className="w-4 h-4 text-teal-600" />,
-  propagation_stage: <ArrowRight className="w-4 h-4 text-teal-500" />,
-  activity_log: <ClipboardList className="w-4 h-4 text-orange-500" />,
-  ledger: <DollarSign className="w-4 h-4 text-emerald-500" />,
-  pos_sale: <DollarSign className="w-4 h-4 text-indigo-500" />,
-};
-
+/**
+ * Daily farm journal in natural language: one entry per date with the
+ * day's events written out, plus quiet-day status lines (days in stage,
+ * days since pollination). Newest day first.
+ */
 export default function DiaryScreen() {
   const [search, setSearch] = useState('');
-  const [filterType, setFilterType] = useState<DiaryEntryType | 'all'>('all');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set([formatDateShort(today())]));
 
-  const allEntries = useLiveQuery(
-    () => db.diaryEntries.orderBy('updatedAt').reverse().limit(200).toArray(),
-    []
-  ) ?? [];
+  const activities = useLiveQuery(() => db.activities.toArray().catch(() => [])) ?? [];
+  const treatmentLogs = useLiveQuery(() => db.treatmentLogs.toArray().catch(() => [])) ?? [];
+  const harvestLogs = useLiveQuery(() => db.harvestLogs.toArray().catch(() => [])) ?? [];
+  const stageLogs = useLiveQuery(() => db.stageLogs.toArray().catch(() => [])) ?? [];
+  const observationLogs = useLiveQuery(() => db.observationLogs.toArray().catch(() => [])) ?? [];
+  const observationEntries = useLiveQuery(() => db.observationEntries.toArray().catch(() => [])) ?? [];
+  const trackings = useLiveQuery(() => db.trackings.toArray().catch(() => [])) ?? [];
+  const trackingEntries = useLiveQuery(() => db.trackingEntries.toArray().catch(() => [])) ?? [];
+  const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray().catch(() => [])) ?? [];
+  const crops = useLiveQuery(() => db.crops.toArray().catch(() => [])) ?? [];
+  const activeCrops = useMemo(() => crops.filter(c => c.status === 'Active'), [crops]);
 
-  const crops = useLiveQuery(() => db.crops.toArray(), []) ?? [];
-
-  const cropMap = useMemo(() => {
-    const map = new Map<string, { plantingDate: string; plantingMethod: string }>();
-    for (const c of crops) {
-      map.set(c.id, { plantingDate: c.plantingDate, plantingMethod: c.plantingMethod });
+  const days = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const events = buildFarmEvents({
+      activities, treatmentLogs, harvestLogs, stageLogs,
+      observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries,
+    }).filter(e =>
+      !q || e.title.toLowerCase().includes(q) || e.subtitle.toLowerCase().includes(q) || e.cropName.toLowerCase().includes(q)
+    );
+    const groups = groupEventsByDate(events);
+    // Quiet days still get a journal page when crops are in the ground:
+    // backfill the most recent 14 days so status lines have somewhere to live.
+    const known = new Set(groups.map(g => g.date));
+    const out = [...groups];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(today().getTime() - i * 86400000);
+      const key = formatDateShort(d);
+      if (!known.has(key)) out.push({ date: key, time: d.getTime(), events: [] });
     }
-    return map;
-  }, [crops]);
+    out.sort((a, b) => b.time - a.time);
+    return out.slice(0, 30);
+  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, search]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, { cropName: string; cropId: string; entries: DiaryEntry[] }>();
-
-    for (const e of allEntries) {
-      if (filterType !== 'all' && e.entryType !== filterType) continue;
-      if (search && !e.cropName.toLowerCase().includes(search.toLowerCase())) continue;
-
-      const key = e.cropId || 'unknown';
-      if (!map.has(key)) {
-        map.set(key, { cropName: e.cropName || 'Unknown', cropId: e.cropId, entries: [] });
-      }
-      map.get(key)!.entries.push(e);
+  const statusFor = (dateStr: string): string[] => {
+    const day = parseDate(dateStr) ?? today();
+    const lines: string[] = [];
+    for (const c of activeCrops.slice(0, 6)) {
+      const line = cropStatusLine(c as never, stageLogs as never, day);
+      if (line) lines.push(line);
     }
-
-    const ts = (d: string) => {
-      const parsed = parseDate(d);
-      return parsed ? parsed.getTime() : 0;
-    };
-    for (const group of map.values()) {
-      group.entries.sort((a, b) => ts(a.date) - ts(b.date));
+    for (const t of (trackings as never[] as { cropName: string; label: string; tagNumber?: string; startDate: string; status: string }[]).slice(0, 4)) {
+      const line = trackingStatusLine(t, day);
+      if (line) lines.push(line);
     }
+    return lines;
+  };
 
-    return Array.from(map.values()).sort((a, b) => {
-      const aLast = a.entries[a.entries.length - 1]?.date || '';
-      const bLast = b.entries[b.entries.length - 1]?.date || '';
-      return ts(bLast) - ts(aLast);
-    });
-  }, [allEntries, filterType, search]);
-
-  const toggleExpand = (cropId: string) => {
+  const toggle = (date: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
-      if (next.has(cropId)) next.delete(cropId);
-      else next.add(cropId);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
       return next;
     });
   };
 
-  async function handleDeleteEntry(id: string) {
-    try {
-      await db.diaryEntries.delete(id);
-    } catch (e) {
-      console.error('[diary] delete failed', { id, e });
-    }
-  }
-
-  const formatDate = (dateStr: string) => {
+  const prettyDate = (dateStr: string) => {
     const d = parseDate(dateStr);
     if (!d) return dateStr;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   return (
     <div className="flex flex-col h-full">
       <div className="sticky top-0 bg-white z-10 border-b p-4 space-y-3">
-        <h1 className="text-lg font-bold">Diary</h1>
+        <h1 className="text-lg font-bold flex items-center gap-2"><BookOpen className="w-5 h-5 text-amber-600" /> Farm Diary</h1>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text" placeholder="Search crops..."
+          <input type="text" placeholder="Search the journal..."
             value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm"
-          />
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {(['all', 'crop_created', 'stage_change', 'treatment', 'harvest', 'propagation_created', 'propagation_stage', 'activity_log', 'ledger', 'pos_sale'] as const).map(t => (
-            <button key={t} onClick={() => setFilterType(t)}
-              className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium ${filterType === t ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}>
-              {t === 'all' ? 'All' : t.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-            </button>
-          ))}
+            className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm" />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {grouped.length === 0 && (
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {days.length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <CalendarDays className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm">No diary entries yet</p>
-            <p className="text-xs mt-1">Diary entries are auto-created as you manage crops</p>
+            <p className="text-sm">No journal pages yet</p>
+            <p className="text-xs mt-1">Log crops and activities and the diary writes itself</p>
           </div>
         )}
-        {grouped.map(group => {
-          const isExpanded = expanded.has(group.cropId);
-          const cropInfo = cropMap.get(group.cropId);
+        {days.map((g, i) => {
+          const open = expanded.has(g.date);
+          const paras = storyForDay(g.date, g.events, statusFor(g.date), i);
           return (
-            <div key={group.cropId} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-              <button
-                onClick={() => toggleExpand(group.cropId)}
-                className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="min-w-0">
-                    <span className="text-sm font-bold text-gray-800 truncate block">
-                      {group.cropName}
-                      {group.cropId && <span className="text-[10px] text-gray-400 font-mono ml-1">(id #{group.cropId})</span>}
-                    </span>
-                    {cropInfo && (
-                      <span className="text-[10px] text-gray-400">
-                        Planted: {cropInfo.plantingDate}{cropInfo.plantingMethod ? ` \u00b7 ${cropInfo.plantingMethod}` : ''}
-                      </span>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-semibold">
-                    {group.entries.length}
-                  </span>
-                </div>
-                {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />}
+            <article key={g.date} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+              <button onClick={() => toggle(g.date)} className="w-full text-left p-4 hover:bg-gray-50">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-amber-700">{prettyDate(g.date)}</p>
+                <p className="text-sm text-gray-800 mt-1 leading-relaxed">{paras[0]}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{g.events.length === 0 ? 'Quiet day' : `${g.events.length} event${g.events.length === 1 ? '' : 's'}`} · tap to {open ? 'fold' : 'read'}</p>
               </button>
-              {isExpanded && (
-                <div className="border-t border-gray-50">
-                  {group.entries.map(e => (
-                    <div key={e.id} className="flex items-start gap-2 px-3 py-2 border-b border-gray-50 last:border-b-0 group">
-                      <span className="shrink-0 mt-0.5">{ENTRY_ICONS[e.entryType]}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] text-gray-400 font-medium">{formatDate(e.date)}</span>
-                          <span className="text-[10px] text-gray-300 uppercase">{e.entryType.replace(/_/g, ' ')}</span>
-                        </div>
-                        <p className="text-sm text-gray-800">{e.description}</p>
-                        {e.details && <p className="text-xs text-gray-400 mt-0.5">{e.details}</p>}
-                      </div>
-                      <button
-                        onClick={() => handleDeleteEntry(e.id)}
-                        className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-300 hover:text-red-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+              {open && (
+                <div className="px-4 pb-4 space-y-2 border-t border-gray-50 pt-3">
+                  {paras.slice(1).map((p, j) => (
+                    <p key={j} className="text-sm text-gray-700 leading-relaxed">{p}</p>
                   ))}
+                  {g.events.length > 0 && (
+                    <details className="pt-1">
+                      <summary className="text-[11px] font-semibold text-gray-400 cursor-pointer">Source events ({g.events.length})</summary>
+                      <div className="mt-1 space-y-1">
+                        {g.events.map(e => (
+                          <p key={e.id} className="text-[11px] text-gray-500">· [{e.kind}] {e.title}{e.cropName ? ` — ${e.cropName}` : ''}</p>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
-            </div>
+            </article>
           );
         })}
       </div>

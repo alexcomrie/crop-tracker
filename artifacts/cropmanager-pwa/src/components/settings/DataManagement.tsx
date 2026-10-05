@@ -7,6 +7,7 @@ import { exportJsonBackup, importJsonBackupFromFile } from '../../lib/backup';
 import { importCSVData } from '../../lib/csvImport';
 import db from '../../db/db';
 import { parseDate } from '../../lib/dates';
+import { useAppStore } from '../../store/useAppStore';
 import { ShieldAlert, Trash2, ScanEye } from 'lucide-react';
 
 export function DataManagement() {
@@ -16,8 +17,16 @@ export function DataManagement() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jsonInputRef = useRef<HTMLInputElement>(null);
+  const { settings, updateSettings } = useAppStore();
+  void updateSettings;
   const dbEntriesCount = useLiveQuery(() =>
-    Promise.all([db.crops.count(), db.propagations.count(), db.reminders.count(), db.activities.count(), db.ledgerEntries.count()]).then(([c, p, r, a, l]) => c + p + r + a + l)
+    Promise.all([
+      db.crops.count(), db.propagations.count(), db.reminders.count(),
+      db.activities.count(), db.ledgerEntries.count(), db.stageLogs.count(),
+      db.harvestLogs.count(), db.treatmentLogs.count(), db.observationLogs.count(),
+      db.trackings.count(), db.posSales.count(), db.posOrders.count(),
+      db.diaryEntries.count(), db.quickNotes.count(), db.personalCropDb.count(),
+    ]).then(ns => ns.reduce((s, n) => s + n, 0))
   ) ?? 0;
 
   async function handleCSVImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -54,7 +63,8 @@ export function DataManagement() {
     setPullMsg('Importing JSON backup...');
     try {
       const res = await importJsonBackupFromFile(file);
-      setPullMsg(`✅ Restored: ${Object.entries(res.counts).map(([k,v]) => `${k}=${v}`).join(', ')}`);
+      const total = Object.values(res.counts).reduce((s, n) => s + n, 0);
+      setPullMsg(`✅ Restored ${total} rows (v10 app backup: rows + settings). Skipped ${res.skipped} keyless rows · settings sections: ${res.localStorageRestored}. Reload the app to pick up restored settings.`);
     } catch (err: any) {
       setPullMsg(`❌ Import failed: ${String(err?.message || err)}`);
     } finally {
@@ -183,6 +193,30 @@ export function DataManagement() {
         )}
       </div>
 
+      {/* Learning system */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <h3 className="font-semibold text-sm">🧠 Learning System <span className="text-[10px] font-normal text-muted-foreground">(tinygpt — included in backups)</span></h3>
+        <div>
+          <label className="text-[11px] font-semibold text-gray-500 uppercase">Samples before personal overrides foundation</label>
+          <div className="flex items-center gap-2 mt-1">
+            <input type="number" min={1} max={20} value={settings.learningThreshold}
+              onChange={e => updateSettings({ learningThreshold: Math.min(20, Math.max(1, Number(e.target.value) || 3)) })}
+              className="w-20 border rounded-lg p-2 text-sm" />
+            <p className="text-[11px] text-muted-foreground">Harvest/fruit/spray observations needed before your data wins.</p>
+          </div>
+        </div>
+        <div>
+          <label className="text-[11px] font-semibold text-gray-500 uppercase">Planting-date history (months)</label>
+          <div className="flex items-center gap-2 mt-1">
+            <input type="number" min={1} max={24} value={settings.monthsOfPlantingDates}
+              onChange={e => updateSettings({ monthsOfPlantingDates: Math.min(24, Math.max(1, Number(e.target.value) || 3)) })}
+              className="w-20 border rounded-lg p-2 text-sm" />
+            <p className="text-[11px] text-muted-foreground">How far back season analysis looks.</p>
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Learned rows live in Personal DB + adjustments tables — the v10 backup exports and restores all of them plus these settings.</p>
+      </div>
+
       {/* Database Cleanup */}
       <div className="bg-white rounded-xl border border-orange-200 p-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -258,6 +292,30 @@ export function DataManagement() {
             else propSeen.add(key);
           }
 
+          // Tracking entries: same trackingId + date + text
+          const teSeen = new Set<string>();
+          for (const e of await db.trackingEntries.toArray()) {
+            const key = `${e.trackingId}|${e.date}|${e.text}`;
+            if (teSeen.has(key)) { await db.trackingEntries.delete(e.id); total++; }
+            else teSeen.add(key);
+          }
+
+          // Observation entries: same observationId + date + text
+          const oeSeen = new Set<string>();
+          for (const e of await db.observationEntries.toArray()) {
+            const key = `${e.observationId}|${e.date}|${e.text}`;
+            if (oeSeen.has(key)) { await db.observationEntries.delete(e.id); total++; }
+            else oeSeen.add(key);
+          }
+
+          // Ledger: same type + date + category + amount
+          const ledSeen = new Set<string>();
+          for (const l of await db.ledgerEntries.toArray() as unknown as { id: string; type: string; date: string; category: string; amount: number }[]) {
+            const key = `${l.type}|${l.date}|${l.category}|${l.amount}`;
+            if (ledSeen.has(key)) { await db.ledgerEntries.delete(l.id); total++; }
+            else ledSeen.add(key);
+          }
+
           toast.success(`Removed ${total} duplicate records across all tables`);
           } catch (e) {
             console.error('[data] dedupe failed', { e });
@@ -281,6 +339,8 @@ export function DataManagement() {
             { table: db.reminders, field: 'trackingId' },
             { table: db.batchPlantingLogs, field: 'cropTrackingId' },
             { table: db.diaryEntries, field: 'cropId' },
+            { table: db.observationLogs, field: 'cropId' },
+            { table: db.trackings, field: 'cropId' },
           ] as const;
 
           for (const { table, field } of linkedTables) {
@@ -292,6 +352,22 @@ export function DataManagement() {
                 total++;
               }
             }
+          }
+
+          // trackingEntries → trackings (empty cropId rows are field notes, keep)
+          const trackingIds = new Set((await db.trackings.toArray()).map(t => t.id));
+          for (const e of await db.trackingEntries.toArray()) {
+            if (!trackingIds.has(e.trackingId)) { await db.trackingEntries.delete(e.id); total++; }
+          }
+          // observationEntries → observationLogs
+          const obsIds = new Set((await db.observationLogs.toArray()).map(o => o.id));
+          for (const e of await db.observationEntries.toArray()) {
+            if (!obsIds.has(e.observationId)) { await db.observationEntries.delete(e.id); total++; }
+          }
+          // posOrders → posCustomers (only when customerId is set but missing)
+          const customerIds = new Set((await db.posCustomers.toArray()).map(c => c.id));
+          for (const o of await db.posOrders.toArray() as unknown as { id: string; customerId?: string }[]) {
+            if (o.customerId && !customerIds.has(o.customerId)) { await db.posOrders.delete(o.id); total++; }
           }
 
           toast.success(`Removed ${total} orphaned records`);

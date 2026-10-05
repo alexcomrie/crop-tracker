@@ -1,6 +1,44 @@
 import db from '../db/db';
 
-const BACKUP_VERSION = 9;
+const BACKUP_VERSION = 10;
+
+/**
+ * App's own backup sections beyond Dexie rows: settings + localStorage
+ * overrides (crop/fert DB edits, treatment presets/history/customs) so a
+ * restore on a new device brings back behavior AND learning, not just rows.
+ */
+const LS_KEYS = [
+  'cropmanager_settings',
+  'crop_db_override_v1',
+  'fert_db_override_v1',
+  'tar_presets',
+  'tar_history',
+  'tar_custom',
+] as const;
+
+function readLocalStorage(): Record<string, string> {
+  const out: Record<string, string> = {};
+  try {
+    for (const k of LS_KEYS) {
+      const v = localStorage.getItem(k);
+      if (v !== null) out[k] = v;
+    }
+  } catch { /* private mode */ }
+  return out;
+}
+
+function writeLocalStorage(section: unknown): number {
+  if (typeof section !== 'object' || section === null) return 0;
+  let n = 0;
+  try {
+    for (const [k, v] of Object.entries(section as Record<string, unknown>)) {
+      if (!(LS_KEYS as readonly string[]).includes(k) || typeof v !== 'string') continue;
+      localStorage.setItem(k, v);
+      n++;
+    }
+  } catch { /* quota/private mode */ }
+  return n;
+}
 
 export async function exportJsonBackup(): Promise<string> {
   const [
@@ -40,14 +78,17 @@ export async function exportJsonBackup(): Promise<string> {
     db.observationEntries.toArray(),
     db.quickNotes.toArray(),
   ]);
+  const localStorageSection = readLocalStorage();
   return JSON.stringify({
     exportedAt: new Date().toISOString(),
     version: BACKUP_VERSION,
+    app: 'cropmanager',
     crops, propagations, reminders, stageLogs, harvestLogs, treatmentLogs,
     cropDbAdjustments, propDbAdjustments, batchPlantingLogs, cropSearchLogs,
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
     microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries, quickNotes,
+    localStorage: localStorageSection,
   }, null, 2);
 }
 
@@ -76,7 +117,7 @@ function rowKey(row: unknown): string | number | null {
   return typeof id === 'string' || typeof id === 'number' ? id : null;
 }
 
-export async function importJsonBackupFromString(json: string): Promise<{ counts: Record<string, number> }> {
+export async function importJsonBackupFromString(json: string): Promise<{ counts: Record<string, number>; skipped: number; localStorageRestored: number }> {
   let data: BackupPayload;
   try {
     data = JSON.parse(json);
@@ -86,10 +127,11 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     throw new Error('Invalid backup payload');
   }
-  if (data.version !== undefined && ![6, 7, 8, BACKUP_VERSION].includes(data.version)) {
-    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6-8 or ${BACKUP_VERSION})`);
+  if (data.version !== undefined && ![6, 7, 8, 9, BACKUP_VERSION].includes(data.version)) {
+    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6-9 or ${BACKUP_VERSION})`);
   }
   const counts: Record<string, number> = {};
+  let skipped = 0;
   const tables = TABLE_NAMES.map(name => getTable(name)).filter((t): t is NonNullable<typeof t> => !!t);
   // Single transaction: all-or-nothing restore. Tables present in the backup
   // are mirrored (cleared then re-added, so empty arrays clear stale rows);
@@ -101,7 +143,18 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
       if (!table) continue;
       const raw = data[name];
       if (!Array.isArray(raw)) continue; // table absent from backup → leave local rows alone
-      const items = raw.filter(r => rowKey(r) !== null);
+      const items = raw.filter(r => {
+        const keep = rowKey(r) !== null;
+        if (!keep) skipped++;
+        return keep;
+      }).map(r => {
+        // personalCropDb keys are lowercase lookups — normalize legacy casing.
+        if (name === 'personalCropDb' && typeof r === 'object' && r !== null) {
+          const rec = r as Record<string, unknown>;
+          if (typeof rec['key'] === 'string') return { ...rec, key: (rec['key'] as string).toLowerCase() };
+        }
+        return r;
+      });
       await table.clear();
       if (items.length > 0) {
         // bulkPut (upsert) inside the transaction: duplicate ids merge instead of throwing BulkError
@@ -110,10 +163,11 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
       counts[name] = items.length;
     }
   });
-  return { counts };
+  const localStorageRestored = writeLocalStorage(data['localStorage']);
+  return { counts, skipped, localStorageRestored };
 }
 
-export async function importJsonBackupFromFile(file: File): Promise<{ counts: Record<string, number> }> {
+export async function importJsonBackupFromFile(file: File): Promise<{ counts: Record<string, number>; skipped: number; localStorageRestored: number }> {
   const text = await file.text();
   return importJsonBackupFromString(text);
 }

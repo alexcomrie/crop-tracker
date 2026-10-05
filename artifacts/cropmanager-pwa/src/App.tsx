@@ -111,6 +111,7 @@ function AppContent() {
 
   useEffect(() => {
     async function migrateCrops() {
+      const { migrateVegetativeCrop } = await import('./lib/methodStages');
       const allCrops = await db.crops.toArray();
       const crops = allCrops.filter(c => (c as unknown as { isContinuous?: boolean | number }).isContinuous === true || (c as unknown as { isContinuous?: boolean | number }).isContinuous === 1);
       for (const crop of crops) {
@@ -121,6 +122,19 @@ function AppContent() {
             batchOffset: crop.batchOffset || batchOffset,
             updatedAt: Date.now(),
           });
+        }
+      }
+      // Vegetative methods (Cuttings/Division/Grafted) created before the
+      // Seedling-start rule: lift them out of Seed/Germinated on every
+      // device so all installs converge without a backup round-trip.
+      for (const crop of allCrops) {
+        try {
+          const patch = migrateVegetativeCrop(crop as never);
+          if (patch) {
+            await db.crops.update(crop.id, { ...patch, updatedAt: Date.now() } as never);
+          }
+        } catch (e) {
+          console.error('[migrate] vegetative stage fix failed', { id: crop.id, e });
         }
       }
     }

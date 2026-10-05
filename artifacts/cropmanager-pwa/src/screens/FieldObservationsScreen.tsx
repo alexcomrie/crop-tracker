@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { useAppStore } from '../store/useAppStore';
 import { getNonAliasCrops } from '../lib/cropDb';
-import { generateId } from '../lib/ids';
+import { generateId, shortCropId } from '../lib/ids';
+import { cropDetailsPath } from '../lib/routes';
 import { DateInput } from '../components/shared/DateInput';
 import { TrackingCard } from '../components/observations/TrackingCard';
 import { addDiaryEntry } from '../lib/diary';
@@ -14,9 +16,10 @@ import { toast } from 'sonner';
 import type { TrackingEntry, ObservationEntry } from '../types';
 
 /**
- * Independent field observations + growth tracking for plants that were
- * never entered into the crop tracker. Stored in the same tables with an
- * empty cropId so crop detail views never mix them in.
+ * All observations in one place: tracker-crop notes (tagged with short crop
+ * id + crop details, tap to open the crop) plus independent field notes for
+ * plants never entered into the tracker. Growth trackings below stay
+ * field-only; tracked-crop fruit tracking lives in Crop Details.
  */
 export function FieldObservationsScreen() {
   const { settings, cropDb } = useAppStore();
@@ -47,12 +50,19 @@ export function FieldObservationsScreen() {
   const [trackDate, setTrackDate] = useState(formatDateShort(today()));
   const [trackNotes, setTrackNotes] = useState('');
 
+  const navigate = useNavigate();
+  const [obsFilter, setObsFilter] = useState<'all' | 'tracked' | 'field'>('all');
+  const crops = useLiveQuery(() => db.crops.toArray().catch(() => []), []) ?? [];
+  const cropById = useMemo(() => new Map(crops.map(c => [c.id, c])), [crops]);
+
   const observations = useLiveQuery(async () => {
     const all = await db.observationLogs.toArray().catch(() => []);
     return all
-      .filter(o => !o.cropId)
       .sort((a, b) => (parseDate(b.date)?.getTime() ?? 0) - (parseDate(a.date)?.getTime() ?? 0));
   }, []) ?? [];
+  const visibleObservations = useMemo(() => observations.filter(o =>
+    obsFilter === 'all' ? true : obsFilter === 'tracked' ? !!o.cropId : !o.cropId
+  ), [observations, obsFilter]);
 
   const trackings = useLiveQuery(async () => {
     const all = await db.trackings.toArray().catch(() => []);
@@ -345,9 +355,20 @@ export function FieldObservationsScreen() {
           <button onClick={handleAddObservation} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
         </div>
 
+        <div className="flex gap-1">
+          {(['all', 'tracked', 'field'] as const).map(f => (
+            <button key={f} onClick={() => setObsFilter(f)}
+              className={`flex-1 py-1.5 rounded-full text-xs font-bold border ${obsFilter === f ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-200 text-gray-600'}`}>
+              {f === 'all' ? `All (${observations.length})` : f === 'tracked' ? 'Tracked crops' : 'Field notes'}
+            </button>
+          ))}
+        </div>
+
         <div className="space-y-1.5">
-          {observations.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No field observations yet</p>}
-          {observations.map(o => (
+          {visibleObservations.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No observations here yet</p>}
+          {visibleObservations.map(o => {
+            const linked = o.cropId ? cropById.get(o.cropId) : undefined;
+            return (
             <div key={o.id} className="bg-white rounded-xl border border-gray-100 p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">{o.date}</p>
@@ -361,7 +382,18 @@ export function FieldObservationsScreen() {
                   <button onClick={() => handleDeleteObservation(o.id)} aria-label="Delete observation" className="text-xs text-red-500 font-semibold">Delete</button>
                 </span>
               </div>
-              {o.plantName && <p className="text-xs font-semibold text-green-700 mt-0.5">🌱 {o.plantName}</p>}
+              {linked ? (
+                <button onClick={() => navigate(cropDetailsPath(linked.id))}
+                  className="mt-1 inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full pl-1.5 pr-2.5 py-0.5 text-left">
+                  <span className="text-[10px] font-bold bg-green-700 text-white rounded-full px-1.5 py-0.5">{shortCropId(linked.id)}</span>
+                  <span className="text-xs font-semibold text-green-800 truncate">{linked.cropName}{linked.variety ? ` · ${linked.variety}` : ''}</span>
+                  <span className="text-[10px] text-green-600 truncate">· {linked.plantStage} · planted {linked.plantingDate}</span>
+                </button>
+              ) : o.plantName ? (
+                <p className="text-xs font-semibold text-amber-700 mt-0.5">🌱 {o.plantName} <span className="text-muted-foreground font-normal">(field note — no tracker crop)</span></p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground mt-0.5">🌱 Field note</p>
+              )}
               {editingObsId === o.id ? (
                 <>
                   <textarea value={editObsText} onChange={e => setEditObsText(e.target.value)} className="w-full mt-1 border rounded-lg p-2 text-sm min-h-[80px]" />
@@ -405,7 +437,8 @@ export function FieldObservationsScreen() {
                 </>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">

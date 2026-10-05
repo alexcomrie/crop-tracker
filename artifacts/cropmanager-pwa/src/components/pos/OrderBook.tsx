@@ -21,7 +21,7 @@ interface Props {
 }
 
 export function OrderBook({ onBack, onFulfillOrder }: Props) {
-  const [tab, setTab] = useState<'pending' | 'delivered'>('pending');
+  const [tab, setTab] = useState<'pending' | 'delivered' | 'canceled'>('pending');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editOrderId, setEditOrderId] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
   const customers = useLiveQuery(() => db.posCustomers.toArray(), []) ?? [];
 
   const filteredOrders = orders
-    .filter(o => tab === 'pending' ? o.status === 'pending' : o.status === 'delivered')
+    .filter(o => tab === 'pending' ? o.status === 'pending' : tab === 'delivered' ? o.status === 'delivered' : o.status === 'canceled')
     .filter(o => !search || o.customerName.toLowerCase().includes(search.toLowerCase()));
 
   const orderTotal = React.useMemo(() => orderItems.reduce((s, i) => s + i.total, 0), [orderItems]);
@@ -221,6 +221,7 @@ export function OrderBook({ onBack, onFulfillOrder }: Props) {
       <div className="flex border-b bg-white">
         <button onClick={() => setTab('pending')} className={`flex-1 py-2 text-sm font-semibold text-center ${tab === 'pending' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-500'}`}>Pending</button>
         <button onClick={() => setTab('delivered')} className={`flex-1 py-2 text-sm font-semibold text-center ${tab === 'delivered' ? 'text-green-600 border-b-2 border-green-600' : 'text-gray-500'}`}>Delivered</button>
+        <button onClick={() => setTab('canceled')} className={`flex-1 py-2 text-sm font-semibold text-center ${tab === 'canceled' ? 'text-red-600 border-b-2 border-red-600' : 'text-gray-500'}`}>Cancelled</button>
       </div>
 
       {showForm ? (

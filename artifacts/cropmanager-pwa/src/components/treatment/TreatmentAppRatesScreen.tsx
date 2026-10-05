@@ -164,7 +164,9 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
   const availUnits = useMemo(() => getUnits(product, rateIdx), [product, rateIdx]);
 
   useEffect(() => {
-    if (product && isAreaBased(product, rateIdx)) { setWaterUnit('ha'); }
+    if (!product) return;
+    if (isAreaBased(product, rateIdx)) { setWaterUnit('ha'); }
+    else if (waterUnit === 'ha') { setWaterUnit('gal'); }
   }, [product, rateIdx]);
 
   useEffect(() => {
@@ -535,11 +537,15 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
           <strong>Safety Reminder:</strong> Always follow label instructions. Wear proper PPE. Do not exceed recommended rates. Consult CCJ agronomists for crop-specific programs.
         </div>
 
-        {waterNum > 100 && waterUnit === 'gal' && product && !isAreaBased(product) && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700">
-            Water volume exceeds typical application range ({waterNum} gal). Verify your input and consult label guidelines.
-          </div>
-        )}
+        {(() => {
+          const unitML = WATER_UNITS.find(u => u.key === waterUnit)?.toML ?? 0;
+          const volML = waterNum * unitML;
+          return volML > 378541 && product && !isAreaBased(product) && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-orange-700">
+              Water volume exceeds typical application range ({waterNum} {waterUnit} ≈ {Math.round(volML / 3785.41)} gal). Verify your input and consult label guidelines.
+            </div>
+          );
+        })()}
       </div>
 
       {/* Custom Product Form Modal */}

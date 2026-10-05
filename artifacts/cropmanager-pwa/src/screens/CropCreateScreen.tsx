@@ -6,6 +6,7 @@ import { generateId } from '../lib/ids';
 import { formatDateShort, today, toIsoDateStr } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
 import { needsTransplant } from '../lib/stages';
+import { startStageForMethod, isVegetativeMethod } from '../lib/methodStages';
 import { generateCropReminders } from '../lib/reminders';
 import { calcSprayDates, formatSprayDates } from '../lib/sprays';
 import { addDiaryEntry } from '../lib/diary';
@@ -78,13 +79,17 @@ export function CropCreateScreen() {
       const transplantDate = cropData && needsTransplant(method)
         ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety)
         : null;
+      // Cuttings / Division / Grafted start as living tissue at Seedling —
+      // they never pass through Seed → Germinated.
+      const startStage = startStageForMethod(method);
+      const vegStart = isVegetativeMethod(method);
       const baseCrop: any = {
         id, cropName: cropData?.display_name ?? cropKey, variety: variety ?? '',
-        plantingMethod: method, plantStage: 'Seed',
+        plantingMethod: method, plantStage: startStage,
         plantingDate: formatDateShort(validPlantDate),
         transplantDateScheduled: transplantDate ? formatDateShort(transplantDate) : '',
         transplantDateActual: '',
-        germinationDate: '',
+        germinationDate: vegStart ? formatDateShort(validPlantDate) : '',
         harvestDateEstimated: '',
         harvestDateActual: '',
         isContinuous: !!isContinuous,

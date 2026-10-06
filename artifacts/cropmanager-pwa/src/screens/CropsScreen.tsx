@@ -16,7 +16,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { BottomSheet } from '../components/shared/BottomSheet';
 import { AddEntrySheet } from '../components/shared/AddEntrySheet';
 import { formatDateShort, today, parseDate, daysBetween } from '../lib/dates';
-import { ROUTES, cropDetailsPath } from '../lib/routes';
+import { ROUTES, cropDetailsPath, cropEditPath } from '../lib/routes';
 
 const CROP_FILTERS = ['All','Seed','Germinated','Seedling','Vegetative Early','Vegetative Middle','Vegetative Late','Flowering','Fruiting'];
 const PROP_FILTERS = ['All','Propagating','Callusing','Rooted','Potted / Transplanted','Failed'];
@@ -337,7 +337,7 @@ export function CropsScreen() {
             onClick={() => {
               if (!actionTarget) return;
               if (actionTarget.kind === 'crop') {
-                navigate(`/crops/new?edit=${actionTarget.id}`);
+                navigate(cropEditPath(actionTarget.id));
               } else {
                 const prop = propById.get(actionTarget.id);
                 if (prop) {

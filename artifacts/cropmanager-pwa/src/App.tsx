@@ -10,6 +10,7 @@ import { CropsScreen } from './screens/CropsScreen';
 import { ArchivedCropsScreen } from './screens/ArchivedCropsScreen';
 import { CropDetailsScreen } from './screens/CropDetailsScreen';
 import { CropCreateScreen } from './screens/CropCreateScreen';
+import { CropEditScreen } from './screens/CropEditScreen';
 import { CalendarScreen } from './screens/CalendarScreen';
 import { MoreScreen } from './screens/MoreScreen';
 import { HerbicideScheduleScreen } from './screens/HerbicideScheduleScreen';
@@ -175,6 +176,7 @@ function AppContent() {
             <Route path={ROUTES.CROP_CREATE} element={<PanelPage><CropCreateScreen /></PanelPage>} />
             <Route path={ROUTES.CROPS_ARCHIVE} element={<PanelPage><ArchivedCropsScreen /></PanelPage>} />
             <Route path={ROUTES.CROP_DETAILS} element={<PanelPage><CropDetailsScreen /></PanelPage>} />
+            <Route path={ROUTES.CROP_EDIT} element={<PanelPage><CropEditScreen /></PanelPage>} />
             <Route path={ROUTES.CALENDAR} element={<AnimatedPage><CalendarScreen /></AnimatedPage>} />
             <Route path={ROUTES.MORE} element={<AnimatedPage><MoreScreen /></AnimatedPage>} />
             <Route path={ROUTES.HERB_SCHEDULE} element={<PanelPage><HerbicideScheduleScreen /></PanelPage>} />

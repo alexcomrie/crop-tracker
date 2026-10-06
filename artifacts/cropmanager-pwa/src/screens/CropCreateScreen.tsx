@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { cropEditPath } from '../lib/routes';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
 import { generateId } from '../lib/ids';
@@ -49,6 +50,12 @@ export function CropCreateScreen() {
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [plantDate, setPlantDate] = useState<Date>(today());
+
+  // Legacy edit links (?edit=) now land on the dedicated edit screen,
+  // which patches the record instead of rebuilding it from the wizard.
+  useEffect(() => {
+    if (editId) navigate(cropEditPath(editId), { replace: true });
+  }, [editId, navigate]);
 
   const validPlantDate = plantDate instanceof Date && !isNaN(plantDate.getTime()) ? plantDate : today();
   const cropKeys = Object.keys(cropDb).sort();

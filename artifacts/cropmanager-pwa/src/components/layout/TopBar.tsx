@@ -10,6 +10,7 @@ function titleFor(pathname: string): string {
   // Dynamic routes never match the literal '/crops/:id' key — resolve by prefix
   if (pathname === ROUTES.CROPS_ARCHIVE) return 'Archive';
   if (pathname === ROUTES.CROP_CREATE) return 'New Crop';
+  if (pathname.endsWith('/edit') && pathname.startsWith('/crops/')) return 'Edit Crop';
   if (pathname.startsWith('/crops/')) return 'Crop Details';
   return 'CropManager';
 }

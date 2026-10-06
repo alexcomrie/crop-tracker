@@ -4,6 +4,7 @@ export const ROUTES = {
   CROPS_ARCHIVE: '/crops/archive',
   CROP_DETAILS: '/crops/:id',
   CROP_CREATE: '/crops/new',
+  CROP_EDIT: '/crops/:id/edit',
   CALENDAR: '/calendar',
   MORE: '/more',
   MORE_CROP_DB: '/more/crop-db',
@@ -26,6 +27,7 @@ export const ROUTES = {
 } as const;
 
 export function cropDetailsPath(id: string) { return `/crops/${id}`; }
+export function cropEditPath(id: string) { return `/crops/${id}/edit`; }
 
 export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.DASHBOARD]: 'CropManager',
@@ -33,6 +35,7 @@ export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.CROPS_ARCHIVE]: 'Archive',
   [ROUTES.CROP_DETAILS]: 'Crop Details',
   [ROUTES.CROP_CREATE]: 'New Crop',
+  [ROUTES.CROP_EDIT]: 'Edit Crop',
   [ROUTES.CALENDAR]: 'Calendar',
   [ROUTES.MORE]: 'More',
   [ROUTES.MORE_CROP_DB]: 'Crop Database',

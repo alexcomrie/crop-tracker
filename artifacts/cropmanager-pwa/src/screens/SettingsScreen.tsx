@@ -5,14 +5,43 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2 } from 'lucide-react';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
   const { isInstallable, isInstalled, handleInstallClick } = usePWAInstall();
-  
+
   const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [shareMsg, setShareMsg] = useState('');
+
+  function appLink(): string {
+    const base = (import.meta.env.BASE_URL as string | undefined) || '/';
+    const root = window.location.origin + (base.endsWith('/') ? base : `${base}/`);
+    return root;
+  }
+
+  async function handleShare() {
+    const url = appLink();
+    const data = { title: 'CropManager', text: 'Track your crops with CropManager:', url };
+    try {
+      if (navigator.share) {
+        await navigator.share(data);
+        return;
+      }
+      throw new Error('no-share');
+    } catch (e) {
+      // User dismissed the sheet — not an error. Fall back to clipboard otherwise.
+      if (e instanceof Error && e.name === 'AbortError') return;
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareMsg('Link copied — paste it anywhere to share');
+      } catch {
+        setShareMsg(url);
+      }
+      setTimeout(() => setShareMsg(''), 4000);
+    }
+  }
 
   // Keep the editable copy in sync if settings change elsewhere
   useEffect(() => { setLocal(settings); }, [settings]);
@@ -88,6 +117,20 @@ export function SettingsScreen() {
             Install CropManager
           </Button>
         )}
+      </div>
+
+      {/* Share */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Share2 className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Share CropManager</h3>
+        </div>
+        <p className="text-xs text-muted-foreground">Send the web app link to another phone or device — it opens straight in the browser, no install needed.</p>
+        <Button variant="outline" className="w-full h-10 text-xs gap-2" onClick={handleShare}>
+          <Share2 className="w-4 h-4" />
+          Share App Link
+        </Button>
+        {shareMsg && <p className="text-xs text-center text-green-700 font-medium break-all">{shareMsg}</p>}
       </div>
 
       {/* About */}

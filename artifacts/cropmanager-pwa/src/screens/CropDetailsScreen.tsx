@@ -14,7 +14,7 @@ import { DateInput } from '../components/shared/DateInput';
 import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
-import { ROUTES } from '../lib/routes';
+import { ROUTES, cropEditPath } from '../lib/routes';
 import type { TrackingEntry, ObservationEntry, StageLog } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight } from 'lucide-react';
 
@@ -630,6 +630,10 @@ export function CropDetailsScreen() {
             <h1 className="font-semibold text-[15px] truncate">{crop.cropName} {crop.variety ? `· ${crop.variety}` : ''}</h1>
             <p className="text-[11px] text-muted-foreground truncate">{crop.plantingMethod} · Planted {crop.plantingDate}</p>
           </div>
+          <button onClick={() => navigate(cropEditPath(crop.id))} aria-label="Edit crop details"
+            className="shrink-0 w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-sm hover:bg-gray-200" title="Edit crop">
+            ✎
+          </button>
           <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white" style={{ backgroundColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }}>
             {normalizedCurrent}
           </span>

@@ -21,6 +21,81 @@ import { ReminderForm } from '../components/reminders/ReminderForm';
 import { markReminderDone } from '../hooks/useReminders';
 import { stageGifUrl } from '../lib/stageGifs';
 
+/**
+ * Milestone strip where the current stage stays centered: it centers on
+ * mount/stage change and re-centers ~3s after the user slides it. Only the
+ * current stage shows the (3x) animated GIF; past/future keep circles.
+ */
+function CenteredMilestone({ currentIdx, normalizedCurrent, stageDateMap }: {
+  currentIdx: number;
+  normalizedCurrent: string;
+  stageDateMap: Map<string, string>;
+}) {
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const timer = React.useRef<number | null>(null);
+
+  const center = React.useCallback((smooth = true) => {
+    const c = containerRef.current;
+    if (!c) return;
+    const el = c.querySelector('[data-current="true"]') as HTMLElement | null;
+    if (!el) return;
+    c.scrollTo({ left: el.offsetLeft - c.clientWidth / 2 + el.clientWidth / 2, behavior: smooth ? 'smooth' : 'auto' });
+  }, []);
+
+  React.useEffect(() => {
+    const t = window.setTimeout(() => center(true), 400);
+    return () => window.clearTimeout(t);
+  }, [currentIdx, normalizedCurrent, center]);
+
+  React.useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+  }, []);
+
+  function handleScroll() {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => center(true), 3000);
+  }
+
+  return (
+    <div ref={containerRef} onScroll={handleScroll} className="flex items-center gap-1 overflow-x-auto scrollbar-hide snap-x py-1">
+      {CANONICAL_STAGES.map((s, idx) => {
+        const done = idx < currentIdx || idx === currentIdx;
+        const isCurrent = idx === currentIdx;
+        const date = stageDateMap.get(s);
+        const prevDate = idx > 0 ? stageDateMap.get(CANONICAL_STAGES[idx - 1]) : null;
+        let delta: number | null = null;
+        if (date && prevDate) {
+          const a = parseDate(prevDate);
+          const b = parseDate(date);
+          if (a && b) delta = daysBetween(a, b);
+        }
+        return (
+          <React.Fragment key={s}>
+            <div className={`flex flex-col items-center ${isCurrent ? 'min-w-[112px]' : 'min-w-[52px]'}`} {...(isCurrent ? { 'data-current': 'true' } : {})}>
+              {isCurrent ? (
+                <img src={stageGifUrl(normalizedCurrent, 256)} alt={`${normalizedCurrent} stage`}
+                  className="w-[108px] h-[108px] rounded-full object-cover border-2"
+                  style={{ borderColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }} loading="lazy" />
+              ) : (
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${done ? 'text-white' : 'bg-white text-gray-400 border-gray-200'}`}
+                  style={{ backgroundColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined, borderColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined }}>
+                  {done ? '✓' : idx + 1}
+                </div>
+              )}
+              <span className={`text-[8px] font-bold mt-1 text-center leading-tight ${isCurrent ? 'text-green-700' : done ? 'text-gray-700' : 'text-gray-400'}`}>{s.replace('Vegetative ', 'V.')}</span>
+              {date && <span className="text-[8px] text-muted-foreground">{date.slice(0, 6)}</span>}
+              {delta !== null && <span className="text-[8px] text-amber-600">+{delta}d</span>}
+            </div>
+            {idx < CANONICAL_STAGES.length - 1 && (
+              <div className={`h-0.5 flex-1 min-w-[8px] rounded ${idx < currentIdx ? 'bg-green-600' : 'bg-gray-200'}`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
 export function CropDetailsScreen() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -688,42 +763,7 @@ export function CropDetailsScreen() {
         </div>
         {/* Milestone progress bar */}
         <div className="max-w-md mx-auto px-4 pb-3 relative">
-          <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide snap-x py-1">
-            {CANONICAL_STAGES.map((s, idx) => {
-              const done = idx < currentIdx || idx === currentIdx;
-              const isCurrent = idx === currentIdx;
-              const date = stageDateMap.get(s);
-              const prevDate = idx > 0 ? stageDateMap.get(CANONICAL_STAGES[idx - 1]) : null;
-              let delta: number | null = null;
-              if (date && prevDate) {
-                const a = parseDate(prevDate);
-                const b = parseDate(date);
-                if (a && b) delta = daysBetween(a, b);
-              }
-              return (
-                <React.Fragment key={s}>
-                  <div className="flex flex-col items-center min-w-[52px]">
-                    {isCurrent ? (
-                      <img src={stageGifUrl(normalizedCurrent, 256)} alt={`${normalizedCurrent} stage`}
-                        className="w-9 h-9 rounded-full object-cover border-2"
-                        style={{ borderColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }} loading="lazy" />
-                    ) : (
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${done ? 'text-white' : 'bg-white text-gray-400 border-gray-200'}`}
-                        style={{ backgroundColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined, borderColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined }}>
-                        {done ? '✓' : idx + 1}
-                      </div>
-                    )}
-                    <span className={`text-[8px] font-bold mt-1 text-center leading-tight ${isCurrent ? 'text-green-700' : done ? 'text-gray-700' : 'text-gray-400'}`}>{s.replace('Vegetative ', 'V.')}</span>
-                    {date && <span className="text-[8px] text-muted-foreground">{date.slice(0, 6)}</span>}
-                    {delta !== null && <span className="text-[8px] text-amber-600">+{delta}d</span>}
-                  </div>
-                  {idx < CANONICAL_STAGES.length - 1 && (
-                    <div className={`h-0.5 flex-1 min-w-[8px] rounded ${idx < currentIdx ? 'bg-green-600' : 'bg-gray-200'}`} />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
+          <CenteredMilestone currentIdx={currentIdx} normalizedCurrent={normalizedCurrent} stageDateMap={stageDateMap} />
           <div className="pointer-events-none absolute right-2 top-0 bottom-8 w-8 bg-gradient-to-l from-white to-transparent" />
           <div className="flex items-center gap-2 mt-2 text-[10px]">
             <span className="text-muted-foreground">Est. harvest: <strong className="text-green-700">{crop.harvestDateEstimated || '—'}</strong></span>

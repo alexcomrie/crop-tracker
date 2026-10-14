@@ -32,6 +32,7 @@ import FarmCalculatorScreen from './components/calculator/FarmCalculatorScreen';
 import POSScreen from './components/pos/POSScreen';
 import { useAppStore } from './store/useAppStore';
 import { useTelegramReminders } from './hooks/useTelegramReminders';
+import { useDueNotifier } from './hooks/useDueNotifier';
 import { autoUpdateService } from './lib/autoUpdateService';
 import { migrateLegacyDatabases } from './lib/migrateLegacy';
 import type { CropDatabase, FertDatabase } from './types';
@@ -100,6 +101,7 @@ function AppContent() {
   const { setCropDb, setFertDb } = useAppStore();
 
   useTelegramReminders();
+  useDueNotifier();
 
   useEffect(() => {
     loadCropDatabase()

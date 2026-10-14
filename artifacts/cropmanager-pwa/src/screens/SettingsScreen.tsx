@@ -5,7 +5,10 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2 } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell } from 'lucide-react';
+import { REM_TYPES } from '../components/reminders/ReminderForm';
+import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
+import type { ReminderTone } from '../types';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
@@ -13,6 +16,21 @@ export function SettingsScreen() {
 
   const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
+  const [perm, setPerm] = useState(() => notifyPermission());
+
+  async function handleEnableNotifications() {
+    const p = await requestNotifyPermission();
+    setPerm(p);
+  }
+
+  const setRem = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
+    setLocal(l => ({ ...l, [key]: value }));
+
+  const toggleKind = (id: string) =>
+    setLocal(l => ({ ...l, reminderKinds: { ...(l.reminderKinds ?? {}), [id]: !((l.reminderKinds ?? {})[id] ?? true) } }));
+
+  const switchCls = (on: boolean) =>
+    `w-11 h-6 rounded-full transition-colors shrink-0 ${on ? 'bg-green-600' : 'bg-gray-300'}`;
   const [shareMsg, setShareMsg] = useState('');
 
   function appLink(): string {
@@ -88,6 +106,64 @@ export function SettingsScreen() {
           {field('weatherLon', 'Longitude', 'number', '-77.2010')}
         </div>
         {field('rainThresholdMm', 'Rain Threshold (mm)', 'number', '5', 'Spraying is not recommended when rain exceeds this amount')}
+      </div>
+
+      {/* Reminders */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Bell className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Reminders</h3>
+          <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold ${perm === 'granted' ? 'bg-green-100 text-green-700' : perm === 'denied' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+            {perm === 'granted' ? 'Notifications on' : perm === 'denied' ? 'Blocked' : perm === 'unsupported' ? 'Not supported' : 'Off'}
+          </span>
+        </div>
+        {perm !== 'granted' && perm !== 'unsupported' && (
+          <Button variant="outline" className="w-full h-10 text-xs gap-2" onClick={handleEnableNotifications}>
+            <Bell className="w-4 h-4" />
+            Enable Device Notifications
+          </Button>
+        )}
+        <p className="text-[10px] text-muted-foreground leading-tight italic">Due reminders pop up as system notifications (app icon in the status bar) while the browser or installed app is running, plus an icon badge with the due count. Tap SAVE below to apply changes.</p>
+        {([
+          ['remindersEnabled', 'Reminder alerts'],
+          ['reminderSound', 'Sound'],
+          ['reminderVibrate', 'Vibrate'],
+          ['reminderBadge', 'App icon badge'],
+        ] as const).map(([key, label]) => (
+          <div key={key} className="flex items-center justify-between">
+            <span className="text-xs font-medium">{label}</span>
+            <button onClick={() => setRem(key, !((local as any)[key] ?? true))} className={switchCls(!!((local as any)[key] ?? true))} aria-label={label}>
+              <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${((local as any)[key] ?? true) ? 'translate-x-5' : 'translate-x-0.5'} mt-0.5`} />
+            </button>
+          </div>
+        ))}
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-medium">Tone</span>
+          <span className="flex items-center gap-2">
+            <select value={local.reminderTone ?? 'chime'}
+              onChange={e => setRem('reminderTone', e.target.value as ReminderTone)}
+              className="border rounded-lg p-1.5 text-xs bg-white">
+              <option value="chime">Chime</option>
+              <option value="double">Double</option>
+              <option value="low">Low</option>
+            </select>
+            <button onClick={() => playTone(local.reminderTone ?? 'chime')} className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-2 py-1.5">Test</button>
+          </span>
+        </div>
+        <div className="pt-1">
+          <p className="text-[11px] font-semibold text-gray-500 uppercase mb-1.5">Show these on device</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {REM_TYPES.map(t => {
+              const on = (local.reminderKinds ?? {})[t.id] ?? true;
+              return (
+                <button key={t.id} onClick={() => toggleKind(t.id)}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs border font-medium ${on ? 'bg-green-50 border-green-300 text-green-800' : 'bg-white border-gray-200 text-gray-400'}`}>
+                  <span>{t.icon}</span><span className="truncate">{t.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       {/* Data Management */}

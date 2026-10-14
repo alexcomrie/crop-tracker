@@ -16,7 +16,9 @@ import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES, cropEditPath } from '../lib/routes';
 import type { TrackingEntry, ObservationEntry, StageLog } from '../types';
-import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight } from 'lucide-react';
+import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight, Bell, CheckCircle2 } from 'lucide-react';
+import { ReminderForm } from '../components/reminders/ReminderForm';
+import { markReminderDone } from '../hooks/useReminders';
 
 export function CropDetailsScreen() {
   const { id } = useParams<{ id: string }>();
@@ -58,7 +60,9 @@ export function CropDetailsScreen() {
   const syncKey = crop?.foundationKey || crop?.cropName || '';
   const personal = useLiveQuery(() => id && crop ? db.personalCropDb.get(crop.cropName.toLowerCase()) : undefined, [crop?.cropName]);
 
-  const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'>('stages');
+  const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'|'reminders'>('stages');
+  const cropReminders = useLiveQuery(() => id ? db.reminders.where('trackingId').equals(id).toArray() : [], [id]) ?? [];
+  const [showReminderForm, setShowReminderForm] = useState(false);
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   const [selectedStage, setSelectedStage] = useState('');
   const [stageMenuOpen, setStageMenuOpen] = useState(false);
@@ -689,6 +693,7 @@ export function CropDetailsScreen() {
             { k: 'observations', l: 'Observations', i: Eye },
             { k: 'treatments', l: 'Treatments', i: Droplets },
             { k: 'harvest', l: 'Harvest', i: Wheat },
+            { k: 'reminders', l: 'Reminders', i: Bell },
           ].map(t => (
             <button key={t.k} onClick={() => setActiveSheet(t.k as never)}
               className={`flex items-center gap-1 px-3 py-2 rounded-full text-xs font-semibold whitespace-nowrap border ${activeSheet === t.k ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-200 text-gray-600'}`}>
@@ -1186,6 +1191,48 @@ export function CropDetailsScreen() {
                   toast.error('Could not save notes: ' + (e instanceof Error ? e.message : String(e)));
                 }
               }} className="w-full mt-2 bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Save Notes</button>
+            </div>
+          </div>
+        )}
+
+        {activeSheet === 'reminders' && (
+          <div className="space-y-3">
+            {!showReminderForm ? (
+              <button onClick={() => setShowReminderForm(true)}
+                className="w-full bg-purple-600 text-white rounded-xl py-2.5 text-sm font-semibold">🔔 New Reminder for this crop</button>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
+                <ReminderForm fixedCrop={{ id: crop.id, cropName: crop.cropName }} crops={[crop]} onDone={() => setShowReminderForm(false)} />
+                <button onClick={() => setShowReminderForm(false)} className="w-full text-sm text-muted-foreground">Cancel</button>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              {cropReminders.length === 0 && <p className="text-xs text-muted-foreground bg-white rounded-xl p-3 border">No reminders for this crop yet</p>}
+              {[...cropReminders].sort((a, b) => (a.sent ? 1 : 0) - (b.sent ? 1 : 0)).map(r => (
+                <div key={r.id} className={`bg-white rounded-xl border border-gray-100 p-3 ${r.sent ? 'opacity-50' : ''}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-bold text-purple-700 uppercase">{r.type.replace(/_/g, ' ')} · {r.sendDate}</p>
+                    {!r.sent && (
+                      <button onClick={async () => {
+                        if (!window.confirm('Delete this reminder?')) return;
+                        try { await db.reminders.delete(r.id); } catch (e) {
+                          toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)));
+                        }
+                      }} aria-label="Delete reminder" className="text-red-400 font-bold shrink-0">×</button>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold mt-0.5">{r.subject}</p>
+                  {r.body && <p className="text-xs text-muted-foreground whitespace-pre-line">{r.body}</p>}
+                  {!r.sent ? (
+                    <button onClick={() => markReminderDone(r.id).catch(e => toast.error('Could not complete: ' + (e instanceof Error ? e.message : String(e))))}
+                      className="w-full mt-2 bg-purple-600 text-white rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Completed
+                    </button>
+                  ) : (
+                    <p className="text-[11px] font-bold text-green-600 mt-1.5">✓ Done</p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}

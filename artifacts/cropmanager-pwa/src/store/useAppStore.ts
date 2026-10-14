@@ -14,7 +14,32 @@ const DEFAULT_SETTINGS: AppSettings = {
   lastSyncAt: 0,
   syncEnabled: true,
   autoSyncHour: 23,
+  remindersEnabled: true,
+  reminderSound: true,
+  reminderTone: 'chime',
+  reminderVibrate: true,
+  reminderBadge: true,
+  reminderKinds: {},
 };
+
+/** Merge stored settings over defaults (old installs lack the newer keys). */
+export function withReminderDefaults(s: AppSettings): Required<Pick<AppSettings,
+  'remindersEnabled' | 'reminderSound' | 'reminderTone' | 'reminderVibrate' | 'reminderBadge'>> & { reminderKinds: Record<string, boolean> } {
+  return {
+    remindersEnabled: s.remindersEnabled ?? true,
+    reminderSound: s.reminderSound ?? true,
+    reminderTone: s.reminderTone ?? 'chime',
+    reminderVibrate: s.reminderVibrate ?? true,
+    reminderBadge: s.reminderBadge ?? true,
+    reminderKinds: s.reminderKinds ?? {},
+  };
+}
+
+/** True unless the user disabled this reminder type in Settings. */
+export function isReminderKindAllowed(s: AppSettings, type: string): boolean {
+  const kinds = s.reminderKinds ?? {};
+  return kinds[type] ?? true;
+}
 
 interface AppStore {
   settings: AppSettings;

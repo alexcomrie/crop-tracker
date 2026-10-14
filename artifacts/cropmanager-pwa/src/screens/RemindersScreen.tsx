@@ -1,28 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Bell, CheckCircle2, Clock, Trash2, Plus } from 'lucide-react';
 import { markReminderDone } from '../hooks/useReminders';
 import { EmptyState } from '../components/shared/EmptyState';
 import { toast } from 'sonner';
-import { generateId } from '../lib/ids';
-import { DateInput } from '../components/shared/DateInput';
-import { formatDateShort, parseDate, today } from '../lib/dates';
-
-
-const REM_TYPES = [
-  { id: 'fungicide', label: 'Fungicide spray', icon: '🍄' },
-  { id: 'pesticide', label: 'Pesticide spray', icon: '🐛' },
-  { id: 'fertilizer', label: 'Fertilizer', icon: '🧪' },
-  { id: 'water', label: 'Watering check', icon: '💧' },
-  { id: 'inspect', label: 'Inspect plant', icon: '🔍' },
-  { id: 'harvest', label: 'Check harvest', icon: '🥬' },
-  { id: 'custom', label: 'Custom task', icon: '📝' },
-];
+import { parseDate } from '../lib/dates';
+import { shortCropId } from '../lib/ids';
+import { cropDetailsPath } from '../lib/routes';
+import { ReminderForm } from '../components/reminders/ReminderForm';
 
 export function RemindersScreen() {
   const remindersData = useLiveQuery(async () => {
@@ -38,40 +27,18 @@ export function RemindersScreen() {
   });
   const reminders = remindersData ?? [];
   const isLoading = remindersData === undefined;
+  const crops = useLiveQuery(() => db.crops.toArray().catch(() => []), []) ?? [];
+  const cropById = useMemo(() => new Map(crops.map(c => [c.id, c])), [crops]);
+  const navigate = useNavigate();
 
   const [showForm, setShowForm] = useState(false);
-  const [plant, setPlant] = useState('');
-  const [type, setType] = useState('fungicide');
-  const [product, setProduct] = useState('');
-  const [date, setDate] = useState(formatDateShort(today()));
-  const [notes, setNotes] = useState('');
-
-  const handleSave = async () => {
-    if (!plant.trim() || !date) { toast.error('Enter a plant and date first'); return; }
-    const rem = {
-      id: generateId('REM'),
-      type,
-      cropPlantName: plant,
-      trackingId: 'MANUAL',
-      sendDate: date,
-      subject: `${REM_TYPES.find(t => t.id === type)?.icon} ${REM_TYPES.find(t => t.id === type)?.label}`,
-      body: `${product ? `Product: ${product}. ` : ''}${notes}`,
-      sent: false,
-      chatId: '', // Will be filled by system if needed
-      updatedAt: Date.now(),
-    };
-    try {
-      await db.reminders.add(rem);
-    } catch (e) {
-      console.error('[reminders] add failed', { rem, e });
-      toast.error('Could not save reminder: ' + (e instanceof Error ? e.message : String(e)));
-      return;
-    }
-    setShowForm(false);
-    setPlant('');
-    setProduct('');
-    setNotes('');
-  };
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'crop' | 'field'>('all');
+  const visible = useMemo(() => reminders.filter(r => {
+    const isCrop = !!r.trackingId && r.trackingId !== 'MANUAL' && cropById.has(r.trackingId);
+    if (scopeFilter === 'crop') return isCrop;
+    if (scopeFilter === 'field') return !isCrop;
+    return true;
+  }), [reminders, scopeFilter, cropById]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this reminder?')) {
@@ -102,58 +69,34 @@ export function RemindersScreen() {
       <div className="p-4 space-y-4">
         {showForm && (
           <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-gray-900">New Manual Reminder</h3>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Plant / Crop Name</label>
-                <Input placeholder="e.g. Peppers (back bed)" value={plant} onChange={e => setPlant(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Task Type</label>
-                  <Select value={type} onValueChange={setType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REM_TYPES.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.icon} {t.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Due Date</label>
-                  <DateInput value={date} onChange={setDate} ariaLabel="Reminder due date" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product / Details</label>
-                <Input placeholder="e.g. Copper fungicide, Neem oil" value={product} onChange={e => setProduct(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notes</label>
-                <Input placeholder="Optional notes..." value={notes} onChange={e => setNotes(e.target.value)} />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button className="flex-1 bg-purple-600 hover:bg-purple-700 h-10 font-bold" onClick={handleSave}>💾 Save Reminder</Button>
-              <Button variant="ghost" className="h-10 text-gray-400" onClick={() => setShowForm(false)}>Cancel</Button>
-            </div>
+            <h3 className="font-bold text-sm text-gray-900">New Reminder</h3>
+            <ReminderForm crops={crops} onDone={() => setShowForm(false)} />
+            <Button variant="ghost" className="w-full h-9 text-gray-400" onClick={() => setShowForm(false)}>Cancel</Button>
           </div>
         )}
+
+        <div className="flex gap-1">
+          {(['all', 'crop', 'field'] as const).map(f => (
+            <button key={f} onClick={() => setScopeFilter(f)}
+              className={`flex-1 py-1.5 rounded-full text-xs font-bold border ${scopeFilter === f ? 'bg-purple-600 text-white border-purple-600' : 'bg-white border-gray-200 text-gray-600'}`}>
+              {f === 'all' ? `All (${reminders.length})` : f === 'crop' ? 'Tracked crops' : 'Field notes'}
+            </button>
+          ))}
+        </div>
 
         <div className="space-y-3">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
             </div>
-          ) : reminders.length === 0 ? (
+          ) : visible.length === 0 ? (
             <EmptyState icon={<Bell className="w-12 h-12" />} title="No reminders found" />
           ) : (
-            reminders.map(r => (
-              <div 
-                key={r.id} 
+            visible.map(r => {
+              const linked = r.trackingId && r.trackingId !== 'MANUAL' ? cropById.get(r.trackingId) : undefined;
+              return (
+              <div
+                key={r.id}
                 className={`bg-white border border-gray-100 rounded-xl p-4 shadow-sm transition-opacity ${r.sent ? 'opacity-50' : 'opacity-100'}`}
               >
                 <div className="flex items-start justify-between mb-2">
@@ -172,12 +115,21 @@ export function RemindersScreen() {
                     </Button>
                   )}
                 </div>
-                
+
                 <h3 className="font-bold text-sm text-gray-900 mb-1">{r.subject}: {r.cropPlantName}</h3>
+                {linked ? (
+                  <button onClick={() => navigate(cropDetailsPath(linked.id))}
+                    className="mb-2 inline-flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-full pl-1.5 pr-2.5 py-0.5 text-left">
+                    <span className="text-[10px] font-bold bg-green-700 text-white rounded-full px-1.5 py-0.5">{shortCropId(linked.id)}</span>
+                    <span className="text-xs font-semibold text-green-800">{linked.cropName} · {linked.plantStage}</span>
+                  </button>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground mb-2">🌱 Field reminder (no tracker crop)</p>
+                )}
                 <p className="text-xs text-gray-500 leading-relaxed mb-4">{r.body}</p>
 
                 {!r.sent ? (
-                  <Button 
+                  <Button
                     className="w-full bg-purple-600 hover:bg-purple-700 h-9 rounded-lg text-xs font-bold gap-2"
                     onClick={() => markReminderDone(r.id)}
                   >
@@ -191,7 +143,8 @@ export function RemindersScreen() {
                   </div>
                 )}
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

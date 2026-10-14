@@ -238,6 +238,8 @@ export interface Reminder {
   body: string;
   sent: boolean;
   telegramSent?: boolean;
+  /** Set when created in "wait" mode (remind me in N days); display only. */
+  durationDays?: number;
   chatId: string;
   updatedAt: number;
 }
@@ -330,6 +332,8 @@ export interface CropSearchLog {
   updatedAt: number;
 }
 
+export type ReminderTone = 'chime' | 'double' | 'low';
+
 export interface AppSettings {
   telegramToken: string;
   telegramChatId: string;
@@ -342,6 +346,17 @@ export interface AppSettings {
   lastSyncAt: number;
   syncEnabled: boolean;
   autoSyncHour: number;
+  /** Device notification master switch (default true). */
+  remindersEnabled?: boolean;
+  /** Play a tone with the notification (default true). */
+  reminderSound?: boolean;
+  reminderTone?: ReminderTone;
+  /** Vibrate pattern on supported devices (default true). */
+  reminderVibrate?: boolean;
+  /** Show due count on the app icon (default true). */
+  reminderBadge?: boolean;
+  /** Per-type allow list; missing keys default to true. */
+  reminderKinds?: Record<string, boolean>;
 }
 
 export interface DayForecast {

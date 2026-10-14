@@ -40,7 +40,7 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         // NOTE: data/*.json is served via runtimeCaching below, not precached,
         // so foundation DB updates are never stuck behind an old precache.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,gif}"],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.open-meteo\.com\/.*/i,

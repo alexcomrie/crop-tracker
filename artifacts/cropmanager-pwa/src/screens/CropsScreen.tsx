@@ -10,6 +10,8 @@ import type { Propagation } from '../types';
 import { useAppStore } from '../store/useAppStore';
 import { resolveCropData } from '../lib/cropDb';
 import { autoUpdateService } from '../lib/autoUpdateService';
+import { CANONICAL_STAGES, normalizeStage, processStageChange } from '../lib/stages';
+import { addDiaryEntry } from '../lib/diary';
 import { toast } from 'sonner';
 import db from '../db/db';
 import { EmptyState } from '../components/shared/EmptyState';
@@ -40,6 +42,39 @@ export function CropsScreen() {
   const [editProp, setEditProp] = useState<Propagation | undefined>(undefined);
   const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
   const [actionTarget, setActionTarget] = useState<{ kind: Kind; id: string } | null>(null);
+  const [rollingBack, setRollingBack] = useState(false);
+
+  async function handleRollbackStage(cropId: string, stage: string) {
+    const crop = cropById.get(cropId);
+    if (!crop) return;
+    setRollingBack(true);
+    try {
+      const cropData = resolveCropData(cropDb, crop.cropName);
+      const [adjustments, existing] = await Promise.all([
+        db.cropDbAdjustments.toArray(),
+        db.harvestLogs.where('cropTrackingId').equals(crop.id).toArray(),
+      ]);
+      const { updatedCrop, stageLog } = processStageChange(crop, stage, today(), cropData as never, adjustments, existing);
+      // Pause auto-transitions so the correction sticks instead of jumping forward again.
+      await db.crops.put({ ...updatedCrop, autoHold: true } as never);
+      await db.stageLogs.add({ ...stageLog, notes: 'Manual rollback from list' } as never);
+      await addDiaryEntry({
+        entryType: 'stage_change',
+        cropId: crop.id,
+        cropName: crop.cropName,
+        variety: crop.variety,
+        description: `${crop.plantStage} → ${stage} (rollback)`,
+        details: 'Rolled back from crop list; auto-update paused',
+      });
+      toast.success(`Rolled back → ${stage} (auto-update paused)`);
+      setActionTarget(null);
+    } catch (e) {
+      console.error('[crops] rollback failed', { cropId, stage, e });
+      toast.error('Rollback failed: ' + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setRollingBack(false);
+    }
+  }
   const { cropDb } = useAppStore();
   const navigate = useNavigate();
   const cropsData = useCrops('All');
@@ -359,6 +394,29 @@ export function CropsScreen() {
             }}
             className="w-full bg-red-50 text-red-600 border border-red-200 rounded-xl py-3 text-sm font-semibold"
           >🗑 Delete</button>
+          {actionTarget?.kind === 'crop' && (() => {
+            const crop = cropById.get(actionTarget.id);
+            if (!crop) return null;
+            const idx = (CANONICAL_STAGES as readonly string[]).indexOf(normalizeStage(crop.plantStage));
+            const past = idx > 0 ? (CANONICAL_STAGES as readonly string[]).slice(0, idx) : [];
+            if (past.length === 0) return null;
+            return (
+              <div className="pt-2 mt-1 border-t border-gray-100">
+                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                  ↩ Roll back stage <span className="normal-case font-normal">(now: {crop.plantStage})</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {past.map(s => (
+                    <button key={s} disabled={rollingBack} onClick={() => void handleRollbackStage(crop.id, s)}
+                      className="px-3 py-1.5 rounded-full text-xs font-semibold border bg-white border-gray-300 text-gray-700 disabled:opacity-40">
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1">Rolls back with history kept · auto-update pauses so it sticks.</p>
+              </div>
+            );
+          })()}
         </div>
       </BottomSheet>
     </div>

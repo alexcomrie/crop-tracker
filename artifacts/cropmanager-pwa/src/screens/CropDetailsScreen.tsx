@@ -171,6 +171,8 @@ export function CropDetailsScreen() {
     return opts;
   })();
   const transplantCatchup = upcomingOptions.includes('Transplanted') && normalizedCurrent !== 'Seedling';
+  const [rollbackMenuOpen, setRollbackMenuOpen] = useState(false);
+  const pastOptions: string[] = currentIdx > 0 ? (CANONICAL_STAGES as readonly string[]).slice(0, currentIdx) as string[] : [];
 
   // Anchor date for the current stage (planting/germination history or last log)
   function currentStageDate(): Date {
@@ -189,19 +191,21 @@ export function CropDetailsScreen() {
       ]);
       const targetIdx = (CANONICAL_STAGES as readonly string[]).indexOf(selectedStage);
       const isJump = targetIdx > currentIdx + 1;
+      const isRollback = targetIdx >= 0 && targetIdx < currentIdx;
       if (!isJump) {
         const { updatedCrop, stageLog } = processStageChange(crop, selectedStage, dt, cropData as never, adjustments, existing);
-        await db.crops.put(updatedCrop as never);
-        await db.stageLogs.add(stageLog as never);
+        // Rollbacks pause auto-transitions so the correction sticks.
+        await db.crops.put(isRollback ? ({ ...updatedCrop, autoHold: true } as never) : (updatedCrop as never));
+        await db.stageLogs.add(isRollback ? ({ ...stageLog, notes: 'Manual rollback' } as never) : (stageLog as never));
         await addDiaryEntry({
           entryType: 'stage_change',
           cropId: crop.id,
           cropName: crop.cropName,
           variety: crop.variety,
-          description: `${crop.plantStage} → ${selectedStage}`,
-          details: selectedStage === 'Germinated' ? 'Manual germination confirmed' : '',
+          description: `${crop.plantStage} → ${selectedStage}${isRollback ? ' (rollback)' : ''}`,
+          details: selectedStage === 'Germinated' ? 'Manual germination confirmed' : isRollback ? 'Auto-update paused' : '',
         });
-        toast.success(`Stage → ${selectedStage}`);
+        toast.success(isRollback ? `Rolled back → ${selectedStage} (auto-update paused)` : `Stage → ${selectedStage}`);
       } else {
         // Direct jump: walk every skipped canonical stage so history stays complete.
         // Tinygpt backfills each missed stage with an interpolated date between
@@ -232,6 +236,7 @@ export function CropDetailsScreen() {
       }
       setSelectedStage('');
       setStageMenuOpen(false);
+      setRollbackMenuOpen(false);
     } catch (e) {
       console.error('[details] stage change failed', { id: crop.id, selectedStage, e });
       toast.error('Stage change failed: ' + (e instanceof Error ? e.message : String(e)));
@@ -785,32 +790,62 @@ export function CropDetailsScreen() {
                   No transplant recorded for this {crop.plantingMethod} crop — pick <strong>Transplanted</strong> below with its date to catch up. Your stage stays put.
                 </p>
               )}
-              <div className="relative mt-3">
-                <button
-                  onClick={() => setStageMenuOpen(v => !v)}
-                  aria-label="Mark stages"
-                  className="px-4 py-2 rounded-full text-xs border font-semibold bg-green-700 text-white border-green-700"
-                >
-                  🏷 Mark stages{selectedStage ? `: ${selectedStage}` : ' ▾'}
-                </button>
-                {stageMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setStageMenuOpen(false)} />
-                    <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
-                      {upcomingOptions.length === 0 && (
-                        <p className="px-4 py-3 text-xs text-muted-foreground">No upcoming stages — crop is at the final stage.</p>
-                      )}
-                      {upcomingOptions.map(s => (
-                        <button
-                          key={s}
-                          onClick={() => { setSelectedStage(s); setStageMenuOpen(false); }}
-                          className={`w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 ${selectedStage === s ? 'bg-green-50 font-semibold text-green-700' : 'text-gray-800'}`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </>
+              <div className="flex gap-2 mt-3">
+                <div className="relative">
+                  <button
+                    onClick={() => { setStageMenuOpen(v => !v); setRollbackMenuOpen(false); }}
+                    aria-label="Mark stages"
+                    className="px-4 py-2 rounded-full text-xs border font-semibold bg-green-700 text-white border-green-700"
+                  >
+                    🏷 Mark stages{selectedStage && upcomingOptions.includes(selectedStage) ? `: ${selectedStage}` : ' ▾'}
+                  </button>
+                  {stageMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setStageMenuOpen(false)} />
+                      <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                        {upcomingOptions.length === 0 && (
+                          <p className="px-4 py-3 text-xs text-muted-foreground">No upcoming stages — crop is at the final stage.</p>
+                        )}
+                        {upcomingOptions.map(s => (
+                          <button
+                            key={s}
+                            onClick={() => { setSelectedStage(s); setStageMenuOpen(false); }}
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-green-50 ${selectedStage === s ? 'bg-green-50 font-semibold text-green-700' : 'text-gray-800'}`}
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                {pastOptions.length > 0 && (
+                  <div className="relative">
+                    <button
+                      onClick={() => { setRollbackMenuOpen(v => !v); setStageMenuOpen(false); }}
+                      aria-label="Roll back stage"
+                      className="px-4 py-2 rounded-full text-xs border font-semibold bg-white border-gray-300 text-gray-700"
+                    >
+                      ↩ Roll back{selectedStage && pastOptions.includes(selectedStage) ? `: ${selectedStage}` : ' ▾'}
+                    </button>
+                    {rollbackMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setRollbackMenuOpen(false)} />
+                        <div className="absolute left-0 mt-1 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                          <p className="px-4 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Back to… (auto-update pauses)</p>
+                          {pastOptions.map(s => (
+                            <button
+                              key={s}
+                              onClick={() => { setSelectedStage(s); setRollbackMenuOpen(false); }}
+                              className={`w-full text-left px-4 py-2.5 text-sm hover:bg-amber-50 ${selectedStage === s ? 'bg-amber-50 font-semibold text-amber-700' : 'text-gray-800'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 mt-3">

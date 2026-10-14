@@ -5,6 +5,7 @@ import type { Crop, CropData } from '../../types';
 import { parseDate, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
 import { getPhiStatus } from '../../lib/phi';
+import { stageGifUrl } from '../../lib/stageGifs';
 
 interface CropCardProps {
   crop: Crop;
@@ -76,7 +77,7 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
       onMouseLeave={cancelPress}
       onContextMenu={e => { if (onLongPress && !selectMode) e.preventDefault(); }}
     >
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
         {selectMode && (
           <input
             type="checkbox"
@@ -87,36 +88,41 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
           />
         )}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-[14px] text-gray-900 truncate leading-tight">{crop.cropName}</h3>
-          {crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.variety} · {crop.plantingMethod}</p>}
-          {!crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.plantingMethod}</p>}
-        </div>
-        <span className="flex items-center gap-1 shrink-0">
-          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none ${kind === 'crop' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
-            {kind === 'crop' ? '🌾 Crop' : '🌿 Prop'}
-          </span>
-          <span
-            className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white leading-none"
-            style={{ backgroundColor: stageColor }}
-          >
-            {crop.plantStage}
-          </span>
-          {phi && (
-            <span
-              title={`Pre-harvest interval: sprayed ${phi.sprayDate}, safe after ${phi.expiresDate}`}
-              className="text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none bg-red-600 text-white animate-pulse"
-            >
-              (PHI) {phi.daysLeft}d
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-[14px] text-gray-900 truncate leading-tight">{crop.cropName}</h3>
+              {crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.variety} · {crop.plantingMethod}</p>}
+              {!crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.plantingMethod}</p>}
+            </div>
+            <img src={stageGifUrl(crop.plantStage, 32)} alt={`${crop.plantStage} stage`}
+              className="w-10 h-10 shrink-0 rounded-lg object-contain" loading="lazy" />
+          </div>
+          <span className="flex items-center gap-1 mt-1.5 flex-wrap">
+            <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none ${kind === 'crop' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
+              {kind === 'crop' ? '🌾 Crop' : '🌿 Prop'}
             </span>
-          )}
-        </span>
-      </div>
-
-      <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2.5 mb-1">
-        <div
-          className="h-1.5 rounded-full transition-all"
-          style={{ width: `${progress}%`, backgroundColor: '#2d6a2d' }}
-        />
+            <span
+              className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white leading-none"
+              style={{ backgroundColor: stageColor }}
+            >
+              {crop.plantStage}
+            </span>
+            {phi && (
+              <span
+                title={`Pre-harvest interval: sprayed ${phi.sprayDate}, safe after ${phi.expiresDate}`}
+                className="text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none bg-red-600 text-white animate-pulse"
+              >
+                (PHI) {phi.daysLeft}d
+              </span>
+            )}
+          </span>
+          <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 mb-1">
+            <div
+              className="h-1.5 rounded-full transition-all"
+              style={{ width: `${progress}%`, backgroundColor: '#2d6a2d' }}
+            />
+          </div>
+        </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
         <span>Day {daysOld} · {progress}%</span>

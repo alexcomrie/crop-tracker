@@ -19,6 +19,7 @@ import type { TrackingEntry, ObservationEntry, StageLog } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight, Bell, CheckCircle2 } from 'lucide-react';
 import { ReminderForm } from '../components/reminders/ReminderForm';
 import { markReminderDone } from '../hooks/useReminders';
+import { stageGifUrl } from '../lib/stageGifs';
 
 export function CropDetailsScreen() {
   const { id } = useParams<{ id: string }>();
@@ -83,6 +84,7 @@ export function CropDetailsScreen() {
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   const [selectedStage, setSelectedStage] = useState('');
   const [stageMenuOpen, setStageMenuOpen] = useState(false);
+  const [rollbackMenuOpen, setRollbackMenuOpen] = useState(false);
   const [obsText, setObsText] = useState('');
   const [trackLabel, setTrackLabel] = useState('');
   const [trackTag, setTrackTag] = useState('');
@@ -171,7 +173,6 @@ export function CropDetailsScreen() {
     return opts;
   })();
   const transplantCatchup = upcomingOptions.includes('Transplanted') && normalizedCurrent !== 'Seedling';
-  const [rollbackMenuOpen, setRollbackMenuOpen] = useState(false);
   const pastOptions: string[] = currentIdx > 0 ? (CANONICAL_STAGES as readonly string[]).slice(0, currentIdx) as string[] : [];
 
   // Anchor date for the current stage (planting/germination history or last log)
@@ -702,10 +703,16 @@ export function CropDetailsScreen() {
               return (
                 <React.Fragment key={s}>
                   <div className="flex flex-col items-center min-w-[52px]">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${done ? 'text-white' : 'bg-white text-gray-400 border-gray-200'}`}
-                      style={{ backgroundColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined, borderColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined }}>
-                      {done ? '✓' : idx + 1}
-                    </div>
+                    {isCurrent ? (
+                      <img src={stageGifUrl(normalizedCurrent, 256)} alt={`${normalizedCurrent} stage`}
+                        className="w-9 h-9 rounded-full object-cover border-2"
+                        style={{ borderColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }} loading="lazy" />
+                    ) : (
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${done ? 'text-white' : 'bg-white text-gray-400 border-gray-200'}`}
+                        style={{ backgroundColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined, borderColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined }}>
+                        {done ? '✓' : idx + 1}
+                      </div>
+                    )}
                     <span className={`text-[8px] font-bold mt-1 text-center leading-tight ${isCurrent ? 'text-green-700' : done ? 'text-gray-700' : 'text-gray-400'}`}>{s.replace('Vegetative ', 'V.')}</span>
                     {date && <span className="text-[8px] text-muted-foreground">{date.slice(0, 6)}</span>}
                     {delta !== null && <span className="text-[8px] text-amber-600">+{delta}d</span>}

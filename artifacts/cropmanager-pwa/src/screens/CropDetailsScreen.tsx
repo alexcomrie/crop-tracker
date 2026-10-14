@@ -157,8 +157,20 @@ export function CropDetailsScreen() {
       if (!opts.includes('Up-planted')) opts.push('Up-planted');
       if (!opts.includes('Transplanted')) opts.push('Transplanted');
     }
+    // Catch-up for crops set before the transplant gate (e.g. pots that
+    // auto-advanced past Seedling with no transplant recorded): offer the
+    // Transplanted action through the vegetative phases. Recording it keeps
+    // the current stage and backfills the date + harvest estimate.
+    if (
+      !crop.transplantDateActual &&
+      needsTransplant(crop?.plantingMethod) &&
+      ['Vegetative Early', 'Vegetative Middle', 'Vegetative Late'].includes(normalizedCurrent)
+    ) {
+      if (!opts.includes('Transplanted')) opts.push('Transplanted');
+    }
     return opts;
   })();
+  const transplantCatchup = upcomingOptions.includes('Transplanted') && normalizedCurrent !== 'Seedling';
 
   // Anchor date for the current stage (planting/germination history or last log)
   function currentStageDate(): Date {
@@ -768,6 +780,11 @@ export function CropDetailsScreen() {
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Stage Control</p>
               <p className="text-[11px] text-muted-foreground mt-1">Current: <strong>{normalizedCurrent}</strong> · Jump straight to any upcoming stage — missed ones are backfilled automatically.</p>
+              {transplantCatchup && (
+                <p className="text-[11px] mt-1 bg-teal-50 border border-teal-200 text-teal-800 rounded-lg p-2">
+                  No transplant recorded for this {crop.plantingMethod} crop — pick <strong>Transplanted</strong> below with its date to catch up. Your stage stays put.
+                </p>
+              )}
               <div className="relative mt-3">
                 <button
                   onClick={() => setStageMenuOpen(v => !v)}

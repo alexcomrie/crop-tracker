@@ -57,7 +57,7 @@ export function needsTransplant(plantingMethod?: string): boolean {
   return plantingMethod !== 'Direct Ground' && plantingMethod !== 'Division';
 }
 
-export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string): string[] {
+export function getValidNextStages(currentStage: string, cropData: CropData | null, plantingMethod?: string, transplantRecorded = false): string[] {
   const normalized = normalizeStage(currentStage);
   const seq = getStageSequence(cropData);
   const idx = seq.indexOf(normalized);
@@ -87,6 +87,16 @@ export function getValidNextStages(currentStage: string, cropData: CropData | nu
     }
   }
   if (normalized === 'Up-planted') {
+    if (!result.includes('Transplanted')) result.push('Transplanted');
+  }
+
+  // Catch-up for pre-gate crops that advanced past Seedling with no
+  // transplant recorded (keeps stage, backfills date on record).
+  if (
+    !transplantRecorded &&
+    needsTransplant(plantingMethod) &&
+    ['Vegetative Early', 'Vegetative Middle', 'Vegetative Late'].includes(normalized)
+  ) {
     if (!result.includes('Transplanted')) result.push('Transplanted');
   }
 

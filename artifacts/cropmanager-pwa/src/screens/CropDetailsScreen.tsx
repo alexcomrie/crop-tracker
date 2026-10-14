@@ -61,8 +61,25 @@ export function CropDetailsScreen() {
   const personal = useLiveQuery(() => id && crop ? db.personalCropDb.get(crop.cropName.toLowerCase()) : undefined, [crop?.cropName]);
 
   const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'|'reminders'>('stages');
-  const cropReminders = useLiveQuery(() => id ? db.reminders.where('trackingId').equals(id).toArray() : [], [id]) ?? [];
+  const cropReminders = (useLiveQuery(() => id ? db.reminders.where('trackingId').equals(id).toArray() : [], [id]) ?? [])
+    .filter(r => !['spray_fungus', 'spray_pest', 'fert_application'].includes(r.type));
   const [showReminderForm, setShowReminderForm] = useState(false);
+  const treatRepeatPending = useLiveQuery(() => id ? db.reminders.where('trackingId').equals(id).toArray() : [], [id]) ?? [];
+  const [customDays, setCustomDays] = useState<Record<string, string>>({});
+
+  async function setTreatmentInterval(log: 'pest' | 'fungus' | 'fertilizer', days: number) {
+    if (!crop) return;
+    const field = log === 'pest' ? 'pestIntervalDays' : log === 'fungus' ? 'fungusIntervalDays' : 'fertilizerIntervalDays';
+    try {
+      await db.crops.update(crop.id, { [field]: days, updatedAt: Date.now() } as never);
+      const { scheduleTreatmentReminder } = await import('../lib/treatmentReminders');
+      await scheduleTreatmentReminder(crop.id, log);
+      toast.success(days > 0 ? `Repeat every ${days}d` : 'Repeat off');
+    } catch (e) {
+      console.error('[details] interval save failed', { id: crop.id, log, e });
+      toast.error('Could not save: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
   const [stageDate, setStageDate] = useState(formatDateShort(today()));
   const [selectedStage, setSelectedStage] = useState('');
   const [stageMenuOpen, setStageMenuOpen] = useState(false);
@@ -605,6 +622,15 @@ export function CropDetailsScreen() {
     for (const t of treatmentTypes) {
       await upsertPersonalSprays(crop.cropName, t, daysFromPlanting);
     }
+    // Roll repeat reminders forward from this application date
+    const { scheduleTreatmentReminder } = await import('../lib/treatmentReminders');
+    for (const t of treatmentTypes) {
+      try {
+        await scheduleTreatmentReminder(crop.id, t as 'pest' | 'fungus' | 'fertilizer');
+      } catch (e) {
+        console.error('[details] repeat reschedule failed', { id: crop.id, type: t, e });
+      }
+    }
     await addDiaryEntry({
       entryType: 'treatment',
       cropId: crop.id,
@@ -1051,6 +1077,41 @@ export function CropDetailsScreen() {
 
         {activeSheet === 'treatments' && (
           <div className="space-y-3">
+            <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Repeat Reminders</p>
+              <p className="text-[10px] text-muted-foreground">One rolling reminder each — set the rhythm, it re-arms after every application or completion.</p>
+              {([
+                { log: 'pest', icon: '🐛', label: 'Pesticide', rem: 'pesticide' },
+                { log: 'fungus', icon: '🍄', label: 'Fungus', rem: 'fungicide' },
+                { log: 'fertilizer', icon: '🧪', label: 'Fertilizer', rem: 'fertilizer' },
+              ] as const).map(k => {
+                const current = k.log === 'pest' ? (crop.pestIntervalDays ?? 0) : k.log === 'fungus' ? (crop.fungusIntervalDays ?? 0) : (crop.fertilizerIntervalDays ?? 0);
+                const next = treatRepeatPending.find(r => !r.sent && r.type === k.rem);
+                return (
+                  <div key={k.log} className="rounded-lg border border-gray-100 p-2 space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold">{k.icon} {k.label}</p>
+                      {next && <p className="text-[10px] text-purple-700 font-semibold">next {next.sendDate}</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      {([0, 7, 14, 21, 30] as const).map(d => (
+                        <button key={d} onClick={() => setTreatmentInterval(k.log, d)}
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold border ${current === d ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-200 text-gray-600'}`}>
+                          {d === 0 ? 'Off' : d === 7 ? '1w' : d === 30 ? '1m' : `${d / 7}w`}
+                        </button>
+                      ))}
+                      <input value={customDays[k.log] ?? ''} onChange={e => setCustomDays(prev => ({ ...prev, [k.log]: e.target.value }))}
+                        onBlur={e => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!Number.isNaN(v) && v > 0 && v <= 365) void setTreatmentInterval(k.log, v);
+                        }}
+                        placeholder="d" inputMode="numeric" aria-label={`Custom ${k.label} interval in days`}
+                        className="w-12 border rounded-lg text-xs text-center" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
             <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Treatment</p>
               <div className="flex gap-1">

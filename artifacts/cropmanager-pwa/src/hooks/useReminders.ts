@@ -38,4 +38,11 @@ export async function markReminderDone(id: string) {
     console.error('[reminders] mark done failed', { id, e });
     throw e;
   }
+  // Per-crop treatment repeats roll forward to the next due date.
+  try {
+    const { rollTreatmentRepeat } = await import('../lib/treatmentReminders');
+    await rollTreatmentRepeat(id);
+  } catch (e) {
+    console.error('[reminders] repeat roll failed', { id, e });
+  }
 }

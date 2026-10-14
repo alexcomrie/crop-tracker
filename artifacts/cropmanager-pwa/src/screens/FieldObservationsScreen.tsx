@@ -13,7 +13,7 @@ import { logDeviation } from '../lib/learning';
 import { foundationFruitDefault, getPersonalCropData, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { formatDateShort, parseDate, daysBetween, today } from '../lib/dates';
 import { toast } from 'sonner';
-import type { TrackingEntry, ObservationEntry } from '../types';
+import type { TrackingEntry, ObservationEntry, ObservationLog, Tracking } from '../types';
 
 /**
  * All observations in one place: tracker-crop notes (tagged with short crop
@@ -56,7 +56,7 @@ export function FieldObservationsScreen() {
   const cropById = useMemo(() => new Map(crops.map(c => [c.id, c])), [crops]);
 
   const observations = useLiveQuery(async () => {
-    const all = await db.observationLogs.toArray().catch(() => []);
+    const all = await db.observationLogs.toArray().catch((): ObservationLog[] => []);
     return all
       .sort((a, b) => (parseDate(b.date)?.getTime() ?? 0) - (parseDate(a.date)?.getTime() ?? 0));
   }, []) ?? [];
@@ -65,7 +65,7 @@ export function FieldObservationsScreen() {
   ), [observations, obsFilter]);
 
   const trackings = useLiveQuery(async () => {
-    const all = await db.trackings.toArray().catch(() => []);
+    const all = await db.trackings.toArray().catch((): Tracking[] => []);
     return all
       .filter(t => !t.cropId)
       .sort((a, b) => {

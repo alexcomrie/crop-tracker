@@ -64,6 +64,9 @@ export function CropEditScreen() {
   const [potSize, setPotSize] = useState('');
   const [potSizeCustom, setPotSizeCustom] = useState('');
   const [potCount, setPotCount] = useState('');
+  const [pestInterval, setPestInterval] = useState(0);
+  const [fungusInterval, setFungusInterval] = useState(0);
+  const [fertilizerInterval, setFertilizerInterval] = useState(0);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -90,6 +93,9 @@ export function CropEditScreen() {
       setPotSizeCustom(/size\s+([^·]+)/i.exec(container)?.[1]?.trim() ?? '');
     }
     setPotCount(parsed.potCount);
+    setPestInterval(crop.pestIntervalDays ?? 0);
+    setFungusInterval(crop.fungusIntervalDays ?? 0);
+    setFertilizerInterval(crop.fertilizerIntervalDays ?? 0);
     setNotes(rest);
     setReady(true);
   }, [crop, ready]);
@@ -126,6 +132,9 @@ export function CropEditScreen() {
       await db.crops.update(id, {
         variety: variety.trim(),
         plantingMethod: method,
+        pestIntervalDays: pestInterval,
+        fungusIntervalDays: fungusInterval,
+        fertilizerIntervalDays: fertilizerInterval,
         plantingDate,
         germinationDate,
         transplantDateScheduled: transplantScheduled,
@@ -144,6 +153,8 @@ export function CropEditScreen() {
         details: `Method: ${method}`,
         date: plantingDate || undefined,
       }).catch(() => {});
+      const { rescheduleAllTreatmentReminders } = await import('../lib/treatmentReminders');
+      await rescheduleAllTreatmentReminders(id).catch(() => {});
       toast.success('Crop updated');
       navigate(cropDetailsPath(id));
     } catch (e) {
@@ -154,8 +165,8 @@ export function CropEditScreen() {
     }
   }
 
-  const pill = (active: boolean) =>
-    `px-3 py-2 rounded-full text-sm border ${active ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`;
+  const pill = (active: boolean, extra = 'px-3 py-2 text-sm') =>
+    `${extra} rounded-full border ${active ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300'}`;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24 pt-2">
@@ -227,6 +238,24 @@ export function CropEditScreen() {
               </div>
             </div>
           )}
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Treatment Repeats</p>
+          {([
+            { label: '🐛 Pesticide', value: pestInterval, set: setPestInterval },
+            { label: '🍄 Fungus', value: fungusInterval, set: setFungusInterval },
+            { label: '🧪 Fertilizer', value: fertilizerInterval, set: setFertilizerInterval },
+          ]).map(r => (
+            <div key={r.label} className="flex items-center gap-1">
+              <span className="text-[11px] font-semibold w-24 shrink-0">{r.label}</span>
+              {([0, 7, 14, 21, 30] as const).map(d => (
+                <button key={d} onClick={() => r.set(d)} className={pill(r.value === d, 'flex-1 py-1.5 text-[11px] font-bold')}>
+                  {d === 0 ? 'Off' : d === 7 ? '1w' : d === 30 ? '1m' : `${d / 7}w`}
+                </button>
+              ))}
+            </div>
+          ))}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">

@@ -38,6 +38,9 @@ export function CropCreateScreen() {
   const [trayCells, setTrayCells] = useState('');
   const [trayCellsCustom, setTrayCellsCustom] = useState('');
   const [trayCount, setTrayCount] = useState('');
+  const [pestInterval, setPestInterval] = useState(0);
+  const [fungusInterval, setFungusInterval] = useState(0);
+  const [fertilizerInterval, setFertilizerInterval] = useState(0);
   const [potSize, setPotSize] = useState('');
   const [potSizeCustom, setPotSizeCustom] = useState('');
   const [potCount, setPotCount] = useState('');
@@ -102,7 +105,7 @@ export function CropCreateScreen() {
       }
       if (containerBits.length) notesStr = `🧫 Container: ${containerBits.join(' · ')}${notes ? '\n' + notes : ''}`;
       else if (trayColors.length) notesStr = `🎨 Tray: ${trayColors.join(', ')}${notes ? '\n' + notes : ''}`;
-      // Direct Ground is planted in place — every other method may transplant
+      // Direct Ground + Division are planted in place — other methods may transplant
       const transplantDate = cropData && needsTransplant(method)
         ? calculateTransplantDate(validPlantDate, null, cropData, [], cropKey, variety)
         : null;
@@ -125,6 +128,7 @@ export function CropCreateScreen() {
         batchNumber: 1,
         fungusSprayDates: '', pestSprayDates: '',
         fertilizerType: '', fertilizerDays: 0, nextFertilizerDate: '',
+        pestIntervalDays: pestInterval, fungusIntervalDays: fungusInterval, fertilizerIntervalDays: fertilizerInterval,
         status: 'Active', notes: notesStr ?? '',
         daysSeedGerm: 0, daysGermTransplant: 0, daysTransplantHarvest: 0,
         telegramChatId: settings.telegramChatId ?? '',
@@ -161,6 +165,11 @@ export function CropCreateScreen() {
           step = 'reminders.bulkAdd';
           await db.reminders.bulkAdd(reminders as never);
         }
+      }
+      if (!editId && (pestInterval > 0 || fungusInterval > 0 || fertilizerInterval > 0)) {
+        step = 'reminders.treatment-repeats';
+        const { rescheduleAllTreatmentReminders } = await import('../lib/treatmentReminders');
+        await rescheduleAllTreatmentReminders(id);
       }
       toast.success(editId ? 'Crop updated' : 'Crop added');
       navigate(ROUTES.CROPS);
@@ -332,6 +341,24 @@ export function CropCreateScreen() {
                 </div>
               </div>
             )}
+            <div className="rounded-lg border border-gray-100 p-2 space-y-1.5">
+              <p className="text-[11px] font-bold uppercase text-gray-500">Treatment repeats (optional)</p>
+              {([
+                { label: '🐛 Pesticide', value: pestInterval, set: setPestInterval },
+                { label: '🍄 Fungus', value: fungusInterval, set: setFungusInterval },
+                { label: '🧪 Fertilizer', value: fertilizerInterval, set: setFertilizerInterval },
+              ]).map(r => (
+                <div key={r.label} className="flex items-center gap-1">
+                  <span className="text-[11px] font-semibold w-24 shrink-0">{r.label}</span>
+                  {([0, 7, 14, 30] as const).map(d => (
+                    <button key={d} onClick={() => r.set(d)}
+                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold border ${r.value === d ? 'bg-green-700 text-white border-green-700' : 'bg-white border-gray-200 text-gray-600'}`}>
+                      {d === 0 ? 'Off' : d === 7 ? '1w' : d === 30 ? '1m' : '2w'}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
             <Button className="w-full" onClick={()=>setStep(6)}>Next</Button>
             <button onClick={()=>setStep(method==='Seed Tray' ? 4 : 3)} className="w-full text-sm text-muted-foreground">← Back</button>
           </div>

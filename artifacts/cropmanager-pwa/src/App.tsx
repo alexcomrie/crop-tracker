@@ -140,6 +140,17 @@ function AppContent() {
           console.error('[migrate] vegetative stage fix failed', { id: crop.id, e });
         }
       }
+      // Foundation spray schedules are retired: per-crop repeat intervals
+      // replace them. Drop pending auto-generated schedule reminders once.
+      try {
+        const { LEGACY_SCHEDULE_TYPES } = await import('./lib/treatmentReminders');
+        const stale = await db.reminders.where('type').anyOf(LEGACY_SCHEDULE_TYPES).toArray();
+        await Promise.all(
+          stale.filter(r => !r.sent).map(r => db.reminders.delete(r.id).catch(() => {})),
+        );
+      } catch (e) {
+        console.error('[migrate] legacy schedule cleanup failed', { e });
+      }
     }
     migrateCrops().catch(console.error);
   }, []);

@@ -200,6 +200,10 @@ export interface Crop {
   fertilizerType: string;     // Selected fertilizer profile for tracking
   fertilizerDays: number;    // Days between fertilizer applications
   nextFertilizerDate: string;
+  /** Repeat reminder intervals in days (0/undefined = off), set per crop. */
+  pestIntervalDays?: number;
+  fungusIntervalDays?: number;
+  fertilizerIntervalDays?: number;
   status: string;
   archivedFrom?: string;
   /** Foundation DB key this tracker crop syncs learning with (defaults to cropName). */

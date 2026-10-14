@@ -1,9 +1,8 @@
 import type { Crop, Propagation, Reminder, CropData, CropDbAdjustment, PropDbAdjustment } from '../types';
 import { generateId } from './ids';
-import { parseDate, addDays, formatDateShort, daysBetween } from './dates';
+import { parseDate, addDays, formatDateShort } from './dates';
 import { getAdjustedValue, calculateHarvestDate, calculateTransplantDate } from './harvest';
 import { needsTransplant } from './stages';
-import { calcSprayDates } from './sprays';
 import { getRootingDays } from './propagation';
 
 function makeReminder(
@@ -93,33 +92,10 @@ export function generateCropReminders(
     ));
   }
 
-  // Fungus spray reminders
-  const fungusDates = calcSprayDates(planted, cropData.fungus_spray_days || []);
-  fungusDates.forEach(d => {
-    reminders.push(makeReminder(
-      'spray_fungus', crop.cropName, crop.id,
-      d,
-      `🍄 Fungus Spray: ${crop.cropName}`,
-      `Apply fungus spray to ${crop.cropName} (${crop.variety}).`,
-      chatId
-    ));
-  });
-
-  // Pest spray reminders
-  const pestDates = calcSprayDates(planted, cropData.pest_spray_days || []);
-  pestDates.forEach(d => {
-    reminders.push(makeReminder(
-      'spray_pest', crop.cropName, crop.id,
-      d,
-      `🐛 Pest Spray: ${crop.cropName}`,
-      `Apply pest spray to ${crop.cropName} (${crop.variety}).`,
-      chatId
-    ));
-  });
-
-  // Fertilizer repeating reminders (firtilizer.md logic)
-  const fertReminders = generateFertilizerReminders(crop, cropData, adjustments, chatId, threshold);
-  reminders.push(...fertReminders);
+  // NOTE: pest/fungus/fertilizer schedules no longer come from the
+  // foundation database. Each crop carries its own repeat interval
+  // (pestIntervalDays / fungusIntervalDays / fertilizerIntervalDays),
+  // managed from the Treatment tab — see lib/treatmentReminders.ts.
 
   // Continuous harvest batch planting reminders
   if (crop.isContinuous) {
@@ -188,62 +164,6 @@ export function calculateBatchPlantingDates(
   }
 
   return batchDates;
-}
-
-export function generateFertilizerReminders(
-  crop: Crop,
-  cropData: CropData,
-  adjustments: CropDbAdjustment[],
-  chatId: string,
-  threshold = 3
-): Reminder[] {
-  const reminders: Reminder[] = [];
-  const planted = parseDate(crop.plantingDate);
-  if (!planted) return reminders;
-
-  const growingTime = cropData.growing_time_days || 60;
-  const transplantDays = cropData.transplant_days || 21;
-  const harvestDate = calculateHarvestDate(crop, cropData, adjustments, threshold) || addDays(planted, growingTime);
-  const transplantDate = calculateTransplantDate(planted, null, cropData, adjustments, crop.cropName.toLowerCase(), crop.variety, threshold) || addDays(planted, transplantDays);
-
-  const stages = [
-    { name: 'Seedling', start: planted, end: transplantDate, interval: 7, emoji: '🌱' },
-    { name: 'Mid-Veg', start: transplantDate, end: addDays(planted, Math.floor(growingTime * 0.35)), interval: 10, emoji: '🌿' },
-    { name: 'Flowering', start: addDays(planted, Math.floor(growingTime * 0.35)), end: addDays(planted, Math.floor(growingTime * 0.60)), interval: 10, emoji: '🌸' },
-    { name: 'Fruiting', start: addDays(planted, Math.floor(growingTime * 0.60)), end: harvestDate, interval: 14, emoji: '🍅' },
-  ];
-
-  stages.forEach(stage => {
-    let current = stage.start;
-    let appNum = 1;
-    const totalApps = Math.max(1, Math.ceil(daysBetween(stage.start, stage.end) / stage.interval));
-
-    while (current < stage.end) {
-      const nextDate = addDays(current, stage.interval);
-      const isFirstOfStage = appNum === 1;
-      
-      let body = `${isFirstOfStage ? '🚀 New growth stage — switch to this mix\n' : ''}`;
-      body += `Application ${appNum} of ~${totalApps}\n`;
-      body += `Apply today: ${formatDateShort(current)}\n`;
-      if (nextDate < stage.end) {
-        body += `Next application: ${formatDateShort(nextDate)}\n`;
-      }
-      body += `\nMix for ${stage.name} stage: See Fertilizer guide in app.`;
-
-      reminders.push(makeReminder(
-        'fert_application', crop.cropName, crop.id,
-        current,
-        `${stage.emoji} Fertilizer: ${stage.name} - ${crop.cropName}`,
-        body,
-        chatId
-      ));
-
-      current = nextDate;
-      appNum++;
-    }
-  });
-
-  return reminders;
 }
 
 export function generatePropReminders(

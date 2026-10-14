@@ -11,6 +11,7 @@ import { PropForm } from '../components/props/PropForm';
 import { AddEntrySheet } from '../components/shared/AddEntrySheet';
 import { CheckCircle2, Sprout } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
+import { useAppStore, withReminderDefaults, isReminderKindAllowed } from '../store/useAppStore';
 import { TYPE_EMOJI, TYPE_DOT, TYPE_TAG } from '../lib/reminderUi';
 import { ROUTES } from '../lib/routes';
 
@@ -18,6 +19,9 @@ export function DashboardScreen() {
   const navigate = useNavigate();
   const todayReminders = useTodayReminders() ?? [];
   const todayStr = formatDateShort(today());
+  const { settings } = useAppStore();
+  const reminderPrefs = withReminderDefaults(settings);
+  const visibleToday = todayReminders.filter(r => reminderPrefs.remindersEnabled && isReminderKindAllowed(settings, r.type));
 
 const upcomingData = useLiveQuery(async () => {
     const all = await db.reminders.toArray()
@@ -37,7 +41,7 @@ const upcomingData = useLiveQuery(async () => {
   const [showPropForm, setShowPropForm] = useState(false);
 
   useEffect(() => {
-    const count = todayReminders.length;
+    const count = visibleToday.length;
     if (count > 0) {
       setAppBadge(count);
       const alertedKey = `alerted_${todayStr}`;
@@ -57,13 +61,13 @@ const upcomingData = useLiveQuery(async () => {
         }
       } catch {}
       if (!localStorage.getItem(alertedKey)) {
-        playAlert();
+        if (reminderPrefs.reminderSound) playAlert();
         try { localStorage.setItem(alertedKey, '1'); } catch {}
       }
     } else {
       clearAppBadge();
     }
-  }, [todayReminders, todayStr]);
+  }, [visibleToday, todayStr]);
 
   return (
     <div className="pb-24 pt-2 bg-[#f5f5f0] min-h-screen">

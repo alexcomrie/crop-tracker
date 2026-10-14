@@ -215,10 +215,11 @@ export function calcExpectedStage(crop: Crop, cropData: CropData | null): string
     return 'Seedling';
   }
 
-  // Seedling gating Condition #3 (tray/bed must move before going vegetative)
-  const isTrayOrBed = crop.plantingMethod === 'Seed Tray' || crop.plantingMethod === 'Seed Bed';
+  // Seedling gating Condition #3: every method that transplants (trays,
+  // beds, pots, cuttings, grafted — all but Direct Ground + Division) holds
+  // at Seedling until the transplant is recorded.
   if (normalizeStage(crop.plantStage) === 'Seedling') {
-    if (isTrayOrBed && !crop.transplantDateActual) {
+    if (needsTransplant(crop.plantingMethod) && !crop.transplantDateActual) {
       // need transplant before vegetative
       return 'Seedling';
     }

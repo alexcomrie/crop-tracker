@@ -28,7 +28,7 @@ export function useDueNotifier() {
       const prefs = withReminderDefaults(settings);
       try {
         const now = today().getTime();
-        const all = await db.reminders.where('sendDate').above('').toArray().catch(() => []);
+        const all = await db.reminders.where('sendDate').above('').toArray().catch((): import('../types').Reminder[] => []);
         const due = all.filter(r => {
           if (r.sent) return false;
           const ts = r.sendDate ? parseDate(r.sendDate)?.getTime() ?? null : null;
@@ -44,11 +44,21 @@ export function useDueNotifier() {
         }
 
         if (!prefs.remindersEnabled || due.length === 0) return;
-        const fresh = due.filter(r => !notifiedThisSession.has(r.id) && isReminderKindAllowed(settings, r.type));
+        // Skip ancient backlog silently (still badged + listed) — only alert
+        // for items due within the last 30 days so old schedules can't flood.
+        const cutoff = now - 30 * 86400000;
+        const fresh = due.filter(r => {
+          if (notifiedThisSession.has(r.id) || !isReminderKindAllowed(settings, r.type)) return false;
+          const ts = r.sendDate ? parseDate(r.sendDate)?.getTime() ?? 0 : 0;
+          return ts >= cutoff;
+        });
         if (fresh.length === 0) return;
 
+        // Cap: 3 individual alerts + one summary, never a wall of popups.
+        const MAX_ALERTS = 3;
+        const shown = fresh.slice(0, MAX_ALERTS);
         let sounded = false;
-        for (const r of fresh) {
+        for (const r of shown) {
           notifiedThisSession.add(r.id);
           const ok = await showSystemNotice(
             { id: r.id, title: `🔔 ${r.subject}`, body: `${r.cropPlantName} · due ${r.sendDate}${r.body ? ` — ${r.body}` : ''}` },
@@ -59,6 +69,13 @@ export function useDueNotifier() {
             await playTone(prefs.reminderTone);
           }
           if (stopped) break;
+        }
+        if (fresh.length > MAX_ALERTS && !stopped) {
+          for (const r of fresh) notifiedThisSession.add(r.id);
+          await showSystemNotice(
+            { id: 'more', title: `🔔 ${fresh.length - MAX_ALERTS} more reminders due`, body: 'Open Reminders to review them.' },
+            { silent: !prefs.reminderSound, vibrate: false },
+          );
         }
       } catch (e) {
         console.error('[notify] due sweep failed', { e });

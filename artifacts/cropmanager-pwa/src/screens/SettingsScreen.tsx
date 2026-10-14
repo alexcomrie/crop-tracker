@@ -23,11 +23,18 @@ export function SettingsScreen() {
     setPerm(p);
   }
 
-  const setRem = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
+  // Reminder prefs apply + persist instantly (no SAVE needed) so the
+  // notifier picks them up on its next sweep.
+  const setRem = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setLocal(l => ({ ...l, [key]: value }));
+    updateSettings({ [key]: value } as Partial<AppSettings>);
+  };
 
-  const toggleKind = (id: string) =>
-    setLocal(l => ({ ...l, reminderKinds: { ...(l.reminderKinds ?? {}), [id]: !((l.reminderKinds ?? {})[id] ?? true) } }));
+  const toggleKind = (id: string) => {
+    const next = { ...(local.reminderKinds ?? {}), [id]: !((local.reminderKinds ?? {})[id] ?? true) };
+    setLocal(l => ({ ...l, reminderKinds: next }));
+    updateSettings({ reminderKinds: next });
+  };
 
   const switchCls = (on: boolean) =>
     `w-11 h-6 rounded-full transition-colors shrink-0 ${on ? 'bg-green-600' : 'bg-gray-300'}`;
@@ -123,7 +130,7 @@ export function SettingsScreen() {
             Enable Device Notifications
           </Button>
         )}
-        <p className="text-[10px] text-muted-foreground leading-tight italic">Due reminders pop up as system notifications (app icon in the status bar) while the browser or installed app is running, plus an icon badge with the due count. Tap SAVE below to apply changes.</p>
+        <p className="text-[10px] text-muted-foreground leading-tight italic">Due reminders pop up as system notifications (app icon in the status bar) while the browser or installed app is running, plus an icon badge with the due count. Changes here save instantly.</p>
         {([
           ['remindersEnabled', 'Reminder alerts'],
           ['reminderSound', 'Sound'],

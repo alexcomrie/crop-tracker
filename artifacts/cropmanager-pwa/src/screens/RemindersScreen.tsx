@@ -25,7 +25,9 @@ export function RemindersScreen() {
       return tb - ta;
     });
   });
-  const reminders = remindersData ?? [];
+  // Retired foundation-schedule types never appear here (migration deletes
+  // pending ones; this guards any that slip through).
+  const reminders = (remindersData ?? []).filter(r => !['spray_fungus', 'spray_pest', 'fert_application'].includes(r.type));
   const isLoading = remindersData === undefined;
   const crops = useLiveQuery(() => db.crops.toArray().catch(() => []), []) ?? [];
   const cropById = useMemo(() => new Map(crops.map(c => [c.id, c])), [crops]);

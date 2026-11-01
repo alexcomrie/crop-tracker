@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from '@/components/ui/sonner';
 import { TopBar } from './components/layout/TopBar';
@@ -204,6 +204,7 @@ function AppContent() {
             <Route path={ROUTES.MORE_ACTIVITY} element={<PanelPage><ActivityRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_LEDGER} element={<PanelPage><FarmLedgerRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_TREATMENT_RATES} element={<PanelPage><TreatmentAppRatesRoute /></PanelPage>} />
+      <Route path="/more/fert-db" element={<Navigate to={ROUTES.MORE_TREATMENT_RATES} replace />} />
             <Route path={ROUTES.MORE_AREA_MAPPER} element={<PanelPage><AreaMapperRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_DIARY} element={<PanelPage><DiaryScreen /></PanelPage>} />
             <Route path={ROUTES.MORE_OBSERVATIONS} element={<PanelPage><FieldObservationsScreen /></PanelPage>} />

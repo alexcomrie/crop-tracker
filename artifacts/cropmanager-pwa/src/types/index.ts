@@ -241,6 +241,12 @@ export interface TreatmentLog {
   product: string;
   notes: string;
   updatedAt: number;
+  /** Snapshot of the treatment database product at log time. */
+  productId?: string;
+  productName?: string;
+  rateLabel?: string;
+  reiHours?: number;
+  phiDays?: number;
 }
 
 export interface CropDbAdjustment {

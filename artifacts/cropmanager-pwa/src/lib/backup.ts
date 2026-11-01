@@ -1,6 +1,6 @@
 import db from '../db/db';
 
-const BACKUP_VERSION = 10;
+const BACKUP_VERSION = 11;
 
 /**
  * App's own backup sections beyond Dexie rows: settings + localStorage
@@ -47,6 +47,7 @@ export async function exportJsonBackup(): Promise<string> {
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
     microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries, quickNotes,
+    repaymentDebts, repaymentPayments,
   ] = await Promise.all([
     db.crops.toArray(),
     db.propagations.toArray(),
@@ -77,6 +78,8 @@ export async function exportJsonBackup(): Promise<string> {
     db.trackingEntries.toArray(),
     db.observationEntries.toArray(),
     db.quickNotes.toArray(),
+    db.repaymentDebts.toArray(),
+    db.repaymentPayments.toArray(),
   ]);
   const localStorageSection = readLocalStorage();
   return JSON.stringify({
@@ -88,6 +91,7 @@ export async function exportJsonBackup(): Promise<string> {
     successionGaps, activities, ledgerEntries, farmLands, farmAreas, diaryEntries,
     posSales, posCustomers, posSettings, posInventory, posOrders, posHeldReceipts,
     microModels, observationLogs, personalCropDb, trackings, trackingEntries, observationEntries, quickNotes,
+    repaymentDebts, repaymentPayments,
     localStorage: localStorageSection,
   }, null, 2);
 }
@@ -104,6 +108,7 @@ const TABLE_NAMES = [
   'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
   'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
   'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries', 'quickNotes',
+  'repaymentDebts', 'repaymentPayments',
 ] as const;
 
 function getTable(name: (typeof TABLE_NAMES)[number]) {
@@ -127,8 +132,8 @@ export async function importJsonBackupFromString(json: string): Promise<{ counts
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
     throw new Error('Invalid backup payload');
   }
-  if (data.version !== undefined && ![6, 7, 8, 9, BACKUP_VERSION].includes(data.version)) {
-    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6-9 or ${BACKUP_VERSION})`);
+  if (data.version !== undefined && (typeof data.version !== 'number' || data.version < 6 || data.version > BACKUP_VERSION)) {
+    throw new Error(`Unsupported backup version ${String(data.version)} (expected 6-${BACKUP_VERSION})`);
   }
   const counts: Record<string, number> = {};
   let skipped = 0;

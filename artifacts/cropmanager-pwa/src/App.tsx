@@ -30,6 +30,7 @@ import { AreaMapperScreen } from './components/area/AreaMapperScreen';
 import DiaryScreen from './components/diary/DiaryScreen';
 import FarmCalculatorScreen from './components/calculator/FarmCalculatorScreen';
 import POSScreen from './components/pos/POSScreen';
+import RepaymentTrackerScreen from './components/repayments/RepaymentTrackerScreen';
 import { useAppStore } from './store/useAppStore';
 import { useTelegramReminders } from './hooks/useTelegramReminders';
 import { useDueNotifier } from './hooks/useDueNotifier';
@@ -95,6 +96,7 @@ const ActivityRoute = withOnClose(ActivityScreen);
 const FarmLedgerRoute = withOnClose(FarmLedgerScreen);
 const TreatmentAppRatesRoute = withOnClose(TreatmentAppRatesScreen);
 const AreaMapperRoute = withOnClose(AreaMapperScreen);
+const RepaymentTrackerRoute = withOnClose(RepaymentTrackerScreen);
 
 function AppContent() {
   const location = useLocation();
@@ -209,6 +211,7 @@ function AppContent() {
             <Route path={ROUTES.MORE_NOTES} element={<PanelPage><NoteTakerScreen /></PanelPage>} />
             <Route path={ROUTES.MORE_CALCULATOR} element={<PanelPage><FarmCalculatorScreen /></PanelPage>} />
             <Route path={ROUTES.MORE_POS} element={<PanelPage><POSScreen /></PanelPage>} />
+            <Route path={ROUTES.MORE_REPAYMENTS} element={<PanelPage><RepaymentTrackerRoute /></PanelPage>} />
           </Routes>
         </AnimatePresence>
       </main>

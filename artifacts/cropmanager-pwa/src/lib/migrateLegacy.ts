@@ -28,6 +28,7 @@ const TABLES = [
   'successionGaps', 'activities', 'ledgerEntries', 'farmLands', 'farmAreas', 'diaryEntries',
   'posSales', 'posCustomers', 'posSettings', 'posInventory', 'posOrders', 'posHeldReceipts',
   'microModels', 'observationLogs', 'personalCropDb', 'trackings', 'trackingEntries', 'observationEntries', 'quickNotes',
+  'repaymentDebts', 'repaymentPayments',
 ] as const;
 
 type Row = Record<string, unknown>;

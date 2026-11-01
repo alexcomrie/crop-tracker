@@ -41,13 +41,13 @@ export function buildFarmEvents(all: {
   activities?: any[]; treatmentLogs?: any[]; harvestLogs?: any[];
   stageLogs?: any[]; observationLogs?: any[]; observationEntries?: any[];
   trackings?: any[]; trackingEntries?: any[]; ledgerEntries?: any[];
-  reminders?: any[];
+  reminders?: any[]; repaymentPayments?: any[];
 }): FarmEvent[] {
   const out: FarmEvent[] = [];
   const {
     activities = [], treatmentLogs = [], harvestLogs = [], stageLogs = [],
     observationLogs = [], observationEntries = [], trackings = [],
-    trackingEntries = [], ledgerEntries = [], reminders = [],
+    trackingEntries = [], ledgerEntries = [], reminders = [], repaymentPayments = [],
   } = all;
 
   for (const a of activities) {
@@ -105,6 +105,12 @@ export function buildFarmEvents(all: {
       `${l.type ?? ''} · ${l.category ?? ''} · $${l.amount ?? 0}`,
       l.notes ?? l.description ?? '', [], '',
       { table: 'ledgerEntries', refId: l.id }));
+  }
+  for (const p of repaymentPayments) {
+    out.push(ev(`rep:${p.id}`, p.date ?? '', 'finance',
+      `Repayment: ${p.debtName ?? 'Debt'} · ${p.currency ?? '$'}${Number(p.amount ?? 0).toFixed(2)}`,
+      p.note ?? p.reference ?? '', [], '',
+      { table: 'repaymentPayments', refId: p.id }));
   }
   for (const r of reminders) {
     if (!r.sendDate) continue;

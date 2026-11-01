@@ -17,9 +17,40 @@ import { InventoryManager } from './InventoryManager';
 import { CustomerManager } from './CustomerManager';
 import { OrderBook } from './OrderBook';
 import { HeldReceipts } from './HeldReceipts';
-import { buildSaleReceipt, connectBluetoothPrinter, printViaBluetooth, buildSaleReceiptText } from '../../lib/receiptPrinter';
+import { buildSaleReceipt, connectBluetoothPrinter, printViaBluetooth, buildSaleReceiptText, setActivePrinter } from '../../lib/receiptPrinter';
 import type { PrintSettings } from '../../lib/receiptPrinter';
 import { toPng } from 'html-to-image';
+
+const CART_DRAFT_KEY = 'pos_cart_draft_v1';
+
+interface PosCartDraft {
+  cart: { inventoryId: string; item: PosSaleItem }[];
+  customerId: string | null;
+  customerName: string;
+  discount: number;
+  discountType: 'percentage' | 'fixed';
+  notes: string;
+}
+
+/** Restore the cart left behind when the user backed out of POS. */
+function readCartDraft(): PosCartDraft | null {
+  try {
+    const raw = localStorage.getItem(CART_DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PosCartDraft>;
+    if (!Array.isArray(parsed.cart)) return null;
+    return {
+      cart: parsed.cart.filter(e => e && e.item && typeof e.inventoryId === 'string'),
+      customerId: typeof parsed.customerId === 'string' ? parsed.customerId : null,
+      customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
+      discount: typeof parsed.discount === 'number' && Number.isFinite(parsed.discount) ? parsed.discount : 0,
+      discountType: parsed.discountType === 'percentage' ? 'percentage' : 'fixed',
+      notes: typeof parsed.notes === 'string' ? parsed.notes : '',
+    };
+  } catch {
+    return null;
+  }
+}
 
 const PAYMENT_METHODS = [
   { id: 'cash', label: 'Cash', emoji: '💵' },
@@ -29,18 +60,22 @@ const PAYMENT_METHODS = [
 ];
 
 export default function POSScreen() {
+  const [restoredDraft] = useState(readCartDraft);
   const [tab, setTab] = useState<'pos' | 'history' | 'settings' | 'inventory' | 'customers' | 'orders' | 'held'>('pos');
-  const [cart, setCart] = useState<Map<string, { item: PosSaleItem; inventoryId: string }>>(new Map());
+  const [cart, setCart] = useState<Map<string, { item: PosSaleItem; inventoryId: string }>>(
+    () => new Map((restoredDraft?.cart ?? []).map(entry => [entry.inventoryId, entry])),
+  );
   const [search, setSearch] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'other'>('cash');
   const [amountPaid, setAmountPaid] = useState(0);
-  const [customerName, setCustomerName] = useState('');
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState(restoredDraft?.customerName ?? '');
+  const [customerId, setCustomerId] = useState<string | null>(restoredDraft?.customerId ?? null);
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
   const [showCheckout, setShowCheckout] = useState(false);
-  const [discount, setDiscount] = useState(0);
-  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('fixed');
-  const [notes, setNotes] = useState('');
+  const [discount, setDiscount] = useState(restoredDraft?.discount ?? 0);
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>(restoredDraft?.discountType ?? 'fixed');
+  const [notes, setNotes] = useState(restoredDraft?.notes ?? '');
+  const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
   const [bluetoothDevice, setBluetoothDevice] = useState<BluetoothDevice | null>(null);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -98,6 +133,36 @@ export default function POSScreen() {
   const customers = useLiveQuery(() => db.posCustomers.toArray(), []) ?? [];
   const posSettingsData = useLiveQuery(() => db.posSettings.toArray(), []);
   const lastSale = useLiveQuery(() => db.posSales.orderBy('receiptNumber').last(), []);
+
+  // Re-link a restored cart to the saved customer once customers load.
+  useEffect(() => {
+    if (!customerId) {
+      if (!customerName) setSelectedCustomer(null);
+      return;
+    }
+    const match = customers.find(c => c.id === customerId);
+    if (match && match.id !== selectedCustomer?.id) setSelectedCustomer(match);
+  }, [customerId, customerName, customers, selectedCustomer?.id]);
+
+  // Keep the cart alive when the user backs out of POS to the main app.
+  useEffect(() => {
+    const draft: PosCartDraft = {
+      cart: Array.from(cart.values()),
+      customerId,
+      customerName,
+      discount,
+      discountType,
+      notes,
+    };
+    try {
+      const isEmpty = draft.cart.length === 0 && !draft.customerId && !draft.customerName
+        && !draft.notes && draft.discount === 0;
+      if (isEmpty) localStorage.removeItem(CART_DRAFT_KEY);
+      else localStorage.setItem(CART_DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // Storage full/private mode — the in-memory cart still works.
+    }
+  }, [cart, customerId, customerName, discount, discountType, notes]);
 
   const settings: PosSettings = (posSettingsData && posSettingsData.length > 0 && posSettingsData[0])
     ? posSettingsData[0]
@@ -191,21 +256,26 @@ export default function POSScreen() {
       const next = new Map(prev);
       const existing = next.get(inventoryId);
       if (!existing) return prev;
-      if (qty <= 0) {
-        next.delete(inventoryId);
-      } else {
-        next.set(inventoryId, { ...existing, item: { ...existing.item, quantity: qty, unitPrice: price, total: qty * price } });
-      }
+      // Never remove a line because of a transient blank/zero quantity.
+      // Lines only leave the cart through the trash button (or Clear).
+      const safeQty = Number.isFinite(qty) ? Math.max(0, qty) : existing.item.quantity;
+      const safePrice = Number.isFinite(price) ? Math.max(0, price) : existing.item.unitPrice;
+      next.set(inventoryId, {
+        ...existing,
+        item: { ...existing.item, quantity: safeQty, unitPrice: safePrice, total: safeQty * safePrice },
+      });
       return next;
     });
   }
 
   function removeFromCart(inventoryId: string) {
     setCart(prev => { const next = new Map(prev); next.delete(inventoryId); return next; });
+    setQtyDrafts(d => { const next = { ...d }; delete next[inventoryId]; return next; });
   }
 
   function clearCart() {
     setCart(new Map());
+    setQtyDrafts({});
     setDiscount(0);
     setNotes('');
     setAmountPaid(0);
@@ -260,7 +330,15 @@ export default function POSScreen() {
 
     setSaving(true);
     try {
-      const cartSnapshot = cartItems.map(({ item, inventoryId }) => ({ ...item, inventoryId }));
+      // Zero-quantity lines stay visible in the cart but are not sold.
+      const cartSnapshot = cartItems
+        .filter(({ item }) => (Number(item.quantity) || 0) > 0)
+        .map(({ item, inventoryId }) => ({ ...item, inventoryId }));
+      if (cartSnapshot.length === 0) {
+        setSaving(false);
+        toast.error('Add at least one item with a quantity');
+        return;
+      }
       const totalQty = cartSnapshot.reduce((s, i) => s + (Number(i.quantity) || 0), 0);
       const units = [...new Set(cartSnapshot.map(i => i.unit).filter(Boolean))];
       let receiptNumber = nextReceiptNumber;
@@ -413,9 +491,11 @@ export default function POSScreen() {
       if (device) {
         setBluetoothDevice(device);
         setPrinterConnected(true);
+        setActivePrinter(device);
         device.addEventListener('gattserverdisconnected', () => {
           setPrinterConnected(false);
           setBluetoothDevice(null);
+          setActivePrinter(null);
         });
         toast.success(`Connected to ${device.name || 'printer'}`);
       }
@@ -444,6 +524,7 @@ export default function POSScreen() {
       });
     }
     setCart(newCart);
+    setQtyDrafts({});
     setCustomerName(order.customerName);
     setCustomerId(order.customerId);
     setFulfillOrder(order);
@@ -456,12 +537,22 @@ export default function POSScreen() {
     toast.info(`Fulfilling order for ${order.customerName} — ${order.items.length} item(s)`);
   }
 
-  function handleLoadReceipt(r: PosHeldReceipt) {
+  async function handleLoadReceipt(r: PosHeldReceipt) {
+    try {
+      // Loading consumes the held copy. If it stayed in the held list, holding
+      // the same cart again would create a duplicate entry.
+      await db.posHeldReceipts.delete(r.id);
+    } catch (e) {
+      console.error('[pos] failed to remove loaded held receipt', { id: r.id, e });
+      toast.error('Could not open that held receipt: ' + (e instanceof Error ? e.message : String(e)));
+      return;
+    }
     const newCart = new Map<string, { item: PosSaleItem; inventoryId: string }>();
     for (const entry of r.cart) {
       newCart.set(entry.inventoryId, entry);
     }
     setCart(newCart);
+    setQtyDrafts({});
     setCustomerId(r.customerId);
     setCustomerName(r.customerName);
     if (r.customerId) {
@@ -644,13 +735,45 @@ export default function POSScreen() {
                   <p className="text-sm font-medium truncate">{item.productName}</p>
                   <p className="text-[10px] text-gray-400">{item.unit}</p>
                   <div className="flex items-center gap-1 mt-1">
-                    <Input type="number" value={item.quantity} onChange={e => updateCartItem(inventoryId, Number(e.target.value) || 0, item.unitPrice)} className="w-16 h-7 text-sm text-center" min={0} step={0.5} />
+                    <Input
+                      type="number"
+                      value={qtyDrafts[inventoryId] ?? String(item.quantity)}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        setQtyDrafts(d => ({ ...d, [inventoryId]: raw }));
+                        // While the field is blank (or zero) keep the line and its
+                        // last valid quantity; only positive numbers update it.
+                        const next = Number(raw);
+                        if (raw !== '' && Number.isFinite(next)) {
+                          updateCartItem(inventoryId, next, item.unitPrice);
+                        }
+                      }}
+                      onBlur={() => setQtyDrafts(d => {
+                        const next = { ...d };
+                        delete next[inventoryId];
+                        return next;
+                      })}
+                      className="w-16 h-7 text-sm text-center"
+                      min={0}
+                      step={0.5}
+                    />
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-gray-400">{cur}</span>
-                    <Input type="number" value={item.unitPrice || ''} onChange={e => updateCartItem(inventoryId, item.quantity, Number(e.target.value))} className="w-20 h-7 text-sm text-right" min={0} step={0.01} placeholder="Price" />
+                    <Input
+                      type="number"
+                      value={item.unitPrice || ''}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        updateCartItem(inventoryId, item.quantity, raw === '' ? 0 : Number(raw));
+                      }}
+                      className="w-20 h-7 text-sm text-right"
+                      min={0}
+                      step={0.01}
+                      placeholder="Price"
+                    />
                   </div>
                   <p className="text-xs font-semibold mt-0.5">{cur}{item.total.toFixed(2)}</p>
                 </div>

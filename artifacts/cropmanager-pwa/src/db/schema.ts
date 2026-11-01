@@ -5,7 +5,7 @@ import type {
   BatchPlantingLog, CropSearchLog, LedgerEntry, FarmArea, FarmLand,
   DiaryEntry, PosSale, PosCustomer, PosSettings, PosInventoryItem,
   PosOrder, PosHeldReceipt, ObservationLog, PersonalCropData, Tracking,
-  TrackingEntry, ObservationEntry, QuickNote
+  TrackingEntry, ObservationEntry, QuickNote, RepaymentDebt, RepaymentPayment
 } from '../types';
 
 export class CropManagerDB extends Dexie {
@@ -48,6 +48,8 @@ export class CropManagerDB extends Dexie {
   trackingEntries!: Table<TrackingEntry>;
   observationEntries!: Table<ObservationEntry>;
   quickNotes!: Table<QuickNote>;
+  repaymentDebts!: Table<RepaymentDebt>;
+  repaymentPayments!: Table<RepaymentPayment>;
 
   constructor() {
     // v4: removed ALL boolean/nullable fields from indexes (IndexedDB rejects booleans/null as keys).
@@ -170,6 +172,40 @@ export class CropManagerDB extends Dexie {
       trackingEntries: 'id, trackingId, date, updatedAt',
       observationEntries: 'id, observationId, date, updatedAt',
       quickNotes: 'id, updatedAt',
+    });
+    // v5: repayment tracker — debts/loans and their payment history (additive).
+    this.version(5).stores({
+      crops: 'id, cropName, variety, status, plantStage, parentCropId, updatedAt',
+      propagations: 'id, plantName, status, updatedAt',
+      reminders: 'id, type, trackingId, sendDate, updatedAt',
+      stageLogs: 'id, trackingId, date, updatedAt',
+      harvestLogs: 'id, cropTrackingId, harvestDate, updatedAt',
+      treatmentLogs: 'id, cropId, date, updatedAt',
+      cropDbAdjustments: 'id, cropKey, variety, field, updatedAt',
+      propDbAdjustments: 'id, plantKey, method, updatedAt',
+      batchPlantingLogs: 'id, cropTrackingId, status, updatedAt',
+      cropSearchLogs: 'id, cropKey, updatedAt',
+      successionGaps: 'id, updatedAt',
+      activities: 'id, date, type, updatedAt',
+      ledgerEntries: 'id, type, date, category, updatedAt',
+      farmLands: 'id, name, updatedAt',
+      farmAreas: 'id, landId, name, updatedAt',
+      diaryEntries: 'id, cropName, entryType, updatedAt',
+      posSales: 'id, date, receiptNumber, createdAt',
+      posCustomers: 'id, name, phone, createdAt',
+      posSettings: 'id',
+      posInventory: 'id, name, category, updatedAt',
+      posOrders: 'id, customerName, status, createdAt',
+      posHeldReceipts: 'id, name, createdAt',
+      microModels: 'id, updatedAt',
+      observationLogs: 'id, cropId, date, updatedAt',
+      personalCropDb: 'key, updatedAt',
+      trackings: 'id, cropId, status, startDate, updatedAt',
+      trackingEntries: 'id, trackingId, date, updatedAt',
+      observationEntries: 'id, observationId, date, updatedAt',
+      quickNotes: 'id, updatedAt',
+      repaymentDebts: 'id, status, category, dueDate, createdAt, updatedAt',
+      repaymentPayments: 'id, debtId, date, createdAt, updatedAt',
     });
   }
 }

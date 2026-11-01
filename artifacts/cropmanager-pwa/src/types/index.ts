@@ -361,6 +361,8 @@ export interface AppSettings {
   reminderBadge?: boolean;
   /** Per-type allow list; missing keys default to true. */
   reminderKinds?: Record<string, boolean>;
+  /** Show outstanding repayment balances on the dashboard (default true). */
+  showRepaymentOnDashboard?: boolean;
 }
 
 export interface DayForecast {
@@ -465,7 +467,7 @@ export interface FarmArea {
   updatedAt: number;
 }
 
-export type DiaryEntryType = 'crop_created' | 'stage_change' | 'treatment' | 'harvest' | 'note' | 'propagation_created' | 'propagation_stage' | 'activity_log' | 'ledger' | 'pos_sale';
+export type DiaryEntryType = 'crop_created' | 'stage_change' | 'treatment' | 'harvest' | 'note' | 'propagation_created' | 'propagation_stage' | 'activity_log' | 'ledger' | 'pos_sale' | 'repayment';
 
 export interface DiaryEntry {
   id: string;
@@ -593,4 +595,42 @@ export interface PosOrder {
   updatedAt: number;
   deliveredAt?: number;
   canceledAt?: number;
+}
+
+// ─── Repayment Tracker ────────────────────────────────────────────────────────
+
+export type RepaymentDebtCategory = 'loan' | 'debt' | 'credit' | 'supplier' | 'personal' | 'other';
+export type RepaymentDebtStatus = 'active' | 'settled';
+
+export interface RepaymentDebt {
+  id: string;
+  name: string;
+  lender: string;
+  category: RepaymentDebtCategory;
+  originalAmount: number;
+  startDate: string;
+  dueDate: string;
+  notes: string;
+  status: RepaymentDebtStatus;
+  createdAt: number;
+  updatedAt: number;
+  settledAt?: number;
+}
+
+export interface RepaymentPayment {
+  id: string;
+  debtId: string;
+  /** Snapshot of the debt name so history survives a debt deletion. */
+  debtName: string;
+  amount: number;
+  date: string;
+  method: string;
+  reference: string;
+  note: string;
+  /** Currency symbol snapshot at the time of payment. */
+  currency?: string;
+  /** Optional proof-of-payment images stored as compressed data URLs. */
+  proofImages: string[];
+  createdAt: number;
+  updatedAt: number;
 }

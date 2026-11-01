@@ -5,7 +5,7 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet } from 'lucide-react';
 import { REM_TYPES } from '../components/reminders/ReminderForm';
 import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
 import type { ReminderTone } from '../types';
@@ -170,6 +170,29 @@ export function SettingsScreen() {
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* Dashboard */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Wallet className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Dashboard</h3>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-xs font-medium">Repayment balances</span>
+            <p className="text-[10px] text-muted-foreground leading-tight italic">
+              Show outstanding debt/loan balances and the next due date on the dashboard.
+            </p>
+          </div>
+          <button
+            onClick={() => setRem('showRepaymentOnDashboard', !(local.showRepaymentOnDashboard ?? true))}
+            className={switchCls(local.showRepaymentOnDashboard ?? true)}
+            aria-label="Show repayment balances on dashboard"
+          >
+            <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${(local.showRepaymentOnDashboard ?? true) ? 'translate-x-5' : 'translate-x-0.5'} mt-0.5`} />
+          </button>
         </div>
       </div>
 

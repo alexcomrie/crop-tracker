@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
 import { LandPlotPreview } from '../components/area/LandPlotPreview';
@@ -9,11 +9,13 @@ import { formatDateShort, today, parseDate, formatDateDisplay, daysBetween } fro
 import { markReminderDone } from '../hooks/useReminders';
 import { PropForm } from '../components/props/PropForm';
 import { AddEntrySheet } from '../components/shared/AddEntrySheet';
-import { CheckCircle2, Sprout } from 'lucide-react';
+import { CheckCircle2, Sprout, Wallet, ChevronRight, AlertTriangle } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
 import { useAppStore, withReminderDefaults, isReminderKindAllowed } from '../store/useAppStore';
 import { TYPE_EMOJI, TYPE_DOT, TYPE_TAG } from '../lib/reminderUi';
 import { ROUTES } from '../lib/routes';
+import { fmtMoney, usePosCurrency } from '../lib/pos';
+import { summarizeRepayments } from '../lib/repayments';
 
 export function DashboardScreen() {
   const navigate = useNavigate();
@@ -36,6 +38,18 @@ const upcomingData = useLiveQuery(async () => {
   const activeCropsData = useLiveQuery(() => db.crops.where('status').equals('Active').count());
   const activeCropsCount = activeCropsData ?? 0;
   const countsLoading = activeCropsData === undefined;
+
+  const cur = usePosCurrency();
+  const repaymentDebts = useLiveQuery(() => db.repaymentDebts.toArray().catch(() => []), []) ?? [];
+  const repaymentPayments = useLiveQuery(() => db.repaymentPayments.toArray().catch(() => []), []) ?? [];
+  const repaymentSummary = useMemo(
+    () => summarizeRepayments(repaymentDebts, repaymentPayments, todayStr),
+    [repaymentDebts, repaymentPayments, todayStr],
+  );
+  const showRepayments = (settings.showRepaymentOnDashboard ?? true) && repaymentSummary.activeCount > 0;
+  const nextDueIsOverdue = repaymentSummary.nextDue
+    ? (parseDate(repaymentSummary.nextDue.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY) < today().getTime()
+    : false;
 
   const [showFAB, setShowFAB] = useState(false);
   const [showPropForm, setShowPropForm] = useState(false);
@@ -101,6 +115,46 @@ const upcomingData = useLiveQuery(async () => {
             <span className="text-[11px] text-gray-500 font-medium">upcoming</span>
           </button>
         </div>
+
+        {/* Repayment balances (toggle in Settings → Dashboard) */}
+        {showRepayments && (
+          <section>
+            <button
+              onClick={() => navigate(ROUTES.MORE_REPAYMENTS)}
+              className="w-full text-left bg-white border border-gray-200 rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                  <Wallet className="w-5 h-5 text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.08em]">Repayments</p>
+                  <p className="text-xl font-bold text-teal-700 leading-tight">{fmtMoney(repaymentSummary.totalOutstanding, cur)}</p>
+                  <p className="text-[11px] text-gray-500">
+                    {repaymentSummary.activeCount} active
+                    {repaymentSummary.overdueCount > 0 && (
+                      <span className="text-amber-600 font-semibold"> · {repaymentSummary.overdueCount} overdue</span>
+                    )}
+                  </p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+              </div>
+              <div className="mt-3 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full bg-teal-500 rounded-full" style={{ width: `${repaymentSummary.progress}%` }} />
+              </div>
+              <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>{fmtMoney(repaymentSummary.totalPaid, cur)} of {fmtMoney(repaymentSummary.totalOriginal, cur)} paid</span>
+                <span>{repaymentSummary.progress.toFixed(0)}%</span>
+              </div>
+              {repaymentSummary.nextDue && (
+                <p className="text-[10px] text-gray-500 mt-1.5 flex items-center gap-1">
+                  {nextDueIsOverdue && <AlertTriangle className="w-3 h-3 text-amber-500" />}
+                  Next: {repaymentSummary.nextDue.name} · {repaymentSummary.nextDue.dueDate}
+                </p>
+              )}
+            </button>
+          </section>
+        )}
 
         {/* Tasks — today pinned on top, then upcoming */}
         <section>

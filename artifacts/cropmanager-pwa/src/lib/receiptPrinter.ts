@@ -124,7 +124,8 @@ export function buildReceipt(lines: ReceiptLine[], settings: PrintSettings): Uin
 
 export function buildSaleReceipt(
   sale: { receiptNumber: number; date: string; items: { productName: string; quantity: number; unit: string; unitPrice: number; total: number }[]; subtotal: number; discount: number; tax: number; total: number; amountPaid: number; change: number; paymentMethod: string; customerName?: string },
-  settings: PrintSettings
+  settings: PrintSettings,
+  options?: { reprint?: boolean }
 ): Uint8Array {
   const lines: ReceiptLine[] = [];
 
@@ -132,6 +133,7 @@ export function buildSaleReceipt(
   if (settings.businessAddress) lines.push({ text: settings.businessAddress, center: true });
   if (settings.businessPhone) lines.push({ text: `Tel: ${settings.businessPhone}`, center: true });
   if (settings.businessEmail) lines.push({ text: settings.businessEmail, center: true });
+  if (options?.reprint) lines.push({ text: '*** REPRINT ***', center: true, bold: true });
   lines.push({ divider: true });
   lines.push({ text: `Receipt #${String(sale.receiptNumber).padStart(6, '0')}`, center: true, bold: true });
   lines.push({ text: sale.date, center: true });
@@ -184,6 +186,8 @@ export function buildSaleReceiptText(
     pointsEarned?: number;
     pointsRedeemed?: number;
     currency?: string;
+    /** Marks the copy as a duplicate/reprint. */
+    reprint?: boolean;
   },
   charPerLine: number = 32
 ): string {
@@ -191,6 +195,7 @@ export function buildSaleReceiptText(
   const sep = '─'.repeat(charPerLine);
   const lines: string[] = [];
   lines.push(sale.businessName);
+  if (sale.reprint) lines.push('*** REPRINT ***');
   lines.push(sep);
   lines.push(`Receipt #${String(sale.receiptNumber).padStart(6, '0')}`);
   if (sale.date) lines.push(sale.date);
@@ -229,6 +234,20 @@ export async function connectBluetoothPrinter(): Promise<BluetoothDevice | null>
     optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'],
   });
   return device;
+}
+
+/**
+ * Last paired printer, shared between POS checkout and Sales History reprints
+ * so a reprint doesn't make the user pick the device again.
+ */
+let activePrinter: BluetoothDevice | null = null;
+
+export function setActivePrinter(device: BluetoothDevice | null): void {
+  activePrinter = device;
+}
+
+export function getActivePrinter(): BluetoothDevice | null {
+  return activePrinter;
 }
 
 export async function printViaBluetooth(device: BluetoothDevice, data: Uint8Array): Promise<void> {

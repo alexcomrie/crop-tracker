@@ -40,6 +40,7 @@ export default function DiaryScreen() {
   const trackings = useLiveQuery(() => db.trackings.toArray().catch(() => [])) ?? [];
   const trackingEntries = useLiveQuery(() => db.trackingEntries.toArray().catch(() => [])) ?? [];
   const ledgerEntries = useLiveQuery(() => db.ledgerEntries.toArray().catch(() => [])) ?? [];
+  const repaymentPayments = useLiveQuery(() => db.repaymentPayments.toArray().catch(() => [])) ?? [];
   const crops = useLiveQuery(() => db.crops.toArray().catch(() => [])) ?? [];
   const activeCrops = useMemo(() => crops.filter(c => c.status === 'Active'), [crops]);
   const cropById = useMemo(
@@ -51,7 +52,7 @@ export default function DiaryScreen() {
     const q = search.trim().toLowerCase();
     const events = buildFarmEvents({
       activities, treatmentLogs, harvestLogs, stageLogs,
-      observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries,
+      observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, repaymentPayments,
     }).filter(e =>
       !q || e.title.toLowerCase().includes(q) || e.subtitle.toLowerCase().includes(q) || e.cropName.toLowerCase().includes(q)
     );
@@ -66,7 +67,7 @@ export default function DiaryScreen() {
     }
     out.sort((a, b) => b.time - a.time);
     return out.slice(0, 30);
-  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, search]);
+  }, [activities, treatmentLogs, harvestLogs, stageLogs, observationLogs, observationEntries, trackings, trackingEntries, ledgerEntries, repaymentPayments, search]);
 
   const plantedOn = (dateStr: string): CropRef[] =>
     (crops as CropRef[]).filter(c => c.plantingDate === dateStr);

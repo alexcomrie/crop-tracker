@@ -1,6 +1,6 @@
 import React from 'react';
 import { ROUTES } from './routes';
-import { Database, Beaker, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings } from 'lucide-react';
+import { Database, Beaker, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings, Wallet } from 'lucide-react';
 
 export interface NavItem { label: string; title?: string; subtitle?: string; icon: React.ReactNode; path: string; iconColor?: string; }
 
@@ -38,6 +38,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Farm Ledger', title: 'Farm Ledger', subtitle: 'Expenses, sales, inventory, treatments, P&L', icon: React.createElement('span', null, '📊'), path: ROUTES.MORE_LEDGER, iconColor: 'bg-emerald-50' },
       { label: 'Point of Sale', title: 'Point of Sale', subtitle: 'Sell crops, print receipts, track sales', icon: React.createElement(Receipt, { className: 'w-6 h-6 text-indigo-600' }), path: ROUTES.MORE_POS, iconColor: 'bg-indigo-50' },
+      { label: 'Repayment Tracker', title: 'Repayment Tracker', subtitle: 'Track debts, loans and payments', icon: React.createElement(Wallet, { className: 'w-6 h-6 text-teal-600' }), path: ROUTES.MORE_REPAYMENTS, iconColor: 'bg-teal-50' },
     ],
   },
   {

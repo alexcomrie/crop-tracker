@@ -26,6 +26,7 @@ export function DataManagement() {
       db.harvestLogs.count(), db.treatmentLogs.count(), db.observationLogs.count(),
       db.trackings.count(), db.posSales.count(), db.posOrders.count(),
       db.diaryEntries.count(), db.quickNotes.count(), db.personalCropDb.count(),
+      db.repaymentDebts.count(), db.repaymentPayments.count(),
     ]).then(ns => ns.reduce((s, n) => s + n, 0))
   ) ?? 0;
 
@@ -64,7 +65,7 @@ export function DataManagement() {
     try {
       const res = await importJsonBackupFromFile(file);
       const total = Object.values(res.counts).reduce((s, n) => s + n, 0);
-      setPullMsg(`✅ Restored ${total} rows (v10 app backup: rows + settings). Skipped ${res.skipped} keyless rows · settings sections: ${res.localStorageRestored}. Reload the app to pick up restored settings.`);
+      setPullMsg(`✅ Restored ${total} rows (v11 app backup: rows + settings). Skipped ${res.skipped} keyless rows · settings sections: ${res.localStorageRestored}. Reload the app to pick up restored settings.`);
     } catch (err: any) {
       setPullMsg(`❌ Import failed: ${String(err?.message || err)}`);
     } finally {
@@ -107,6 +108,8 @@ export function DataManagement() {
       db.trackingEntries.clear(),
       db.observationEntries.clear(),
       db.quickNotes.clear(),
+      db.repaymentDebts.clear(),
+      db.repaymentPayments.clear(),
     ]);
     setClearInput('');
     setShowClear(false);

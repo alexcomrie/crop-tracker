@@ -17,7 +17,6 @@ import { HerbicideScheduleScreen } from './screens/HerbicideScheduleScreen';
 import { RemindersScreen } from './screens/RemindersScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { CropDatabaseScreen } from './components/CropDatabaseScreen';
-import { FertilizerDatabaseScreen } from './components/FertilizerDatabaseScreen';
 import { CropHistoryScreen } from './components/reports/CropHistory';
 import { CHCalculatorScreen } from './components/ch/CHCalculatorScreen';
 import { SuccessionGapReport } from './components/reports/SuccessionGapReport';
@@ -36,9 +35,8 @@ import { useTelegramReminders } from './hooks/useTelegramReminders';
 import { useDueNotifier } from './hooks/useDueNotifier';
 import { autoUpdateService } from './lib/autoUpdateService';
 import { migrateLegacyDatabases } from './lib/migrateLegacy';
-import type { CropDatabase, FertDatabase } from './types';
+import type { CropDatabase } from './types';
 import { loadCropDatabase } from './lib/cropDb';
-import { loadFertDatabase } from './lib/fertDb';
 import db from './db/db';
 import { ROUTES } from './lib/routes';
 
@@ -89,7 +87,6 @@ function withOnClose(Component: React.ComponentType<{ onClose: () => void }>) {
 }
 
 const CropDatabaseRoute = withOnClose(CropDatabaseScreen);
-const FertilizerDatabaseRoute = withOnClose(FertilizerDatabaseScreen);
 const CropHistoryRoute = withOnClose(CropHistoryScreen);
 const CHCalculatorRoute = withOnClose(CHCalculatorScreen);
 const ActivityRoute = withOnClose(ActivityScreen);
@@ -100,7 +97,7 @@ const RepaymentTrackerRoute = withOnClose(RepaymentTrackerScreen);
 
 function AppContent() {
   const location = useLocation();
-  const { setCropDb, setFertDb } = useAppStore();
+  const { setCropDb } = useAppStore();
 
   useTelegramReminders();
   useDueNotifier();
@@ -109,10 +106,7 @@ function AppContent() {
     loadCropDatabase()
       .then((data: CropDatabase) => setCropDb(data))
       .catch(console.error);
-    loadFertDatabase()
-      .then((data: FertDatabase) => setFertDb(data))
-      .catch(console.error);
-  }, [setCropDb, setFertDb]);
+  }, [setCropDb]);
 
   useEffect(() => {
     async function migrateCrops() {
@@ -198,7 +192,6 @@ function AppContent() {
             <Route path={ROUTES.REMINDERS} element={<PanelPage><RemindersScreen /></PanelPage>} />
             <Route path={ROUTES.SETTINGS} element={<AnimatedPage><SettingsScreen /></AnimatedPage>} />
             <Route path={ROUTES.MORE_CROP_DB} element={<PanelPage><CropDatabaseRoute /></PanelPage>} />
-            <Route path={ROUTES.MORE_FERT_DB} element={<PanelPage><FertilizerDatabaseRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_HISTORY} element={<PanelPage><CropHistoryRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_CH_CALC} element={<PanelPage><CHCalculatorRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_SUCCESSION} element={<PanelPage><div className="p-4"><SuccessionGapReport /></div></PanelPage>} />

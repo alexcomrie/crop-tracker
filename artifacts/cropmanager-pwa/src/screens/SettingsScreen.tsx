@@ -5,18 +5,58 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2 } from 'lucide-react';
 import { REM_TYPES } from '../components/reminders/ReminderForm';
 import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
+import { resolveCurrentLocation } from '../lib/location';
 import type { ReminderTone } from '../types';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
-  const { isInstallable, isInstalled, handleInstallClick } = usePWAInstall();
+  const { isInstallable, isInstalled, handleInstallClick, platform, steps } = usePWAInstall();
 
   const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
   const [perm, setPerm] = useState(() => notifyPermission());
+  const [locating, setLocating] = useState(false);
+  const [locMsg, setLocMsg] = useState('');
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [installNote, setInstallNote] = useState('');
+
+  async function handleUseMyLocation() {
+    setLocating(true);
+    setLocMsg('');
+    try {
+      const loc = await resolveCurrentLocation();
+      const patch = {
+        weatherLat: loc.lat,
+        weatherLon: loc.lon,
+        weatherLocation: loc.name,
+      };
+      setLocal(l => ({ ...l, ...patch }));
+      // Save immediately so the dashboard forecast refreshes for the new spot.
+      updateSettings(patch);
+      setLocMsg(`Located: ${loc.name}${loc.accuracy ? ` (±${loc.accuracy} m)` : ''}`);
+    } catch (e) {
+      setLocMsg(e instanceof Error ? e.message : 'Could not get your location.');
+    } finally {
+      setLocating(false);
+    }
+  }
+
+  async function handleInstall() {
+    const result = await handleInstallClick();
+    if (result === 'unavailable') {
+      setInstallNote(
+        platform === 'ios'
+          ? 'Safari does not show an automatic install prompt. Follow the steps below.'
+          : 'Your browser did not offer an automatic prompt. Follow the steps below.',
+      );
+      setShowInstallHelp(true);
+    } else if (result === 'accepted') {
+      setInstallNote('Installing… CropManager will appear on your home screen.');
+    }
+  }
 
   async function handleEnableNotifications() {
     const p = await requestNotifyPermission();
@@ -112,6 +152,23 @@ export function SettingsScreen() {
           {field('weatherLat', 'Latitude', 'number', '18.4358')}
           {field('weatherLon', 'Longitude', 'number', '-77.2010')}
         </div>
+        <Button
+          variant="outline"
+          className="w-full h-10 text-xs gap-2"
+          onClick={handleUseMyLocation}
+          disabled={locating}
+        >
+          {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+          {locating ? 'Getting GPS location…' : 'Use My Current Location'}
+        </Button>
+        <p className="text-[10px] text-muted-foreground leading-tight italic">
+          GPS fills the coordinates above and saves them right away, so the dashboard forecast follows you. If location is blocked or unavailable, type coordinates manually.
+        </p>
+        {locMsg && (
+          <p className={`text-[11px] font-medium leading-tight ${locMsg.startsWith('Located:') ? 'text-green-700' : 'text-amber-700'}`}>
+            {locMsg}
+          </p>
+        )}
         {field('rainThresholdMm', 'Rain Threshold (mm)', 'number', '5', 'Spraying is not recommended when rain exceeds this amount')}
       </div>
 
@@ -217,11 +274,38 @@ export function SettingsScreen() {
             {isInstalled ? 'Installed' : 'Not Installed'}
           </span>
         </div>
-        {!isInstalled && isInstallable && (
-          <Button variant="outline" className="w-full h-10 text-xs gap-2" onClick={handleInstallClick}>
-            <Smartphone className="w-4 h-4" />
-            Install CropManager
-          </Button>
+        {!isInstalled && (
+          <>
+            <Button variant="outline" className="w-full h-10 text-xs gap-2" onClick={handleInstall}>
+              <Smartphone className="w-4 h-4" />
+              {isInstallable ? 'Install CropManager' : 'How to Install CropManager'}
+            </Button>
+            {installNote && <p className="text-[11px] text-amber-700 font-medium leading-tight">{installNote}</p>}
+            <button
+              onClick={() => setShowInstallHelp(v => !v)}
+              className="w-full text-[11px] text-green-700 font-semibold text-center"
+            >
+              {showInstallHelp ? 'Hide installation steps' : isInstallable ? 'Trouble installing? Show steps' : 'Show installation steps'}
+            </button>
+            {showInstallHelp && (
+              <ol className="space-y-2 rounded-lg bg-gray-50 border p-3">
+                {steps.map((step, i) => (
+                  <li key={step.title} className="flex gap-2">
+                    <span className="w-5 h-5 shrink-0 rounded-full bg-green-700 text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold">{step.title}</p>
+                      <p className="text-[10px] text-muted-foreground leading-tight">{step.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+        {isInstalled && (
+          <p className="text-[11px] text-green-700 font-medium">
+            CropManager is running as an installed app.
+          </p>
         )}
       </div>
 

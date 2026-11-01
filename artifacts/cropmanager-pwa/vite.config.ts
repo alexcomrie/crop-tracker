@@ -51,7 +51,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/data\/(crop_database|fertilizer_schedule)\.json$/,
+            urlPattern: /\/data\/(crop_database|treatment_database)\.json$/,
             handler: "StaleWhileRevalidate",
             options: {
               cacheName: "data-cache",

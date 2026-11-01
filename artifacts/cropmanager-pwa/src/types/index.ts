@@ -30,68 +30,6 @@ export interface CropDatabase {
   [key: string]: CropDbRecord;
 }
 
-// ─── fertilizer_schedule.json ─────────────────────────────────────────────────
-
-export interface FertMix {
-  mix_parts?: {
-    cow_manure_tea?: number;
-    chicken_manure_tea?: number;
-    plant_based_tea?: number;
-    wood_ash_tea?: number;
-    [key: string]: number | undefined;
-  };
-  final_dilution: number | string;
-  yeast_tsp_per_litre?: number;
-  yeast_tbsp_per_5L?: number;
-  mixing_example?: string;
-  note?: string;
-  frequency?: string;
-}
-
-export interface FertStage {
-  description?: string;
-  foliar?: FertMix;
-  drench?: FertMix;
-}
-
-export interface FertCropEntry {
-  display_name: string;
-  plant_type: string;
-  fert_profile: string;
-  stages: {
-    seedling: FertStage;
-    mid_vegetative: FertStage;
-    flowering: FertStage;
-    fruiting: FertStage;
-  };
-}
-
-export interface FertMeta {
-  version: string;
-  description: string;
-  teas: Record<string, string>;
-  yeast_preparation: string;
-  yeast_dosing: { foliar_spray: string; soil_drench: string };
-  thyme_oil_mosquito_control: string;
-  application_tips: string[];
-  dilution_note: string;
-}
-
-export interface FertDatabase {
-  _meta: FertMeta;
-  crops: Record<string, FertCropEntry>;
-  [key: string]: any; // To support older lookups
-}
-
-// Support for older code
-export type FertProfile = FertCropEntry | {
-  seedling?: FertStage;
-  mid_vegetative?: FertStage;
-  flowering?: FertStage;
-  fruiting?: FertStage;
-  _meta?: Partial<FertMeta>;
-};
-
 export interface ObservationLog {
   id: string;
   cropId: string;
@@ -373,28 +311,6 @@ export interface DayForecast {
   weatherCode: number;
   label: string;
   emoji: string;
-}
-
-export interface FertScheduleStage {
-  key: string;
-  label: string;
-  foliarStr: string;
-  foliarMixExample: string;
-  drenchStr: string;
-  drenchMixExample: string;
-  frequency: string;
-  note: string;
-}
-
-export interface FertScheduleData {
-  teas: { name: string; description: string }[];
-  yeastPrep: string;
-  yeastDosing: string;
-  dilutionNote: string;
-  thymeOilTip: string;
-  stages: FertScheduleStage[];
-  applicationRules: string[];
-  currentActiveStageKey: string;
 }
 
 export type LedgerEntryType = 'expense' | 'sale' | 'inventory' | 'treatment';

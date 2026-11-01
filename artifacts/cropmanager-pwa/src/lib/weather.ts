@@ -1,7 +1,12 @@
 import type { DayForecast } from '../types';
 
-const CACHE_KEY = 'cropmanager_weather_cache';
+const CACHE_PREFIX = 'cropmanager_weather_cache';
 const CACHE_TTL = 3600 * 1000; // 1 hour
+
+/** Cache key rounded to ~100m so tiny GPS jitter does not miss the cache. */
+function cacheKey(lat: number, lon: number): string {
+  return `${CACHE_PREFIX}:${lat.toFixed(3)}:${lon.toFixed(3)}`;
+}
 
 export function weatherCodeLabel(code: number): string {
   if (code === 0) return 'Clear sky';
@@ -32,7 +37,7 @@ export function weatherCodeEmoji(code: number): string {
 }
 
 export async function fetchWeather(lat: number, lon: number, days = 7): Promise<DayForecast[]> {
-  const cached = getCachedWeather();
+  const cached = getCachedWeather(lat, lon);
   if (cached) return cached;
 
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode&timezone=America%2FJamaica&forecast_days=${days}`;
@@ -51,13 +56,13 @@ export async function fetchWeather(lat: number, lon: number, days = 7): Promise<
     emoji: weatherCodeEmoji(data.daily.weathercode[i]),
   }));
 
-  localStorage.setItem(CACHE_KEY, JSON.stringify({ data: forecasts, ts: Date.now() }));
+  localStorage.setItem(cacheKey(lat, lon), JSON.stringify({ data: forecasts, ts: Date.now() }));
   return forecasts;
 }
 
-export function getCachedWeather(): DayForecast[] | null {
+export function getCachedWeather(lat: number, lon: number): DayForecast[] | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey(lat, lon));
     if (!raw) return null;
     const { data, ts } = JSON.parse(raw);
     if (Date.now() - ts > CACHE_TTL) return null;
@@ -65,9 +70,9 @@ export function getCachedWeather(): DayForecast[] | null {
   } catch { return null; }
 }
 
-export function getWeatherCacheAge(): number | null {
+export function getWeatherCacheAge(lat: number, lon: number): number | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(cacheKey(lat, lon));
     if (!raw) return null;
     const { ts } = JSON.parse(raw);
     return Math.round((Date.now() - ts) / 60000);

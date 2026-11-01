@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCrops } from '../hooks/useCrops';
 import { useProps } from '../hooks/useProps';
 import { CropCard } from '../components/crops/CropCard';
+import { CropGroupCard } from '../components/crops/CropGroupCard';
 import { PropCard } from '../components/props/PropCard';
 import { PropDetail } from '../components/props/PropDetail';
 import { PropForm } from '../components/props/PropForm';
@@ -43,6 +44,7 @@ export function CropsScreen() {
   const [selectedProp, setSelectedProp] = useState<Propagation | null>(null);
   const [actionTarget, setActionTarget] = useState<{ kind: Kind; id: string } | null>(null);
   const [rollingBack, setRollingBack] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   async function handleRollbackStage(cropId: string, stage: string) {
     const crop = cropById.get(cropId);
@@ -89,11 +91,40 @@ export function CropsScreen() {
   );
   const hasFilter = kind !== 'all' || cropFilter !== 'All' || propFilter !== 'All';
 
-  type Row = { key: string; kind: Kind; updatedAt: number };
-  const rows: Row[] = [
-    ...cropRows.map(c => ({ key: `crop:${c.id}`, kind: 'crop' as const, updatedAt: c.updatedAt })),
-    ...propRows.map(p => ({ key: `prop:${p.id}`, kind: 'propagation' as const, updatedAt: p.updatedAt })),
-  ].sort((a, b) => b.updatedAt - a.updatedAt);
+  type ListItem =
+    | { type: 'group'; key: string; name: string; crops: typeof cropRows; updatedAt: number }
+    | { type: 'crop'; key: string; crop: (typeof cropRows)[number]; updatedAt: number }
+    | { type: 'prop'; key: string; prop: (typeof propRows)[number]; updatedAt: number };
+
+  // Same-name crops (2+) collapse into one group card ("Pumpkin ×3").
+  const cropGroups = new Map<string, typeof cropRows>();
+  for (const crop of cropRows) {
+    const groupKey = crop.cropName.trim().toLowerCase();
+    const list = cropGroups.get(groupKey) ?? [];
+    list.push(crop);
+    cropGroups.set(groupKey, list);
+  }
+
+  const listItems: ListItem[] = [];
+  for (const [groupKey, groupCrops] of cropGroups) {
+    if (groupCrops.length >= 2) {
+      listItems.push({
+        type: 'group',
+        key: `group:${groupKey}`,
+        name: groupCrops[0].cropName,
+        crops: groupCrops,
+        updatedAt: Math.max(...groupCrops.map(c => c.updatedAt)),
+      });
+    } else {
+      const crop = groupCrops[0];
+      listItems.push({ type: 'crop', key: `crop:${crop.id}`, crop, updatedAt: crop.updatedAt });
+    }
+  }
+  for (const prop of propRows) {
+    listItems.push({ type: 'prop', key: `prop:${prop.id}`, prop, updatedAt: prop.updatedAt });
+  }
+  listItems.sort((a, b) => b.updatedAt - a.updatedAt);
+
   const cropById = new Map((cropsData ?? []).map(c => [c.id, c]));
   const propById = new Map((propsData ?? []).map(p => [p.id, p]));
 
@@ -277,15 +308,32 @@ export function CropsScreen() {
       <div className="px-4 pt-3">
         {isLoading ? (
           <div className="flex justify-center py-20"><div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /></div>
-        ) : rows.length === 0 ? (
+        ) : listItems.length === 0 ? (
           <EmptyState emoji="🌱" title="Nothing here yet" subtitle="Tap + to log your first crop or propagation." />
         ) : (
           <div className="space-y-2">
-            {rows.map(row => {
-              if (row.kind === 'crop') {
-                const crop = cropById.get(row.key.slice(5));
-                if (!crop) return null;
-                const selKey = row.key;
+            {listItems.map(item => {
+              if (item.type === 'group') {
+                const groupKey = item.key;
+                return (
+                  <CropGroupCard
+                    key={groupKey}
+                    name={item.name}
+                    crops={item.crops}
+                    expanded={selecting || !!expandedGroups[groupKey]}
+                    onToggleExpand={() => setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))}
+                    cropDataFor={crop => resolveCropData(cropDb, crop.cropName) || undefined}
+                    selectMode={selecting}
+                    selectedIds={selectedKeys.filter(k => k.startsWith('crop:')).map(k => k.slice(5))}
+                    onToggleSelect={id => toggleSelect(`crop:${id}`)}
+                    onOpenCrop={crop => navigate(cropDetailsPath(crop.id))}
+                    onLongPressCrop={crop => !selecting && setActionTarget({ kind: 'crop', id: crop.id })}
+                  />
+                );
+              }
+              if (item.type === 'crop') {
+                const crop = item.crop;
+                const selKey = item.key;
                 return (
                   <CropCard
                     key={selKey}
@@ -300,9 +348,8 @@ export function CropsScreen() {
                   />
                 );
               }
-              const prop = propById.get(row.key.slice(5));
-              if (!prop) return null;
-              const selKey = row.key;
+              const prop = item.prop;
+              const selKey = item.key;
               return (
                 <PropCard
                   key={selKey}

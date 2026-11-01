@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local-only projects and stale clones
+/Beekeeping app/
+/crop-tracker/

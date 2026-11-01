@@ -1,6 +1,6 @@
 import React from 'react';
 import { ROUTES } from './routes';
-import { Database, Beaker, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings, Wallet } from 'lucide-react';
+import { Database, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings, Wallet } from 'lucide-react';
 
 export interface NavItem { label: string; title?: string; subtitle?: string; icon: React.ReactNode; path: string; iconColor?: string; }
 
@@ -11,16 +11,15 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Main',
     items: [
       { label: 'Dashboard', title: 'Dashboard', subtitle: 'Overview & today', icon: React.createElement(Home, { className: 'w-5 h-5' }), path: ROUTES.DASHBOARD },
-      { label: 'Crops', title: 'Crops & Propagations', subtitle: 'Manage crops and cuttings', icon: React.createElement(Sprout, { className: 'w-5 h-5' }), path: ROUTES.CROPS },
+      { label: 'Crops', title: 'Crops', subtitle: 'Manage crops, propagation and growth', icon: React.createElement(Sprout, { className: 'w-5 h-5' }), path: ROUTES.CROPS },
     ],
   },
   {
     title: 'Databases',
     items: [
       { label: 'Crop Database', title: 'Crop Database', subtitle: 'View and edit crop timings, varieties, sprays', icon: React.createElement(Database, { className: 'w-6 h-6 text-green-600' }), path: ROUTES.MORE_CROP_DB, iconColor: 'bg-green-50' },
-      { label: 'Fertilizer Database', title: 'Fertilizer Database', subtitle: 'Edit 5-tea mix ratios per crop & stage', icon: React.createElement(Beaker, { className: 'w-6 h-6 text-amber-600' }), path: ROUTES.MORE_FERT_DB, iconColor: 'bg-amber-50' },
       { label: 'Crop Analysis', title: 'Crop Analysis', subtitle: 'Stage durations, yield, seasons, learning', icon: React.createElement(BarChart2, { className: 'w-6 h-6 text-blue-600' }), path: ROUTES.MORE_HISTORY, iconColor: 'bg-blue-50' },
-      { label: 'Treatment App Rates', title: 'Treatment App Rates', subtitle: 'Calculate fungicide/insecticide application rates', icon: React.createElement(FlaskConical, { className: 'w-6 h-6 text-cyan-600' }), path: ROUTES.MORE_TREATMENT_RATES, iconColor: 'bg-cyan-50' },
+      { label: 'Treatment Database', title: 'Treatment Database', subtitle: 'Products, usage guides, rates, REI & PHI', icon: React.createElement(FlaskConical, { className: 'w-6 h-6 text-cyan-600' }), path: ROUTES.MORE_TREATMENT_RATES, iconColor: 'bg-cyan-50' },
       { label: 'Reminders', title: 'Reminders', subtitle: 'View and manage queued Telegram reminders', icon: React.createElement(Bell, { className: 'w-6 h-6 text-purple-600' }), path: ROUTES.REMINDERS, iconColor: 'bg-purple-50' },
       { label: 'Activity Log', title: 'Activity Log', subtitle: 'Record and track field activities', icon: React.createElement('span', null, '📋'), path: ROUTES.MORE_ACTIVITY, iconColor: 'bg-orange-50' },
     ],

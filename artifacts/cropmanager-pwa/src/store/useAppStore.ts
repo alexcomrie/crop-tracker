@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppSettings, CropDatabase, FertDatabase } from '../types';
+import type { AppSettings, CropDatabase } from '../types';
 
 const DEFAULT_SETTINGS: AppSettings = {
   telegramToken: '',
@@ -44,12 +44,10 @@ export function isReminderKindAllowed(s: AppSettings, type: string): boolean {
 interface AppStore {
   settings: AppSettings;
   cropDb: CropDatabase;
-  fertDb: FertDatabase;
   lastSyncAt: number;
   drawerOpen: boolean;
   updateSettings: (patch: Partial<AppSettings>) => void;
   setCropDb: (db: CropDatabase) => void;
-  setFertDb: (db: FertDatabase) => void;
   setLastSyncAt: (ts: number) => void;
   setDrawerOpen: (open: boolean) => void;
 }
@@ -59,25 +57,11 @@ export const useAppStore = create<AppStore>()(
     (set) => ({
       settings: DEFAULT_SETTINGS,
       cropDb: {},
-      fertDb: {
-        _meta: {
-          version: '1.0',
-          description: '',
-          teas: {},
-          yeast_preparation: '',
-          yeast_dosing: { foliar_spray: '', soil_drench: '' },
-          thyme_oil_mosquito_control: '',
-          application_tips: [],
-          dilution_note: ''
-        },
-        crops: {}
-      },
       lastSyncAt: 0,
       drawerOpen: false,
       updateSettings: (patch) =>
         set((s) => ({ settings: { ...s.settings, ...patch } })),
       setCropDb: (db) => set({ cropDb: db }),
-      setFertDb: (db) => set({ fertDb: db }),
       setLastSyncAt: (ts) => set({ lastSyncAt: ts }),
       setDrawerOpen: (open) => set({ drawerOpen: open }),
     }),
@@ -86,8 +70,7 @@ export const useAppStore = create<AppStore>()(
       partialize: (s) => ({ 
         settings: s.settings, 
         lastSyncAt: s.lastSyncAt,
-        cropDb: s.cropDb,
-        fertDb: s.fertDb
+        cropDb: s.cropDb
       }),
     }
   )

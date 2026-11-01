@@ -5,7 +5,8 @@ import type {
   BatchPlantingLog, CropSearchLog, LedgerEntry, FarmArea, FarmLand,
   DiaryEntry, PosSale, PosCustomer, PosSettings, PosInventoryItem,
   PosOrder, PosHeldReceipt, ObservationLog, PersonalCropData, Tracking,
-  TrackingEntry, ObservationEntry, QuickNote, RepaymentDebt, RepaymentPayment
+  TrackingEntry, ObservationEntry, QuickNote, RepaymentDebt, RepaymentPayment,
+  FarmPoint
 } from '../types';
 
 export class CropManagerDB extends Dexie {
@@ -34,7 +35,7 @@ export class CropManagerDB extends Dexie {
   ledgerEntries!: Table<LedgerEntry>;
   farmLands!: Table<FarmLand>;
   farmAreas!: Table<FarmArea>;
-  diaryEntries!: Table<DiaryEntry>;
+  farmPoints!: Table<FarmPoint>;  diaryEntries!: Table<DiaryEntry>;
   posSales!: Table<PosSale>;
   posCustomers!: Table<PosCustomer>;
   posSettings!: Table<PosSettings>;
@@ -206,6 +207,9 @@ export class CropManagerDB extends Dexie {
       quickNotes: 'id, updatedAt',
       repaymentDebts: 'id, status, category, dueDate, createdAt, updatedAt',
       repaymentPayments: 'id, debtId, date, createdAt, updatedAt',
+    });
+    this.version(6).stores({
+      farmPoints: 'id, landId, kind, updatedAt',
     });
   }
 }

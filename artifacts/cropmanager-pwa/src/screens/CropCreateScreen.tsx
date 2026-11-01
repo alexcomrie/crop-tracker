@@ -8,6 +8,7 @@ import { formatDateShort, today, toIsoDateStr } from '../lib/dates';
 import { calculateHarvestDate, calculateTransplantDate } from '../lib/harvest';
 import { needsTransplant } from '../lib/stages';
 import { startStageForMethod, isVegetativeMethod } from '../lib/methodStages';
+import { initialPropStage, isPropagationMethod, normalizePropMethod } from '../lib/propStages';
 import { generateCropReminders } from '../lib/reminders';
 import { calcSprayDates, formatSprayDates } from '../lib/sprays';
 import { addDiaryEntry } from '../lib/diary';
@@ -19,7 +20,7 @@ import { ROUTES } from '../lib/routes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const PLANTING_METHODS = ['Seed Tray','Seed Bed','Direct Ground','Pot / Container','Cuttings','Division','Grafted','Hydroponic'];
+const PLANTING_METHODS = ['Seed Tray','Seed Bed','Direct Ground','Pot / Container','Air Layering','Cuttings','Division','Grafted','Hydroponic'];
 const TRAY_COLORS = ['Red','Orange','Yellow','Green','Blue','Purple','Pink','White'];
 const TRAY_CELLS = ['50', '75', '128', '200'];
 const POT_SIZES = ['XS', 'SML', 'MED', 'LARGE', 'XL', 'XXL'];
@@ -31,6 +32,7 @@ export function CropCreateScreen() {
   const { cropDb, settings } = useAppStore();
   const [step, setStep] = useState(1);
   const [cropKey, setCropKey] = useState('');
+  const [customCropName, setCustomCropName] = useState('');
   const [variety, setVariety] = useState('');
   const [customVariety, setCustomVariety] = useState('');
   const [method, setMethod] = useState('');
@@ -67,6 +69,8 @@ export function CropCreateScreen() {
     return k.includes(search.toLowerCase()) || (data?.display_name ?? k).toLowerCase().includes(search.toLowerCase());
   });
   const selectedCropData = cropKey ? resolveCropData(cropDb, cropKey) : null;
+  const effectiveCropName = selectedCropData?.display_name ?? customCropName.trim() ?? '';
+  const propMethodKey = isPropagationMethod(method) ? normalizePropMethod(method) : null;
 
   const chResult = useMemo(() => {
     if (!selectedCropData || !isContinuous) return null;
@@ -83,10 +87,12 @@ export function CropCreateScreen() {
     return { growDays, batchOffset, numBatches, subplotArea, upcomingBatches };
   }, [selectedCropData, isContinuous, freqDays, plotArea, validPlantDate]);
 
-  const locked = !cropKey;
+  const locked = !cropKey && !customCropName.trim();
 
   async function handleSave() {
-    if (!cropKey || !method) { toast.error('Select a crop and planting method first'); return; }
+    if (!cropKey && !customCropName.trim()) { toast.error('Choose a crop or type a custom crop name first'); return; }
+    if (!method) { toast.error('Select a planting method first'); return; }
+    if (!effectiveCropName) { toast.error('Crop name is missing'); return; }
     setSaving(true);
     let step = 'init';
     try {
@@ -114,7 +120,7 @@ export function CropCreateScreen() {
       const startStage = startStageForMethod(method);
       const vegStart = isVegetativeMethod(method);
       const baseCrop: any = {
-        id, cropName: cropData?.display_name ?? cropKey, variety: variety ?? '',
+        id, cropName: effectiveCropName, variety: variety ?? '',
         plantingMethod: method, plantStage: startStage,
         plantingDate: formatDateShort(validPlantDate),
         transplantDateScheduled: transplantDate ? formatDateShort(transplantDate) : '',
@@ -136,6 +142,10 @@ export function CropCreateScreen() {
       };
       // Only include optional numeric fields when defined — explicit undefined
       // values can break IndexedDB structured-clone in some browsers.
+      if (propMethodKey) {
+        baseCrop.propagationMethod = propMethodKey;
+        baseCrop.propagationStage = initialPropStage(propMethodKey);
+      }
       if (isContinuous) baseCrop.harvestFrequency = freqDays;
       if (chResult?.numBatches != null) baseCrop.numPlots = chResult.numBatches;
       if (chResult?.batchOffset != null) baseCrop.batchOffset = chResult.batchOffset;
@@ -211,6 +221,7 @@ export function CropCreateScreen() {
                 return (
                   <button key={k} onClick={()=>{
                     setCropKey(k);
+                    setCustomCropName('');
                     if(data && (data.number_of_weeks_harvest??0)>1) setIsContinuous(true); else setIsContinuous(false);
                     if (data && data.batch_offset_days && data.batch_offset_days > 0) setFreqDays(data.batch_offset_days);
                   }} className={`w-full text-left px-3 py-2 rounded-lg text-sm ${cropKey===k?'bg-green-100 font-semibold':'bg-gray-50 hover:bg-green-50'}`}>
@@ -219,14 +230,28 @@ export function CropCreateScreen() {
                 );
               })}
             </div>
-            <Button className="w-full" disabled={!cropKey} onClick={()=>setStep(2)}>Next</Button>
+            <div className="rounded-lg border border-dashed border-green-300 bg-green-50/50 p-3 space-y-1.5">
+              <p className="text-[11px] font-bold uppercase text-gray-500">Can’t find it?</p>
+              <Input
+                placeholder="Type a custom crop name, e.g. My Pumpkin"
+                value={customCropName}
+                onChange={e => { setCustomCropName(e.target.value); if (e.target.value.trim()) setCropKey(''); }}
+              />
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Use a custom name for landraces, mixed plantings or anything not in the shared crop database. You can add variety and details in the next steps.
+              </p>
+            </div>
+            <p className="text-[10px] text-muted-foreground bg-gray-50 rounded-lg p-2 leading-snug">
+              <strong>One crop record.</strong> Continue builds a single tracker for the whole lifecycle. Cuttings, grafting, air layering and division are recorded as propagation milestones inside this crop — there is no separate propagation tracker.
+            </p>
+            <Button className="w-full" disabled={!cropKey && !customCropName.trim()} onClick={()=>setStep(2)}>Continue</Button>
           </div>
         )}
 
         {step === 2 && (
           <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Variety</p>
-            <p className="text-xs text-muted-foreground">Crop: <strong>{selectedCropData?.display_name ?? cropKey}</strong></p>
+            <p className="text-xs text-muted-foreground">Crop: <strong>{effectiveCropName || '—'}</strong></p>
             <div className="flex flex-wrap gap-2">
               {(selectedCropData?.varieties ?? []).map(v=>(
                 <button key={v} onClick={()=>{ setVariety(v); setCustomVariety(''); }} className={`px-3 py-1.5 rounded-full text-sm border ${variety===v?'bg-green-600 text-white border-green-600':'bg-white border-gray-300'}`}>{v}</button>
@@ -244,12 +269,21 @@ export function CropCreateScreen() {
         {step === 3 && (
           <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Planting Method</p>
+            <p className="text-[10px] text-muted-foreground">Propagation methods (Air Layering, Cuttings, Division, Grafted) are stored inside this crop as milestones.</p>
             <div className={`flex flex-wrap gap-2 ${locked?'opacity-40 pointer-events-none':''}`}>
               {PLANTING_METHODS.map(m=>(
                 <button key={m} onClick={()=>setMethod(m)} className={`px-3 py-2 rounded-full text-sm border ${method===m?'bg-green-600 text-white border-green-600':'bg-white border-gray-300'}`}>{m}</button>
               ))}
             </div>
             {locked && <p className="text-xs text-amber-600">Select a crop first</p>}
+            {propMethodKey && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-2.5">
+                <p className="text-[11px] font-bold text-green-800">Propagation: {propMethodKey}</p>
+                <p className="text-[10px] text-green-700 leading-snug mt-0.5">
+                  The crop starts at Seedling and gets a separate {propMethodKey.toLowerCase()} milestone track. Update it from the crop’s Stages tab as roots form and it moves out.
+                </p>
+              </div>
+            )}
             {method === 'Seed Tray' && !locked && (
               <div className="space-y-2 rounded-lg border border-green-200 bg-green-50/50 p-3">
                 <p className="text-[11px] font-bold uppercase text-gray-500">Tray cells per tray</p>
@@ -377,9 +411,10 @@ export function CropCreateScreen() {
           <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-3">
             <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Review & Confirm</p>
             <div className="bg-green-50 rounded-lg p-3 text-sm space-y-1">
-              <p><strong>Crop:</strong> {selectedCropData?.display_name ?? cropKey}</p>
+              <p><strong>Crop:</strong> {effectiveCropName}</p>
               {variety && <p><strong>Variety:</strong> {variety}</p>}
               <p><strong>Method:</strong> {method}</p>
+              {propMethodKey && <p><strong>Propagation:</strong> {propMethodKey} · starts at {initialPropStage(propMethodKey)}</p>}
               {method === 'Seed Tray' && (trayCellsFinal || trayCount.trim()) && (
                 <p><strong>Tray:</strong> {trayCellsFinal ? `${trayCellsFinal}-cell` : '—'}{trayCount.trim() ? ` × ${trayCount.trim()} tray${trayCount.trim() === '1' ? '' : 's'}` : ''}</p>
               )}

@@ -15,11 +15,13 @@ import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES, cropEditPath } from '../lib/routes';
-import type { TrackingEntry, ObservationEntry, StageLog } from '../types';
-import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight, Bell, CheckCircle2 } from 'lucide-react';
+import type { TrackingEntry, ObservationEntry, StageLog, CropData } from '../types';
+import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight, Bell, CheckCircle2, Info as InfoIcon } from 'lucide-react';
 import { ReminderForm } from '../components/reminders/ReminderForm';
 import { markReminderDone } from '../hooks/useReminders';
 import { stageGifUrl } from '../lib/stageGifs';
+import { CropInfoTab } from '../components/crops/CropInfoTab';
+import { PropagationCard } from '../components/crops/PropagationCard';
 
 /**
  * Milestone strip where the current stage stays centered: it centers on
@@ -136,7 +138,7 @@ export function CropDetailsScreen() {
   const syncKey = crop?.foundationKey || crop?.cropName || '';
   const personal = useLiveQuery(() => id && crop ? db.personalCropDb.get(crop.cropName.toLowerCase()) : undefined, [crop?.cropName]);
 
-  const [activeSheet, setActiveSheet] = useState<'stages'|'observations'|'treatments'|'harvest'|'reminders'>('stages');
+  const [activeSheet, setActiveSheet] = useState<'info'|'stages'|'observations'|'treatments'|'harvest'|'reminders'>('stages');
   const cropReminders = (useLiveQuery(() => id ? db.reminders.where('trackingId').equals(id).toArray() : [], [id]) ?? [])
     .filter(r => !['spray_fungus', 'spray_pest', 'fert_application'].includes(r.type));
   const [showReminderForm, setShowReminderForm] = useState(false);
@@ -779,6 +781,7 @@ export function CropDetailsScreen() {
         {/* Sheet tabs */}
         <div className="max-w-md mx-auto flex gap-1 px-2 overflow-x-auto scrollbar-hide">
           {[
+            { k: 'info', l: 'Info', i: InfoIcon },
             { k: 'stages', l: 'Stages', i: Sprout },
             { k: 'observations', l: 'Observations', i: Eye },
             { k: 'treatments', l: 'Treatments', i: Droplets },
@@ -794,8 +797,18 @@ export function CropDetailsScreen() {
       </div>
 
       <div className="max-w-md mx-auto px-4 py-4 space-y-4">
+        {activeSheet === 'info' && (
+          <CropInfoTab
+            crop={crop}
+            cropData={(cropData as CropData | null) ?? null}
+            stageLogs={stageLogs}
+            harvestLogs={harvestLogs}
+            treatmentLogs={treatmentLogs}
+          />
+        )}
         {activeSheet === 'stages' && (
           <div className="space-y-3">
+            <PropagationCard crop={crop} />
             {(() => {
               const planted = parseDate(crop.plantingDate);
               const elapsedDays = planted ? Math.max(0, daysBetween(planted, today())) : 0;

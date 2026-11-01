@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
 import { LandPlotPreview } from '../components/area/LandPlotPreview';
@@ -7,8 +7,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { formatDateShort, today, parseDate, formatDateDisplay, daysBetween } from '../lib/dates';
 import { markReminderDone } from '../hooks/useReminders';
-import { PropForm } from '../components/props/PropForm';
-import { AddEntrySheet } from '../components/shared/AddEntrySheet';
 import { CheckCircle2, Sprout, Wallet, ChevronRight, AlertTriangle } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
 import { useAppStore, withReminderDefaults, isReminderKindAllowed } from '../store/useAppStore';
@@ -50,9 +48,6 @@ const upcomingData = useLiveQuery(async () => {
   const nextDueIsOverdue = repaymentSummary.nextDue
     ? (parseDate(repaymentSummary.nextDue.dueDate)?.getTime() ?? Number.POSITIVE_INFINITY) < today().getTime()
     : false;
-
-  const [showFAB, setShowFAB] = useState(false);
-  const [showPropForm, setShowPropForm] = useState(false);
 
   useEffect(() => {
     const count = visibleToday.length;
@@ -220,23 +215,13 @@ const upcomingData = useLiveQuery(async () => {
 
       {/* FAB */}
       <button
-        onClick={() => setShowFAB(true)}
-        aria-label="Quick add"
+        onClick={() => navigate(ROUTES.CROP_CREATE)}
+        aria-label="Add crop"
         className="fixed right-4 w-14 h-14 bg-green-700 text-white rounded-full shadow-xl flex items-center justify-center text-2xl z-40 hover:bg-green-800 active:scale-90 transition-all border-4 border-white"
         style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
       >
         <Sprout className="w-6 h-6" />
       </button>
-
-      {/* Quick Add Sheet (shared with crop list) */}
-      <AddEntrySheet
-        open={showFAB}
-        onClose={() => setShowFAB(false)}
-        onSelectCrop={() => { setShowFAB(false); navigate(ROUTES.CROP_CREATE); }}
-        onSelectPropagation={() => { setShowFAB(false); setShowPropForm(true); }}
-      />
-
-      <PropForm open={showPropForm} onClose={() => setShowPropForm(false)} date={today()} />
     </div>
   );
 }

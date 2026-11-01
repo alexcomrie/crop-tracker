@@ -6,6 +6,7 @@ import { parseDate, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
 import { getPhiStatus } from '../../lib/phi';
 import { stageGifUrl } from '../../lib/stageGifs';
+import { propGifUrl, getPropMethod } from '../../lib/propStages';
 
 interface CropCardProps {
   crop: Crop;
@@ -64,6 +65,9 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
   const harvestCount = harvestLogs?.length ?? 0;
 
   const stageColor = STAGE_COLORS[crop.plantStage] ?? '#9e9e9e';
+  const propMethod = getPropMethod(crop.propagationMethod);
+  const propStage = crop.propagationStage || propMethod?.stages[0]?.key;
+  const listGif = propMethod ? (propGifUrl(crop.propagationMethod, propStage, 32) ?? stageGifUrl(crop.plantStage, 32)) : stageGifUrl(crop.plantStage, 32);
 
   return (
     <div
@@ -94,19 +98,25 @@ export function CropCard({ crop, cropData, onClick, selectMode, selected, onTogg
               {crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.variety} · {crop.plantingMethod}</p>}
               {!crop.variety && <p className="text-[11px] text-muted-foreground truncate">{crop.plantingMethod}</p>}
             </div>
-            <img src={stageGifUrl(crop.plantStage, 32)} alt={`${crop.plantStage} stage`}
+            <img src={listGif} alt={propMethod ? `${propStage} propagation stage` : `${crop.plantStage} stage`}
               className="w-10 h-10 shrink-0 rounded-lg object-contain" loading="lazy" />
           </div>
           <span className="flex items-center gap-1 mt-1.5 flex-wrap">
             <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none ${kind === 'crop' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'}`}>
               {kind === 'crop' ? '🌾 Crop' : '🌿 Prop'}
             </span>
-            <span
-              className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white leading-none"
-              style={{ backgroundColor: stageColor }}
-            >
-              {crop.plantStage}
-            </span>
+            {propMethod ? (
+              <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full leading-none bg-emerald-50 text-emerald-700">
+                🌿 {propStage}
+              </span>
+            ) : (
+              <span
+                className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white leading-none"
+                style={{ backgroundColor: stageColor }}
+              >
+                {crop.plantStage}
+              </span>
+            )}
             {phi && (
               <span
                 title={`Pre-harvest interval: sprayed ${phi.sprayDate}, safe after ${phi.expiresDate}`}

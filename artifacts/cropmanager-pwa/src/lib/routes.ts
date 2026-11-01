@@ -24,6 +24,8 @@ export const ROUTES = {
   HERB_SCHEDULE: '/herb-schedule',
   REMINDERS: '/reminders',
   SETTINGS: '/settings',
+  FARMER_INFO: '/farmer',
+  COMMUNITY: '/community',
 } as const;
 
 export function cropDetailsPath(id: string) { return `/crops/${id}`; }
@@ -55,6 +57,8 @@ export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.HERB_SCHEDULE]: 'Herbicide Schedule',
   [ROUTES.REMINDERS]: 'Reminders',
   [ROUTES.SETTINGS]: 'Settings',
+  [ROUTES.FARMER_INFO]: 'Farmer Profile',
+  [ROUTES.COMMUNITY]: 'Community',
 };
 
 const ROOT_ROUTES = new Set<string>([
@@ -65,6 +69,7 @@ const ROOT_ROUTES = new Set<string>([
   ROUTES.SETTINGS,
   ROUTES.REMINDERS,
   ROUTES.HERB_SCHEDULE,
+  ROUTES.FARMER_INFO,
 ]);
 
 export function isRootRoute(pathname: string): boolean {
@@ -86,7 +91,7 @@ export function showBottomNav(pathname: string): boolean {
  * Returns true if the route is a sub-page that should show a back button in the TopBar.
  */
 export function isSubRoute(pathname: string): boolean {
-  return pathname.startsWith('/more/') || pathname.startsWith('/crops/') || pathname === ROUTES.REMINDERS || pathname === ROUTES.HERB_SCHEDULE;
+  return pathname.startsWith('/more/') || pathname.startsWith('/crops/') || pathname === ROUTES.REMINDERS || pathname === ROUTES.HERB_SCHEDULE || pathname === ROUTES.FARMER_INFO;
 }
 
 /**
@@ -97,5 +102,6 @@ export function getParentRoute(pathname: string): string {
   if (pathname.startsWith('/crops/')) return ROUTES.CROPS;
   if (pathname === ROUTES.REMINDERS) return ROUTES.MORE;
   if (pathname === ROUTES.HERB_SCHEDULE) return ROUTES.MORE;
+  if (pathname === ROUTES.FARMER_INFO) return ROUTES.MORE;
   return ROUTES.DASHBOARD;
 }

@@ -12,7 +12,6 @@ const router: IRouter = Router();
 // Note: In a production monorepo, these would be absolute or relative to the workspace root
 const PWA_DATA_DIR = path.resolve(__dirname, "../../../cropmanager-pwa/public/data");
 const CROP_DB_PATH = path.join(PWA_DATA_DIR, "crop_database.json");
-const FERT_DB_PATH = path.join(PWA_DATA_DIR, "fertilizer_schedule.json");
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -38,24 +37,6 @@ router.post("/crop-db", async (req: Request, res: Response) => {
     }
     await atomicWriteJson(CROP_DB_PATH, data);
     res.json({ success: true, message: "Crop database updated" });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * POST /api/data/fert-db
- * Updates the fertilizer_schedule.json file
- */
-router.post("/fert-db", async (req: Request, res: Response) => {
-  try {
-    const data = req.body;
-    if (!isJsonObject(data)) {
-      res.status(400).json({ success: false, error: "Body must be a JSON object" });
-      return;
-    }
-    await atomicWriteJson(FERT_DB_PATH, data);
-    res.json({ success: true, message: "Fertilizer database updated" });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

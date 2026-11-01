@@ -20,6 +20,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   reminderVibrate: true,
   reminderBadge: true,
   reminderKinds: {},
+  farmerSetupDone: false,
+  farmerNameHistory: [],
 };
 
 /** Merge stored settings over defaults (old installs lack the newer keys). */

@@ -38,6 +38,8 @@ export interface ObservationLog {
   photos?: string[];
   /** Free-text plant name for standalone field observations (no crop record). */
   plantName?: string;
+  /** Optional GPS location for this observation. */
+  location?: GeoPoint;
   updatedAt: number;
 }
 
@@ -146,6 +148,23 @@ export interface Crop {
   archivedFrom?: string;
   /** Foundation DB key this tracker crop syncs learning with (defaults to cropName). */
   foundationKey?: string;
+  /** Free-form growing environment (open field, greenhouse, container…). */
+  environment?: string;
+  /** Recommended/recorded soil pH window for this planting. */
+  soilPhMin?: number;
+  soilPhMax?: number;
+  /** Latest measured soil pH. */
+  soilPhActual?: number;
+  /** Notes on beneficial bacteria / soil biology. */
+  bacteriaNotes?: string;
+  /** Compressed photo stored as a data URL. */
+  imageDataUrl?: string;
+  /** Optional GPS location for this crop planting. */
+  location?: GeoPoint;
+  /** Propagation method when this crop record started from a cutting/graft/layer/division. */
+  propagationMethod?: string;
+  /** Current propagation milestone (Set/Rooted/Grafted/Air layered…), separate from plantStage. */
+  propagationStage?: string;
   notes: string;
   daysSeedGerm: number;
   daysGermTransplant: number;
@@ -301,6 +320,24 @@ export interface AppSettings {
   reminderKinds?: Record<string, boolean>;
   /** Show outstanding repayment balances on the dashboard (default true). */
   showRepaymentOnDashboard?: boolean;
+  /** Permanent, device-local farmer ID. Generated once on first launch. */
+  farmerId?: string;
+  /** Farmer's display name. */
+  farmerName?: string;
+  /** Farm / garden name. */
+  farmName?: string;
+  /** Parish, town or address shown on the farmer card. */
+  farmLocation?: string;
+  /** Contact number (optional). */
+  farmerPhone?: string;
+  /** Free-form note about the farm. */
+  farmerNotes?: string;
+  /** Timestamps (ms) of accepted name changes, used for the rolling limit. */
+  farmerNameHistory?: number[];
+  /** True once the first-start name prompt was completed or skipped. */
+  farmerSetupDone?: boolean;
+  /** Local override to show the Community feature (default false = Coming Soon). */
+  communityEnabled?: boolean;
 }
 
 export interface DayForecast {
@@ -379,6 +416,19 @@ export interface FarmArea {
   cropAssignments: CropAssignment[];
   plantingMethod: string;
   notes: string;
+  createdAt: string;
+  updatedAt: number;
+}
+
+export type FarmPointKind = 'crop' | 'object' | 'tree';
+
+export interface FarmPoint {
+  id: string;
+  landId: string;
+  point: GeoPoint;
+  label: string;
+  kind: FarmPointKind;
+  notes?: string;
   createdAt: string;
   updatedAt: number;
 }

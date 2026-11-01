@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2 } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2, UserRound, Users } from 'lucide-react';
 import { REM_TYPES } from '../components/reminders/ReminderForm';
 import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
 import { resolveCurrentLocation } from '../lib/location';
@@ -14,6 +15,7 @@ import type { ReminderTone } from '../types';
 export function SettingsScreen() {
   const { settings, updateSettings } = useAppStore();
   const { isInstallable, isInstalled, handleInstallClick, platform, steps } = usePWAInstall();
+  const navigate = useNavigate();
 
   const [local, setLocal] = useState<AppSettings>(settings);
   const [saved, setSaved] = useState(false);
@@ -141,7 +143,22 @@ export function SettingsScreen() {
     <div className="min-h-screen bg-gray-50 pb-24 pt-2 px-4 space-y-4 max-w-md mx-auto">
       <h1 className="text-2xl font-bold mb-4">Settings</h1>
 
-      {/* Weather */}
+      {/* Farmer profile */}
+      <button
+        onClick={() => navigate('/farmer')}
+        className="w-full bg-white rounded-xl border p-4 flex items-center gap-3 text-left hover:border-green-300 active:scale-[0.99] transition"
+      >
+        <div className="w-10 h-10 rounded-full bg-green-50 border flex items-center justify-center shrink-0">
+          <UserRound className="w-5 h-5 text-green-700" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">Farmer Profile</p>
+          <p className="text-[10px] text-muted-foreground leading-tight truncate">
+            {settings.farmerName ? `${settings.farmerName} · ${settings.farmerId}` : 'Add your name, farm details and permanent farmer ID'}
+          </p>
+        </div>
+        <span className="text-gray-400">›</span>
+      </button>
       <div className="bg-white rounded-xl border p-4 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <CloudRain className="w-4 h-4 text-green-700" />
@@ -253,7 +270,28 @@ export function SettingsScreen() {
         </div>
       </div>
 
-      {/* Data Management */}
+      {/* Community */}
+      <div className="bg-white rounded-xl border p-4 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Users className="w-4 h-4 text-green-700" />
+          <h3 className="font-semibold text-sm">Community</h3>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <span className="text-xs font-medium">Show Community</span>
+            <p className="text-[10px] text-muted-foreground leading-tight italic">
+              Default is off (Coming Soon). Turn on only after the Google Sheet is connected.
+            </p>
+          </div>
+          <button
+            onClick={() => updateSettings({ communityEnabled: !(settings.communityEnabled ?? false) })}
+            className={switchCls(settings.communityEnabled ?? false)}
+            aria-label="Show community"
+          >
+            <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${(settings.communityEnabled ?? false) ? 'translate-x-5' : 'translate-x-0.5'} mt-0.5`} />
+          </button>
+        </div>
+      </div>
       <div className="bg-white rounded-xl border p-4 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <Download className="w-4 h-4 text-green-700" />

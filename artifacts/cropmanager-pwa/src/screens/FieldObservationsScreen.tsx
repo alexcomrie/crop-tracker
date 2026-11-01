@@ -42,6 +42,8 @@ export function FieldObservationsScreen() {
   const [obsPlant, setObsPlant] = useState('');
   const [obsText, setObsText] = useState('');
   const [obsDate, setObsDate] = useState(formatDateShort(today()));
+  const [obsLat, setObsLat] = useState('');
+  const [obsLng, setObsLng] = useState('');
 
   // Tracking form
   const [trackPlant, setTrackPlant] = useState('');
@@ -106,6 +108,7 @@ export function FieldObservationsScreen() {
         date: formatDateShort(date),
         text: obsText.trim(),
         plantName: plant,
+        location: (obsLat.trim() && obsLng.trim() && Number.isFinite(Number(obsLat)) && Number.isFinite(Number(obsLng))) ? { lat: Number(obsLat), lng: Number(obsLng) } : undefined,
         updatedAt: Date.now(),
       } as never);
       await addDiaryEntry({
@@ -119,6 +122,7 @@ export function FieldObservationsScreen() {
       });
       setObsText('');
       setObsDate(formatDateShort(today()));
+      setObsLat(''); setObsLng('');
       toast.success('Observation saved');
     } catch (e) {
       console.error('[field-obs] add observation failed', { e });
@@ -352,6 +356,10 @@ export function FieldObservationsScreen() {
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
             className="w-full border rounded-lg p-2 text-sm min-h-[80px]" />
           <DateInput value={obsDate} onChange={setObsDate} ariaLabel="Observation date" />
+          <div className="grid grid-cols-2 gap-2">
+            <input value={obsLat} onChange={e => setObsLat(e.target.value)} placeholder="Latitude (optional)" className="border rounded-lg p-2 text-sm" inputMode="decimal" />
+            <input value={obsLng} onChange={e => setObsLng(e.target.value)} placeholder="Longitude (optional)" className="border rounded-lg p-2 text-sm" inputMode="decimal" />
+          </div>
           <button onClick={handleAddObservation} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
         </div>
 

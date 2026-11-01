@@ -1,6 +1,6 @@
 import React from 'react';
 import { ROUTES } from './routes';
-import { Database, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings, Wallet } from 'lucide-react';
+import { Database, BarChart2, FlaskConical, Bell, MapPin, BookOpen, Calendar, Calculator, Receipt, Home, Sprout, Settings, Wallet, UserRound, Users } from 'lucide-react';
 
 export interface NavItem { label: string; title?: string; subtitle?: string; icon: React.ReactNode; path: string; iconColor?: string; }
 
@@ -12,6 +12,8 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Dashboard', title: 'Dashboard', subtitle: 'Overview & today', icon: React.createElement(Home, { className: 'w-5 h-5' }), path: ROUTES.DASHBOARD },
       { label: 'Crops', title: 'Crops', subtitle: 'Manage crops, propagation and growth', icon: React.createElement(Sprout, { className: 'w-5 h-5' }), path: ROUTES.CROPS },
+      { label: 'Farmer Profile', title: 'Farmer Profile', subtitle: 'Farmer ID, name and farm details', icon: React.createElement(UserRound, { className: 'w-5 h-5' }), path: ROUTES.FARMER_INFO },
+      { label: 'Community', title: 'Community', subtitle: 'Posts, comments and likes', icon: React.createElement(Users, { className: 'w-5 h-5' }), path: ROUTES.COMMUNITY },
     ],
   },
   {

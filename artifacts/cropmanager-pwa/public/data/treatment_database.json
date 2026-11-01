@@ -1,0 +1,1475 @@
+{
+  "version": 1,
+  "updatedAt": "2026-11-01T16:24:04.272Z",
+  "source": "Built-in starter list — replace with your Google Sheet",
+  "entries": [
+    {
+      "id": "fung-1",
+      "name": "Titan 20% EW",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 20,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Tebuconazole (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "leaf spot",
+        "rust",
+        "powdery mildew",
+        "anthracnose"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Preventive spray at first sign of disease. Repeat every 7–14 days while conditions stay wet. Rotate with a different mode of action.",
+      "warnings": "Triazole fungicide — do not spray during flowering if bees are active. Do not exceed the label number of applications per season.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-2",
+      "name": "Control 75% WP",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 10,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Chlorothalonil",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "leaf spot",
+        "early blight",
+        "late blight",
+        "downy mildew",
+        "fruit rot"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Protectant — apply before disease establishes. Cover both leaf surfaces and repeat on the label interval.",
+      "warnings": "Not for use on crops eaten raw within the PHI window. Wear gloves, eye protection and a respirator when mixing.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-3",
+      "name": "Mancozeb 80% WP",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 30,
+          "max": 30,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Mancozeb",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "early blight",
+        "late blight",
+        "downy mildew",
+        "leaf spot",
+        "anthracnose"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Protectant used in a preventive programme. Apply on a 7–10 day schedule in wet weather.",
+      "warnings": "Do not apply within 7 days of harvest. Repeated use can build resistance — alternate with systemic products.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-4",
+      "name": "Carigold 22.3 EC",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 15,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "leaf spot",
+        "blight",
+        "rust"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Use as part of a preventive spray programme. Confirm the registered crops on the label before use.",
+      "warnings": "Label rates and intervals vary by formulation — confirm before mixing.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-5",
+      "name": "Sulcox-OH 50 WP",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 30,
+          "max": 45,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Copper oxychloride (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "bacterial spot",
+        "leaf spot",
+        "anthracnose",
+        "black spot"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Copper protectant. Apply early morning or late afternoon; avoid spraying in strong sun to reduce leaf burn.",
+      "warnings": "Copper can accumulate in soil and burn tender leaves. Do not tank-mix with strongly acidic products.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-6",
+      "name": "Acrobat 69% WP",
+      "category": "Fungicide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 20,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Dimethomorph + mancozeb",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "downy mildew",
+        "late blight",
+        "fruit rot"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Targets oomycete diseases. Apply preventively and alternate with a different mode of action.",
+      "warnings": "Contains mancozeb — observe the 24-hour re-entry interval and 7-day PHI.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-7",
+      "name": "Carbendazim 50 SC",
+      "category": "Fungicide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Carbendazim",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "powdery mildew",
+        "leaf spot",
+        "fruit rot",
+        "anthracnose"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Systemic benzimidazole. Apply at first sign and repeat on the label interval.",
+      "warnings": "Resistance develops quickly with benzimidazoles. Rotate modes of action and never exceed label applications.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-8",
+      "name": "Topsin-M 70% WP",
+      "category": "Fungicide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 10,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Thiophanate-methyl",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "leaf spot",
+        "fruit rot",
+        "powdery mildew"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Systemic protectant/curative. Apply on a 7–14 day schedule during disease pressure.",
+      "warnings": "Benzimidazole resistance is common — rotate with unrelated fungicides.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-9",
+      "name": "Regnum",
+      "category": "Fungicide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 0.4,
+          "max": 1.25,
+          "unit": "L",
+          "perVolume": 1,
+          "perVolumeUnit": "ha",
+          "notes": "Crop-dependent; see label"
+        }
+      ],
+      "activeIngredient": "Pyraclostrobin",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "anthracnose",
+        "leaf spot",
+        "rust",
+        "blight"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Broad-spectrum strobilurin. Use preventively; area-based rate — calculate litres for the area actually sprayed.",
+      "warnings": "Strobilurins are resistance-prone. Never apply more than two consecutive sprays.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-10",
+      "name": "Zampro DM 52.5 SC",
+      "category": "Fungicide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 8,
+          "max": 12,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Ametoctradin + dimethomorph",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "downy mildew",
+        "late blight"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Oomycete-specific. Apply before infection periods and alternate with another downy-mildew group.",
+      "warnings": "Confirm the registered crop on the label; not a broad-spectrum fungicide.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-11",
+      "name": "Bellis 38 WG",
+      "category": "Fungicide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 8,
+          "max": 12,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        },
+        {
+          "label": "AgCelence",
+          "min": 16,
+          "max": 16,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Boscalid + pyraclostrobin",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "powdery mildew",
+        "leaf spot",
+        "anthracnose",
+        "blight"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Two modes of action in one product. Use preventively on a 7–14 day interval.",
+      "warnings": "Do not exceed the label maximum number of sprays per season. Rotate with a different group.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-12",
+      "name": "Metazeb Gold 72% WP",
+      "category": "Fungicide",
+      "classification": "Both",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 10,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Metalaxyl + mancozeb",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "downy mildew",
+        "late blight",
+        "damping off"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Apply preventively when humidity is high. Good for seedling damping-off when used as a soil drench at label rate.",
+      "warnings": "Metalaxyl resistance is common — always tank-mix or alternate with a different downy-mildew fungicide.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "fung-13",
+      "name": "Trifmine 30% WP",
+      "category": "Fungicide",
+      "classification": "Both",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 5,
+          "max": 5,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Triflumizole (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "powdery mildew",
+        "leaf spot",
+        "rust"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Systemic protectant. Apply at first sign and repeat on the label interval.",
+      "warnings": "Confirm registered crops and maximum applications on the label.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-1",
+      "name": "Advance 10EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 5,
+          "max": 10,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips",
+        "leafminer"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Spray to thorough coverage, especially leaf undersides where pests feed. Repeat on the label interval.",
+      "warnings": "Confirm the active ingredient and registered crop on the label before use.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-2",
+      "name": "Carimectin 2.3% EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Abamectin",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "mites",
+        "leafminer",
+        "thrips"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Translaminar — spray both leaf surfaces for mites and leafminer. Repeat after 7–10 days if needed.",
+      "warnings": "Highly toxic to bees and aquatic life. Do not spray during bloom or near water. Maximum two consecutive applications.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-3",
+      "name": "Pegastar",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 3,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Apply at first sign of infestation and repeat on the label interval.",
+      "warnings": "Confirm the label before mixing; observe the PHI shown on the product.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-4",
+      "name": "Lufen 5 EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Lufenuron",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "caterpillars",
+        "leafminer",
+        "armyworm"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Insect growth regulator — targets eggs and larvae, so apply early. Repeat after 7–10 days.",
+      "warnings": "Slow-acting; do not expect a immediate knockdown. Best used in a rotation.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-5",
+      "name": "Phoenix 20 WP",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "caterpillars"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Apply as a foliar spray with thorough coverage. Repeat on the label interval.",
+      "warnings": "Confirm the active ingredient on the label before use.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-6",
+      "name": "Nissorun 10 WP",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Hexythiazox",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "mites"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Acaricide for eggs and immature mites. Apply when mites first appear; repeat after 7–10 days.",
+      "warnings": "Not effective against adult mites — target early stages. Rotate with a different acaricide.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-7",
+      "name": "Cure 1.8 EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Abamectin",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "mites",
+        "leafminer",
+        "thrips"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Spray both leaf surfaces. Repeat after 7–10 days if pressure continues.",
+      "warnings": "Toxic to bees and fish. Do not spray during bloom or near water.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-8",
+      "name": "Botanigard ES",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Aphids/Whiteflies",
+          "min": 15,
+          "max": 20,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        },
+        {
+          "label": "Other Pests",
+          "min": 40,
+          "max": 45,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Beauveria bassiana",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips",
+        "mites"
+      ],
+      "reiHours": 4,
+      "phiDays": 0,
+      "guide": "Biological insecticide. Apply in the evening or on cloudy days; keep the spray mix cool and use it soon after mixing.",
+      "warnings": "Do not tank-mix with chemical fungicides. Store in a cool place and check the expiry date.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-9",
+      "name": "MiMiC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 5,
+          "max": 10,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Methoxyfenozide (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "caterpillars",
+        "armyworm",
+        "loopers"
+      ],
+      "reiHours": 4,
+      "phiDays": 7,
+      "guide": "Targets caterpillar larvae. Apply when larvae are small and repeat on the label interval.",
+      "warnings": "Confirm the active ingredient on the label; rotate to avoid resistance.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-10",
+      "name": "Caratrax 5 EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Lambda-cyhalothrin (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "thrips",
+        "caterpillars",
+        "whiteflies"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Broad-spectrum contact pyrethroid. Spray late evening to protect pollinators.",
+      "warnings": "Highly toxic to bees and fish. Do not spray during flowering. Rotate with a different mode of action.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-11",
+      "name": "Indicarb 14.5% SC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 5,
+          "max": 10,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Foliar spray with thorough coverage. Repeat on the label interval.",
+      "warnings": "Confirm the label before use; observe the PHI for the crop.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-12",
+      "name": "Carbaryl 85% WP",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 30,
+          "max": 45,
+          "unit": "g",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Carbaryl",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "caterpillars",
+        "beetles",
+        "aphids"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Contact insecticide. Apply when pests are actively feeding and repeat on the label interval.",
+      "warnings": "Highly toxic to bees and beneficial insects. Do not spray during bloom.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-13",
+      "name": "Suldan",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 875,
+          "max": 875,
+          "unit": "mL",
+          "perVolume": 1,
+          "perVolumeUnit": "ha",
+          "notes": "350 mL/acre"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips",
+        "mites"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Area-based product — enter the area actually sprayed, not the sprayer tank volume.",
+      "warnings": "Confirm the label rate for the specific crop; area-based labels are easy to overdose.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-14",
+      "name": "Danitol 10 EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 15,
+          "max": 30,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Fenpropathrin",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "mites",
+        "aphids",
+        "whiteflies",
+        "thrips"
+      ],
+      "reiHours": 24,
+      "phiDays": 7,
+      "guide": "Broad-spectrum pyrethroid/acaricide. Apply late evening and repeat on the label interval.",
+      "warnings": "Highly toxic to bees, fish and beneficials. Do not spray during bloom or near water.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-15",
+      "name": "Definite 2.5 EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 5,
+          "max": 10,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Check product label",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "thrips",
+        "whiteflies"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Foliar spray at first sign; repeat on the label interval.",
+      "warnings": "Confirm the label before use; observe the PHI for the crop.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-16",
+      "name": "Diazinon 48% EC",
+      "category": "Insecticide",
+      "classification": "Contact",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 15,
+          "max": 30,
+          "unit": "mL",
+          "perVolume": 1,
+          "perVolumeUnit": "gal"
+        }
+      ],
+      "activeIngredient": "Diazinon",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "thrips",
+        "soil insects"
+      ],
+      "reiHours": 24,
+      "phiDays": 10,
+      "guide": "Apply as a foliar spray or soil drench at the label rate. Do not re-enter treated areas until the spray has dried.",
+      "warnings": "Organophosphate — high toxicity. Wear full PPE, keep children and animals away, and observe the longer PHI.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-17",
+      "name": "Protect 35% SC",
+      "category": "Insecticide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Foliar",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        },
+        {
+          "label": "Soil Drench",
+          "min": 15,
+          "max": 25,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L",
+          "notes": "Crop-dependent"
+        }
+      ],
+      "activeIngredient": "Imidacloprid (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips",
+        "leafhoppers"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Systemic — foliar or soil drench. Soil drench needs to be watered in for uptake.",
+      "warnings": "Highly toxic to bees. Never apply during flowering or let runoff reach waterways.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-18",
+      "name": "Caprid 20 SL",
+      "category": "Insecticide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 2.5,
+          "max": 5,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Acetamiprid (verify on label)",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips"
+      ],
+      "reiHours": 12,
+      "phiDays": 7,
+      "guide": "Systemic foliar spray. Apply at first sign and repeat on the label interval.",
+      "warnings": "Toxic to bees; avoid spraying during bloom. Confirm the active ingredient on the label.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    },
+    {
+      "id": "ins-19",
+      "name": "Dimethoate 40 EC",
+      "category": "Insecticide",
+      "classification": "Systemic",
+      "rates": [
+        {
+          "label": "Standard",
+          "min": 10,
+          "max": 10,
+          "unit": "mL",
+          "perVolume": 3.8,
+          "perVolumeUnit": "L"
+        }
+      ],
+      "activeIngredient": "Dimethoate",
+      "crops": [
+        "tomato",
+        "pepper",
+        "sweet pepper",
+        "hot pepper",
+        "okra",
+        "cucumber",
+        "pumpkin",
+        "cabbage",
+        "callaloo",
+        "lettuce",
+        "beans",
+        "corn",
+        "mango",
+        "papaya",
+        "banana",
+        "citrus",
+        "avocado",
+        "guava",
+        "soursop"
+      ],
+      "targets": [
+        "aphids",
+        "whiteflies",
+        "thrips",
+        "leafminer"
+      ],
+      "reiHours": 48,
+      "phiDays": 14,
+      "guide": "Systemic organophosphate. Apply at first sign with thorough coverage; do not repeat more often than the label allows.",
+      "warnings": "High toxicity — full PPE, 48-hour re-entry, 14-day PHI. Not for use near homes, schools or water.",
+      "source": "builtin",
+      "updatedAt": 1793550244272
+    }
+  ]
+}

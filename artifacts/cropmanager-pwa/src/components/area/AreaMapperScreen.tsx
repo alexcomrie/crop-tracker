@@ -9,7 +9,7 @@ import { InteractiveMap } from './InteractiveMap';
 import { LeafletMapView } from './LeafletMapView';
 import { LinkCropModal } from './LinkCropModal';
 import { haversineMeters, calcArea, gpsToSvgAll, formatAreaShort } from '../../lib/geo';
-import type { GeoPoint, FarmArea, FarmLand, CropAssignment } from '../../types';
+import type { GeoPoint, FarmArea, FarmLand, CropAssignment, FarmPoint, FarmPointKind } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
 const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Pot / Container', 'Hydroponic'];
@@ -82,6 +82,14 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [editingPoints, setEditingPoints] = useState(false);
   const [editingLandPoints, setEditingLandPoints] = useState(false);
   const allCrops = useLiveQuery(() => db.crops.where('status').equals('Active').toArray(), []) ?? [];
+  const pointTags = useLiveQuery(() => selectedLand ? db.farmPoints.where('landId').equals(selectedLand.id).toArray() : [], [selectedLand]) ?? [];
+  const [showPointForm, setShowPointForm] = useState(false);
+  const [pointLabel, setPointLabel] = useState('');
+  const [pointKind, setPointKind] = useState<FarmPointKind>('crop');
+  const [pointLat, setPointLat] = useState('');
+  const [pointLng, setPointLng] = useState('');
+  const [pointNotes, setPointNotes] = useState('');
+  const [pointBusy, setPointBusy] = useState(false);
 
   function interpolatePoints(start: GeoPoint, end: GeoPoint): GeoPoint[] {
     const dist = haversineMeters(start, end);
@@ -425,6 +433,56 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       console.error('[area] delete plot failed', { id, err });
       toast.error('Delete failed: ' + (err instanceof Error ? err.message : String(err)));
     }
+  }
+
+  async function captureGpsForPoint() {
+    if (!navigator.geolocation) { toast.error('GPS is not available on this device'); return; }
+    setPointBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setPointLat(pos.coords.latitude.toFixed(6));
+        setPointLng(pos.coords.longitude.toFixed(6));
+        setPointBusy(false);
+        toast.success('GPS position captured');
+      },
+      err => {
+        setPointBusy(false);
+        toast.error(err.code === err.PERMISSION_DENIED ? 'Location permission denied' : 'Could not read GPS');
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+
+  async function savePointTag() {
+    if (!selectedLand) { toast.error('Map a land first — points belong to a land'); return; }
+    const lat = Number(pointLat);
+    const lng = Number(pointLng);
+    if (!pointLabel.trim()) { toast.error('Enter a label for this point'); return; }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error('Enter valid latitude and longitude, or capture GPS'); return; }
+    try {
+      const pt: FarmPoint = {
+        id: generateId('FA'),
+        landId: selectedLand.id,
+        point: { lat, lng },
+        label: pointLabel.trim(),
+        kind: pointKind,
+        notes: pointNotes.trim() || undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+      };
+      await db.farmPoints.add(pt);
+      setShowPointForm(false);
+      setPointLabel(''); setPointNotes(''); setPointLat(''); setPointLng('');
+      toast.success('Point tag saved');
+    } catch (e) {
+      console.error('[area] save point tag failed', { e });
+      toast.error('Could not save point tag: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
+  async function deletePointTag(id: string) {
+    try { await db.farmPoints.delete(id); toast.success('Point tag deleted'); }
+    catch (e) { console.error('[area] delete point tag failed', { id, e }); toast.error('Delete failed'); }
   }
 
   function editPlotPerimeter(plot: FarmArea) {
@@ -773,6 +831,58 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               );
             })}
           </>
+        )}
+
+        {/* ─── POINT TAGS (single-point crops/objects/trees) ─── */}
+        {mode === 'plots' && selectedLand && (
+          <div className="bg-white rounded-xl border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Point Tags</p>
+              <button onClick={() => setShowPointForm(v => !v)} className="text-xs text-green-700 font-semibold">
+                {showPointForm ? 'Cancel' : '+ Tag point'}
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Tag a single spot (a tree, a plant or an object) inside this land. Land must be mapped first.
+            </p>
+            {showPointForm && (
+              <div className="space-y-2 border-t pt-2">
+                <input value={pointLabel} onChange={e => setPointLabel(e.target.value)} placeholder="Label (e.g. Mango tree #1)" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <select value={pointKind} onChange={e => setPointKind(e.target.value as FarmPointKind)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <option value="crop">Crop / plant</option>
+                  <option value="tree">Tree</option>
+                  <option value="object">Object / feature</option>
+                </select>
+                <textarea value={pointNotes} onChange={e => setPointNotes(e.target.value)} placeholder="Notes (optional)" rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={pointLat} onChange={e => setPointLat(e.target.value)} placeholder="Latitude" className="border rounded-lg px-3 py-2 text-sm" inputMode="decimal" />
+                  <input value={pointLng} onChange={e => setPointLng(e.target.value)} placeholder="Longitude" className="border rounded-lg px-3 py-2 text-sm" inputMode="decimal" />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => void captureGpsForPoint()} disabled={pointBusy} className="flex-1 text-xs">
+                    {pointBusy ? 'Capturing…' : 'Use my GPS'}
+                  </Button>
+                  <Button onClick={() => void savePointTag()} className="flex-1 text-xs bg-green-600 hover:bg-green-700">Save Tag</Button>
+                </div>
+              </div>
+            )}
+            {pointTags.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">No point tags yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {pointTags.map(pt => (
+                  <div key={pt.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
+                    <span className="text-[10px] font-bold uppercase bg-green-100 text-green-700 rounded-full px-2 py-0.5 shrink-0">{pt.kind}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate">{pt.label}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{pt.point.lat.toFixed(5)}, {pt.point.lng.toFixed(5)}</p>
+                    </div>
+                    <button onClick={() => void deletePointTag(pt.id)} className="text-red-400 text-xs px-1.5">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* ─── MAP VIEW (Leaflet tiles) ─── */}

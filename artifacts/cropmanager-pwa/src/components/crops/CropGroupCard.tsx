@@ -4,6 +4,7 @@ import type { Crop, CropData } from '../../types';
 import { parseDate, daysBetween, today } from '../../lib/dates';
 import { STAGE_COLORS } from '../../lib/stages';
 import { stageGifUrl } from '../../lib/stageGifs';
+import { propGifUrl, getPropMethod } from '../../lib/propStages';
 
 interface CropGroupCardProps {
   name: string;
@@ -99,6 +100,9 @@ export function CropGroupCard({
             const daysToHarvest = harvestEst ? daysBetween(today(), harvestEst) : null;
             const stageColor = STAGE_COLORS[crop.plantStage] ?? '#9e9e9e';
             const selected = selectedIds.includes(crop.id);
+            const propMethod = getPropMethod(crop.propagationMethod);
+            const propStage = crop.propagationStage || propMethod?.stages[0]?.key;
+            const listGif = propMethod ? (propGifUrl(crop.propagationMethod, propStage, 32) ?? stageGifUrl(crop.plantStage, 32)) : stageGifUrl(crop.plantStage, 32);
 
             function handleClick() {
               if (pressFired.current === crop.id) {
@@ -134,17 +138,17 @@ export function CropGroupCard({
                     className="w-5 h-5 accent-green-700 shrink-0"
                   />
                 )}
-                <img src={stageGifUrl(crop.plantStage, 32)} alt="" className="w-8 h-8 shrink-0 rounded-lg object-contain" loading="lazy" />
+                <img src={listGif} alt="" className="w-8 h-8 shrink-0 rounded-lg object-contain" loading="lazy" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-[12px] font-medium truncate">
                       {crop.variety || crop.plantingMethod || 'Standard'}
                     </span>
                     <span
-                      className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full text-white leading-none shrink-0"
-                      style={{ backgroundColor: stageColor }}
+                      className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full leading-none shrink-0 text-white ${propMethod ? 'bg-emerald-600' : ''}`}
+                      style={propMethod ? undefined : { backgroundColor: stageColor }}
                     >
-                      {crop.plantStage}
+                      {propMethod ? `🌿 ${propStage}` : crop.plantStage}
                     </span>
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-0.5">

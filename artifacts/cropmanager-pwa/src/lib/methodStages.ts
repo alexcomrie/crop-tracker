@@ -13,7 +13,7 @@
 
 export type MethodStart = 'Seed' | 'Seedling';
 
-const VEGETATIVE_METHODS = new Set(['cuttings', 'division', 'grafted']);
+const VEGETATIVE_METHODS = new Set(['cuttings', 'division', 'grafted', 'air layering', 'airlayering']);
 
 export function normalizeMethod(method?: string): string {
   return (method ?? '').trim().toLowerCase();

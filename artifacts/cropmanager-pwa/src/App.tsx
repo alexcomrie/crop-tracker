@@ -16,6 +16,9 @@ import { MoreScreen } from './screens/MoreScreen';
 import { HerbicideScheduleScreen } from './screens/HerbicideScheduleScreen';
 import { RemindersScreen } from './screens/RemindersScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { FarmerInfoScreen } from './screens/FarmerInfoScreen';
+import { CommunityScreen } from './screens/CommunityScreen';
+import { FarmerSetupPrompt } from './components/farmer/FarmerSetupPrompt';
 import { CropDatabaseScreen } from './components/CropDatabaseScreen';
 import { CropHistoryScreen } from './components/reports/CropHistory';
 import { CHCalculatorScreen } from './components/ch/CHCalculatorScreen';
@@ -175,6 +178,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto relative">
+      <FarmerSetupPrompt />
       <TopBar />
       <NavigationDrawer />
       <main className="pt-14 pb-16">
@@ -191,6 +195,8 @@ function AppContent() {
             <Route path={ROUTES.HERB_SCHEDULE} element={<PanelPage><HerbicideScheduleScreen /></PanelPage>} />
             <Route path={ROUTES.REMINDERS} element={<PanelPage><RemindersScreen /></PanelPage>} />
             <Route path={ROUTES.SETTINGS} element={<AnimatedPage><SettingsScreen /></AnimatedPage>} />
+      <Route path={ROUTES.FARMER_INFO} element={<AnimatedPage><FarmerInfoScreen /></AnimatedPage>} />
+      <Route path={ROUTES.COMMUNITY} element={<AnimatedPage><CommunityScreen /></AnimatedPage>} />
             <Route path={ROUTES.MORE_CROP_DB} element={<PanelPage><CropDatabaseRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_HISTORY} element={<PanelPage><CropHistoryRoute /></PanelPage>} />
             <Route path={ROUTES.MORE_CH_CALC} element={<PanelPage><CHCalculatorRoute /></PanelPage>} />

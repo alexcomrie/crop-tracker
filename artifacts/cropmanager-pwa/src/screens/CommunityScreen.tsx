@@ -35,8 +35,6 @@ export function CommunityScreen() {
   const [comments, setComments] = useState<Record<string, CommunityComment[]>>({});
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({});
 
-  const localEnabled = settings.communityEnabled === true;
-
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -44,16 +42,15 @@ export function CommunityScreen() {
       const status = await communityStatus(settings);
       if (!alive) return;
       setRemote(status.remote);
-      const isEnabled = localEnabled && status.enabled;
-      setEnabled(isEnabled);
-      if (isEnabled) {
+      setEnabled(status.enabled);
+      if (status.enabled) {
         const list = await fetchPosts(settings);
         if (alive) setPosts(list);
       }
       setLoading(false);
     })();
     return () => { alive = false; };
-  }, [settings, localEnabled]);
+  }, [settings]);
 
   async function handlePost() {
     if (!draft.trim()) return;
@@ -117,7 +114,7 @@ export function CommunityScreen() {
     return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="w-8 h-8 border-2 border-green-600 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
-  if (!localEnabled || enabled === false) {
+  if (enabled === false) {
     return (
       <div className="min-h-screen bg-gray-50 pb-24 pt-2 px-4 max-w-md mx-auto flex flex-col items-center justify-center text-center gap-4">
         <div className="w-16 h-16 rounded-2xl bg-green-50 border flex items-center justify-center">

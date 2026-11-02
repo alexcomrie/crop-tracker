@@ -42,13 +42,21 @@ async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
 }
 
 export async function communityStatus(settings: AppSettings): Promise<{ enabled: boolean; remote: boolean }> {
-  const base = apiUrl(settings);
-  if (!base) return { enabled: false, remote: false };
+  // Visibility is controlled by the API server (.env COMMUNITY_ENABLED).
   try {
-    const raw = await fetchJson(`${base}?action=status`) as { success?: boolean; data?: { communityEnabled?: boolean } };
-    return { enabled: raw?.data?.communityEnabled !== false, remote: true };
+    const raw = await fetchJson('/api/community/status') as { success?: boolean; data?: { communityEnabled?: boolean } };
+    if (raw?.data?.communityEnabled === true) return { enabled: true, remote: true };
+    return { enabled: false, remote: true };
   } catch {
-    return { enabled: false, remote: false };
+    // Fall back to the GAS endpoint if configured.
+    const base = apiUrl(settings);
+    if (!base) return { enabled: false, remote: false };
+    try {
+      const raw2 = await fetchJson(`${base}?action=status`) as { success?: boolean; data?: { communityEnabled?: boolean } };
+      return { enabled: raw2?.data?.communityEnabled !== false, remote: true };
+    } catch {
+      return { enabled: false, remote: false };
+    }
   }
 }
 

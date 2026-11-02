@@ -356,10 +356,8 @@ export function FieldObservationsScreen() {
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
             className="w-full border rounded-lg p-2 text-sm min-h-[80px]" />
           <DateInput value={obsDate} onChange={setObsDate} ariaLabel="Observation date" />
-          <div className="grid grid-cols-2 gap-2">
-            <input value={obsLat} onChange={e => setObsLat(e.target.value)} placeholder="Latitude (optional)" className="border rounded-lg p-2 text-sm" inputMode="decimal" />
-            <input value={obsLng} onChange={e => setObsLng(e.target.value)} placeholder="Longitude (optional)" className="border rounded-lg p-2 text-sm" inputMode="decimal" />
-          </div>
+          <button type="button" onClick={() => { if (!navigator.geolocation) { toast.error('GPS not available'); return; } navigator.geolocation.getCurrentPosition(p => { setObsLat(p.coords.latitude.toFixed(6)); setObsLng(p.coords.longitude.toFixed(6)); toast.success('Location captured'); }, () => toast.error('Could not read GPS')); }} className="w-full text-xs text-amber-700 font-semibold border border-amber-200 rounded-lg py-2">Tag my current location (GPS)</button>
+          {(obsLat && obsLng) && <p className="text-[10px] text-muted-foreground">Tagged: {obsLat}, {obsLng}</p>}
           <button onClick={handleAddObservation} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
         </div>
 

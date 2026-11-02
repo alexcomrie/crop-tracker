@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bell, CheckCircle2, Clock, Trash2, Plus } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Trash2, Plus, Eraser } from 'lucide-react';
 import { markReminderDone } from '../hooks/useReminders';
 import { EmptyState } from '../components/shared/EmptyState';
 import { toast } from 'sonner';
@@ -42,6 +42,21 @@ export function RemindersScreen() {
     return true;
   }), [reminders, scopeFilter, cropById]);
 
+  const handleClearPastDue = async () => {
+    if (!window.confirm('Mark all past-due reminders as done? This stops them re-alerting.')) return;
+    try {
+      const all = await db.reminders.toArray();
+      const todayMs = (parseDate(new Date().toISOString().slice(0, 10)) ?? new Date()).getTime();
+      const due = all.filter(r => !r.sent && r.sendDate && (parseDate(r.sendDate)?.getTime() ?? Infinity) <= todayMs);
+      await Promise.all(due.map(r => db.reminders.update(r.id, { sent: true, updatedAt: Date.now() })));
+      try { localStorage.removeItem('cropmanager_notified_v1'); } catch { /* ignore */ }
+      toast.success(`Cleared ${due.length} past-due reminder${due.length === 1 ? '' : 's'}`);
+    } catch (e) {
+      console.error('[reminders] clear past-due failed', { e });
+      toast.error('Could not clear: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this reminder?')) {
       try {
@@ -57,6 +72,9 @@ export function RemindersScreen() {
     <div className="min-h-screen bg-gray-50 pb-24 pt-2">
       {/* Header actions (title lives in TopBar) */}
       <div className="bg-white border-b border-gray-100 p-4 sticky top-0 z-10 flex items-center justify-end gap-2">
+         <Button variant="ghost" size="icon" aria-label="Clear past-due reminders" onClick={() => void handleClearPastDue()} className="h-9 w-9 rounded-lg border border-gray-100 shadow-sm text-amber-600 bg-amber-50">
+           <Eraser className="w-4 h-4" />
+         </Button>
         <Button
           variant="ghost"
           size="icon"

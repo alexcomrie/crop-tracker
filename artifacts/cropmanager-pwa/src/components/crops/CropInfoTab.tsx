@@ -157,10 +157,8 @@ export function CropInfoTab({ crop, cropData, stageLogs, harvestLogs, treatmentL
           </div>
           <div className="col-span-2">
             <p className="text-[9px] font-bold uppercase text-gray-400">Location (optional)</p>
-            <div className="grid grid-cols-2 gap-2 mt-0.5">
-              <input type="number" step="0.000001" value={locLat} onChange={e => setLocLat(e.target.value)} placeholder="Latitude" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-              <input type="number" step="0.000001" value={locLng} onChange={e => setLocLng(e.target.value)} placeholder="Longitude" className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs" />
-            </div>
+            <button type="button" onClick={() => { if (!navigator.geolocation) { toast.error('GPS not available'); return; } navigator.geolocation.getCurrentPosition(p => { setLocLat(p.coords.latitude.toFixed(6)); setLocLng(p.coords.longitude.toFixed(6)); toast.success('Location captured'); }, () => toast.error('Could not read GPS')); }} className="mt-0.5 w-full text-xs text-amber-700 font-semibold border border-amber-200 rounded-lg py-1.5">Tag my current location (GPS)</button>
+            {(locLat && locLng) && <p className="text-[10px] text-muted-foreground mt-0.5">Tagged: {locLat}, {locLng}</p>}
           </div>
           <Info label="Planting method" value={crop.plantingMethod || '—'} />
           <Info label="Planted" value={crop.plantingDate || '—'} />

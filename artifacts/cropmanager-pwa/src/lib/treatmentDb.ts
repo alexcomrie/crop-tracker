@@ -1,5 +1,5 @@
-import { ALL_PRODUCTS, type TreatmentProduct } from '../components/treatment/treatment-data';
-import { TREATMENT_GUIDES, fallbackGuide, type TreatmentGuide } from '../components/treatment/treatment-guides';
+import type { TreatmentProduct } from '../components/treatment/treatment-data';
+import { fallbackGuide, type TreatmentGuide } from '../components/treatment/treatment-guides';
 
 export interface TreatmentEntry extends TreatmentProduct, TreatmentGuide {
   source?: 'builtin' | 'sheet' | 'custom';
@@ -35,11 +35,9 @@ function baseUrl(): string {
 }
 
 export function builtinTreatmentEntries(): TreatmentEntry[] {
-  return ALL_PRODUCTS.map(product => ({
-    ...product,
-    ...(TREATMENT_GUIDES[product.id] ?? fallbackGuide(product.category)),
-    source: 'builtin' as const,
-  }));
+  // Hard-coded starter data has been archived to the Google Sheet.
+  // The app now depends entirely on the shared sheet; nothing is bundled.
+  return [];
 }
 
 /** Accept sheet rows with slightly different column names. */
@@ -210,8 +208,8 @@ export async function loadTreatmentDatabase(opts?: { force?: boolean }): Promise
   const database: TreatmentDatabase = {
     version: 1,
     updatedAt: new Date().toISOString(),
-    source: 'built-in',
-    entries: builtinTreatmentEntries(),
+    source: 'sheet',
+    entries: [],
   };
   return { database, fromCache: false, error: lastError };
 }

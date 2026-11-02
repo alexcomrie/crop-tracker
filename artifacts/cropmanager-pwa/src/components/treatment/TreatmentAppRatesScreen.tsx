@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ChevronLeft, History, Star, FlaskConical, Plus, Trash2, ClipboardList, Search, RefreshCw, ShieldAlert, Clock, CalendarClock, BookOpen, Filter, Leaf } from 'lucide-react';
+import { ChevronLeft, History, Star, FlaskConical, Trash2, ClipboardList, Search, RefreshCw, ShieldAlert, Clock, CalendarClock, BookOpen, Filter, Leaf } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -454,9 +454,6 @@ export function TreatmentAppRatesScreen({ onClose }: { onClose: () => void }) {
               </div>
             </div>
 
-            <button onClick={() => setShowCustomForm(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-green-300 text-xs text-green-700 font-semibold bg-white">
-              <Plus className="w-3.5 h-3.5" /> Add a local product
-            </button>
 
             {grouped.length === 0 ? (
               <div className="text-center py-12 text-sm text-gray-400">

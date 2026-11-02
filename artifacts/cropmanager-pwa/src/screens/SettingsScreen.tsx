@@ -6,7 +6,7 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2, UserRound, Users } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2, UserRound } from 'lucide-react';
 import { REM_TYPES } from '../components/reminders/ReminderForm';
 import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
 import { resolveCurrentLocation } from '../lib/location';
@@ -270,28 +270,6 @@ export function SettingsScreen() {
         </div>
       </div>
 
-      {/* Community */}
-      <div className="bg-white rounded-xl border p-4 space-y-3">
-        <div className="flex items-center gap-2 mb-1">
-          <Users className="w-4 h-4 text-green-700" />
-          <h3 className="font-semibold text-sm">Community</h3>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <span className="text-xs font-medium">Show Community</span>
-            <p className="text-[10px] text-muted-foreground leading-tight italic">
-              Default is off (Coming Soon). Turn on only after the Google Sheet is connected.
-            </p>
-          </div>
-          <button
-            onClick={() => updateSettings({ communityEnabled: !(settings.communityEnabled ?? false) })}
-            className={switchCls(settings.communityEnabled ?? false)}
-            aria-label="Show community"
-          >
-            <span className={`block w-5 h-5 bg-white rounded-full shadow transition-transform ${(settings.communityEnabled ?? false) ? 'translate-x-5' : 'translate-x-0.5'} mt-0.5`} />
-          </button>
-        </div>
-      </div>
       <div className="bg-white rounded-xl border p-4 space-y-4">
         <div className="flex items-center gap-2 mb-1">
           <Download className="w-4 h-4 text-green-700" />

@@ -1,8 +1,9 @@
 # The-Hub Google Apps Script implementation
 
-This is the complete GAS backend that backs CropManager's shared features. Copy
-it into the Apps Script project attached to the CropManager spreadsheet (see
-`docs/google-sheet-setup.md`) and deploy it as a web app.
+This document explains the GAS backend. **Do not paste this Markdown file into
+Apps Script** — the code fences are not valid JavaScript and will cause
+`SyntaxError: Unexpected identifier`. Instead, open `docs/gas-backend.gs` and
+paste its contents (pure JavaScript) into `Code.gs`.
 
 The script is a single `doGet`/`doPost` router. All requests go to one URL with
 an `action` query parameter.
@@ -195,7 +196,92 @@ function doPost(e) {
     return jsonOut({ success: false, error: String(err) });
   }
 }
+
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('CropManager')
+    .addItem('Setup sheets', 'setupSheets')
+    .addToUi();
+}
+
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const defs = {
+    Treatments: ['id','name','category','classification','activeIngredient','crops','targets','reiHours','phiDays','guide','warnings','imageUrl','rates','notes','updatedAt','description','action','distributor','active'],
+    CommunityPosts: ['id','author','authorId','text','createdAt','updatedAt'],
+    CommunityComments: ['id','postId','parentId','author','authorId','text','createdAt','updatedAt'],
+    CommunityLikes: ['postId','farmerId','createdAt'],
+    Farmers: ['farmerId','farmerName','farmName','farmLocation','farmerPhone','createdAt','updatedAt'],
+  };
+  Object.keys(defs).forEach(name => {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getLastRow() === 0) sh.appendRow(defs[name]);
+  });
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('COMMUNITY_ENABLED')) props.setProperty('COMMUNITY_ENABLED', 'true');
+  if (!props.getProperty('ADMIN_TOKEN')) props.setProperty('ADMIN_TOKEN', 'change-me');
+}
 ```
+
+## Sheet bootstrap (run once)
+
+Add this function to the Apps Script project and run it from the editor
+(**Run → setupSheets**) to create every tab with the correct headers. It is
+idempotent — existing sheets are left untouched, only missing ones are created.
+
+```javascript
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('CropManager')
+    .addItem('Setup sheets', 'setupSheets')
+    .addToUi();
+}
+
+function setupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const defs = {
+    Treatments: ['id','name','category','classification','activeIngredient','crops','targets','reiHours','phiDays','guide','warnings','imageUrl','rates','notes','updatedAt','description','action','distributor','active'],
+    CommunityPosts: ['id','author','authorId','text','createdAt','updatedAt'],
+    CommunityComments: ['id','postId','parentId','author','authorId','text','createdAt','updatedAt'],
+    CommunityLikes: ['postId','farmerId','createdAt'],
+    Farmers: ['farmerId','farmerName','farmName','farmLocation','farmerPhone','createdAt','updatedAt'],
+  };
+  Object.keys(defs).forEach(name => {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getLastRow() === 0) sh.appendRow(defs[name]);
+  });
+  // Community config stored as script properties, not a sheet.
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('COMMUNITY_ENABLED')) props.setProperty('COMMUNITY_ENABLED', 'true');
+  if (!props.getProperty('ADMIN_TOKEN')) props.setProperty('ADMIN_TOKEN', 'change-me');
+}
+```
+
+## Testing on localhost
+
+The PWA and API server can be pointed at a local mock instead of the deployed
+GAS URL while developing:
+
+1. Set `GAS_SYNC_URL`, `TREATMENT_DB_URL` and `VITE_COMMUNITY_API_URL` to
+   `http://localhost:5001/api/gas-mock`.
+2. The API server ships a mock router (see `artifacts/api-server/src/routes/gasMock.ts`)
+   that mirrors the GAS actions against an in-memory store, so the front-end can
+   be exercised without a Google account.
+3. For end-to-end validation, deploy the script and run `setupSheets()`, then
+   switch the env vars to the real `script.google.com` URL.
+
+## Runtime requirement
+
+Apps Script must use the **V8** runtime (default for new projects). If you are on
+the legacy Rhino runtime, arrow functions and `const`/`let` will fail to parse.
+Enable V8 via **Project Settings → Show appsscript.json manifest file** and set:
+
+```json
+{ "timeZone": "America/Jamaica", "dependencies": {}, "exceptionLogging": "STACKDRIVER", "runtimeVersion": "V8" }
+```
+
+After saving, reload the editor and use the **CropManager → Setup sheets** menu
+(or Run → setupSheets) to create all tabs.
 
 ## Kill switch
 

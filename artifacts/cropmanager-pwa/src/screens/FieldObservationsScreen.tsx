@@ -8,12 +8,14 @@ import { generateId, shortCropId } from '../lib/ids';
 import { cropDetailsPath } from '../lib/routes';
 import { DateInput } from '../components/shared/DateInput';
 import { TrackingCard } from '../components/observations/TrackingCard';
+import { PointTagPicker } from '../components/area/PointTagPicker';
+import { savePointTag, deletePointTag } from '../lib/farmPoints';
 import { addDiaryEntry } from '../lib/diary';
 import { logDeviation } from '../lib/learning';
 import { foundationFruitDefault, getPersonalCropData, upsertPersonalFruitMaturity } from '../lib/personalCropDb';
 import { formatDateShort, parseDate, daysBetween, today } from '../lib/dates';
 import { toast } from 'sonner';
-import type { TrackingEntry, ObservationEntry, ObservationLog, Tracking } from '../types';
+import type { PointTagDraft, FarmPoint, TrackingEntry, ObservationEntry, ObservationLog, Tracking } from '../types';
 
 /**
  * All observations in one place: tracker-crop notes (tagged with short crop
@@ -42,8 +44,7 @@ export function FieldObservationsScreen() {
   const [obsPlant, setObsPlant] = useState('');
   const [obsText, setObsText] = useState('');
   const [obsDate, setObsDate] = useState(formatDateShort(today()));
-  const [obsLat, setObsLat] = useState('');
-  const [obsLng, setObsLng] = useState('');
+  const [obsPoint, setObsPoint] = useState<PointTagDraft | null>(null);
 
   // Tracking form
   const [trackPlant, setTrackPlant] = useState('');
@@ -102,13 +103,16 @@ export function FieldObservationsScreen() {
     const date = parseDate(obsDate) ?? today();
     const plant = foundationName || obsPlant.trim();
     try {
+      const observationId = generateId('DE');
+      const pointTagId = obsPoint ? await savePointTag(obsPoint, { linkedObservationId: observationId }) : undefined;
       await db.observationLogs.add({
-        id: generateId('DE' as never) as string,
+        id: observationId,
         cropId: '',
         date: formatDateShort(date),
         text: obsText.trim(),
         plantName: plant,
-        location: (obsLat.trim() && obsLng.trim() && Number.isFinite(Number(obsLat)) && Number.isFinite(Number(obsLng))) ? { lat: Number(obsLat), lng: Number(obsLng) } : undefined,
+        location: obsPoint?.point,
+        pointTagId,
         updatedAt: Date.now(),
       } as never);
       await addDiaryEntry({
@@ -122,7 +126,7 @@ export function FieldObservationsScreen() {
       });
       setObsText('');
       setObsDate(formatDateShort(today()));
-      setObsLat(''); setObsLng('');
+      setObsPoint(null);
       toast.success('Observation saved');
     } catch (e) {
       console.error('[field-obs] add observation failed', { e });
@@ -166,8 +170,12 @@ export function FieldObservationsScreen() {
   async function handleDeleteObservation(id: string) {
     if (!window.confirm('Delete this observation and its updates?')) return;
     try {
+      const obs = await db.observationLogs.get(id).catch(() => undefined);
+      const linkedTags = await db.farmPoints.where('linkedObservationId').equals(id).toArray().catch((): FarmPoint[] => []);
       const entries = await db.observationEntries.where('observationId').equals(id).toArray().catch((): ObservationEntry[] => []);
       await Promise.all(entries.map(e => db.observationEntries.delete(e.id)));
+      await Promise.all(linkedTags.map(pt => db.farmPoints.delete(pt.id)));
+      if (obs?.pointTagId) await deletePointTag(obs.pointTagId);
       await db.observationLogs.delete(id);
       if (editingObsId === id) setEditingObsId(null);
       toast.success('Observation deleted');
@@ -356,8 +364,13 @@ export function FieldObservationsScreen() {
           <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
             className="w-full border rounded-lg p-2 text-sm min-h-[80px]" />
           <DateInput value={obsDate} onChange={setObsDate} ariaLabel="Observation date" />
-          <button type="button" onClick={() => { if (!navigator.geolocation) { toast.error('GPS not available'); return; } navigator.geolocation.getCurrentPosition(p => { setObsLat(p.coords.latitude.toFixed(6)); setObsLng(p.coords.longitude.toFixed(6)); toast.success('Location captured'); }, () => toast.error('Could not read GPS')); }} className="w-full text-xs text-amber-700 font-semibold border border-amber-200 rounded-lg py-2">Tag my current location (GPS)</button>
-          {(obsLat && obsLng) && <p className="text-[10px] text-muted-foreground">Tagged: {obsLat}, {obsLng}</p>}
+          <PointTagPicker
+            value={obsPoint}
+            onChange={setObsPoint}
+            defaultLabel={foundationName || obsPlant.trim() || 'Field observation'}
+            defaultKind="crop"
+            height={200}
+          />
           <button onClick={handleAddObservation} className="w-full bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
         </div>
 

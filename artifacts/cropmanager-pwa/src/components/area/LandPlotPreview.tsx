@@ -2,19 +2,21 @@ import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../../db/db';
 import { InteractiveMap } from './InteractiveMap';
-import type { FarmArea, FarmLand } from '../../types';
+import type { FarmArea, FarmLand, FarmPoint } from '../../types';
 
 export function LandPlotPreview() {
   const lands = useLiveQuery(() => db.farmLands.toArray(), []);
   const allPlots = useLiveQuery(() => db.farmAreas.toArray(), []);
-  const isLoading = lands === undefined || allPlots === undefined;
+  const allPoints = useLiveQuery(() => db.farmPoints.toArray().catch((): FarmPoint[] => []), []);
+  const isLoading = lands === undefined || allPlots === undefined || allPoints === undefined;
 
-  const mapData: { land: FarmLand; plots: FarmArea[] }[] = (lands ?? [])
-    .filter(l => l.points?.length >= 3)
+  const mappedLands = (lands ?? []).filter(l => l.points?.length >= 3);
+  const mapData: { land: FarmLand; plots: FarmArea[] }[] = mappedLands
     .map(land => ({
       land,
       plots: (allPlots ?? []).filter(p => p.landId === land.id && p.points?.length >= 3),
     }));
+  const visiblePoints = (allPoints ?? []).filter(pt => mappedLands.some(l => l.id === pt.landId));
 
   if (isLoading) {
     return (
@@ -34,5 +36,5 @@ export function LandPlotPreview() {
     );
   }
 
-  return <InteractiveMap mapData={mapData} />;
+  return <InteractiveMap mapData={mapData} points={visiblePoints} />;
 }

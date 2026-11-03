@@ -15,23 +15,35 @@ import { addDiaryEntry } from '../lib/diary';
 import { logDeviation, scheduleMicroTraining } from '../lib/learning';
 import { toast } from 'sonner';
 import { ROUTES, cropEditPath } from '../lib/routes';
-import type { TrackingEntry, ObservationEntry, StageLog, CropData } from '../types';
+import type { TrackingEntry, ObservationEntry, StageLog, CropData, FarmPoint, PointTagDraft } from '../types';
 import { Trash2, Sprout, Droplets, Eye, Wheat, ChevronRight, Bell, CheckCircle2, Info as InfoIcon } from 'lucide-react';
 import { ReminderForm } from '../components/reminders/ReminderForm';
 import { markReminderDone } from '../hooks/useReminders';
 import { stageGifUrl } from '../lib/stageGifs';
+import { getPropMethod, propGifUrl, PROP_STAGE_COLORS } from '../lib/propStages';
 import { CropInfoTab } from '../components/crops/CropInfoTab';
-import { PropagationCard } from '../components/crops/PropagationCard';
+import { PointTagPicker } from '../components/area/PointTagPicker';
+import { savePointTag, deletePointTag } from '../lib/farmPoints';
 
 /**
  * Milestone strip where the current stage stays centered: it centers on
  * mount/stage change and re-centers ~3s after the user slides it. Only the
  * current stage shows the (3x) animated GIF; past/future keep circles.
  */
-function CenteredMilestone({ currentIdx, normalizedCurrent, stageDateMap }: {
+function CenteredMilestone({
+  currentIdx,
+  normalizedCurrent,
+  stageDateMap,
+  stages = CANONICAL_STAGES as unknown as string[],
+  gifUrl = (stage: string) => stageGifUrl(stage, 256),
+  colors = STAGE_COLORS,
+}: {
   currentIdx: number;
   normalizedCurrent: string;
   stageDateMap: Map<string, string>;
+  stages?: string[];
+  gifUrl?: (stage: string) => string | null;
+  colors?: Record<string, string>;
 }) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const timer = React.useRef<number | null>(null);
@@ -60,11 +72,11 @@ function CenteredMilestone({ currentIdx, normalizedCurrent, stageDateMap }: {
 
   return (
     <div ref={containerRef} onScroll={handleScroll} className="flex items-center gap-1 overflow-x-auto scrollbar-hide snap-x py-1">
-      {CANONICAL_STAGES.map((s, idx) => {
+      {stages.map((s, idx) => {
         const done = idx < currentIdx || idx === currentIdx;
         const isCurrent = idx === currentIdx;
         const date = stageDateMap.get(s);
-        const prevDate = idx > 0 ? stageDateMap.get(CANONICAL_STAGES[idx - 1]) : null;
+        const prevDate = idx > 0 ? stageDateMap.get(stages[idx - 1]) : null;
         let delta: number | null = null;
         if (date && prevDate) {
           const a = parseDate(prevDate);
@@ -75,12 +87,12 @@ function CenteredMilestone({ currentIdx, normalizedCurrent, stageDateMap }: {
           <React.Fragment key={s}>
             <div className={`flex flex-col items-center ${isCurrent ? 'min-w-[112px]' : 'min-w-[52px]'}`} {...(isCurrent ? { 'data-current': 'true' } : {})}>
               {isCurrent ? (
-                <img src={stageGifUrl(normalizedCurrent, 256)} alt={`${normalizedCurrent} stage`}
+                <img src={gifUrl(normalizedCurrent) ?? ''} alt={`${normalizedCurrent} stage`}
                   className="w-[108px] h-[108px] rounded-full object-cover border-2"
-                  style={{ borderColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }} loading="lazy" />
+                  style={{ borderColor: colors[normalizedCurrent] ?? '#9e9e9e' }} loading="lazy" />
               ) : (
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 ${done ? 'text-white' : 'bg-white text-gray-400 border-gray-200'}`}
-                  style={{ backgroundColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined, borderColor: done ? (STAGE_COLORS[s] ?? '#9e9e9e') : undefined }}>
+                  style={{ backgroundColor: done ? (colors[s] ?? '#9e9e9e') : undefined, borderColor: done ? (colors[s] ?? '#9e9e9e') : undefined }}>
                   {done ? '✓' : idx + 1}
                 </div>
               )}
@@ -88,7 +100,7 @@ function CenteredMilestone({ currentIdx, normalizedCurrent, stageDateMap }: {
               {date && <span className="text-[8px] text-muted-foreground">{date.slice(0, 6)}</span>}
               {delta !== null && <span className="text-[8px] text-amber-600">+{delta}d</span>}
             </div>
-            {idx < CANONICAL_STAGES.length - 1 && (
+            {idx < stages.length - 1 && (
               <div className={`h-0.5 flex-1 min-w-[8px] rounded ${idx < currentIdx ? 'bg-green-600' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
@@ -163,6 +175,7 @@ export function CropDetailsScreen() {
   const [stageMenuOpen, setStageMenuOpen] = useState(false);
   const [rollbackMenuOpen, setRollbackMenuOpen] = useState(false);
   const [obsText, setObsText] = useState('');
+  const [obsPoint, setObsPoint] = useState<PointTagDraft | null>(null);
   const [trackLabel, setTrackLabel] = useState('');
   const [trackTag, setTrackTag] = useState('');
   const [trackDate, setTrackDate] = useState(formatDateShort(today()));
@@ -213,6 +226,23 @@ export function CropDetailsScreen() {
   const normalizedCurrent = normalizeStage(crop.plantStage);
   const currentIdx = CANONICAL_STAGES.indexOf(normalizedCurrent as never);
   const phi = getPhiStatus(crop.plantStage, treatmentLogs);
+
+  // Propagation crops get their own milestone track (Set → Rooted → …) in the
+  // header and Stages tab instead of the seed lifecycle track.
+  const propMethod = getPropMethod(crop.propagationMethod);
+  const propStages = propMethod?.stages.map(s => s.key) ?? [];
+  const propCurrent = propMethod
+    ? (crop.propagationStage && propStages.includes(crop.propagationStage) ? crop.propagationStage : propMethod.stages[0].key)
+    : '';
+  const propIdx = propMethod ? Math.max(0, propStages.indexOf(propCurrent)) : -1;
+  const propStageDates = new Map<string, string>();
+  if (propMethod) {
+    for (const h of crop.propagationHistory ?? []) {
+      if (h?.stage && h?.date) propStageDates.set(h.stage, h.date);
+    }
+    if (!propStageDates.has(propCurrent)) propStageDates.set(propCurrent, crop.plantingDate);
+  }
+  const propGif = (stage: string) => propGifUrl(crop.propagationMethod, stage, 256);
 
   // Build milestone map with dates and deltas
   const stageDateMap = new Map<string, string>();
@@ -326,11 +356,17 @@ export function CropDetailsScreen() {
   async function handleAddObservation() {
     if (!crop || !obsText.trim()) return;
     try {
+      const observationId = generateId('DE');
+      const pointTagId = obsPoint
+        ? await savePointTag(obsPoint, { linkedCropId: crop.id, linkedObservationId: observationId })
+        : undefined;
       const entry = {
-        id: generateId('DE' as never) as string,
+        id: observationId,
         cropId: crop.id,
         date: formatDateShort(today()),
         text: obsText.trim(),
+        location: obsPoint?.point,
+        pointTagId,
         updatedAt: Date.now(),
       };
       await db.observationLogs.add(entry as never);
@@ -343,12 +379,40 @@ export function CropDetailsScreen() {
         details: obsText.trim(),
       });
     setObsText('');
+    setObsPoint(null);
     toast.success('Observation saved');
     } catch (e) {
       console.error('[details] add observation failed', { id: crop.id, e });
       toast.error('Could not save observation: ' + (e instanceof Error ? e.message : String(e)));
     }
   }
+
+  async function markPropagationStage(stage: string) {
+    if (!crop || !propMethod) return;
+    try {
+      const date = formatDateShort(today());
+      const history = (crop.propagationHistory ?? []).filter(h => h.stage !== stage);
+      history.push({ stage, date });
+      await db.crops.update(crop.id, {
+        propagationStage: stage,
+        propagationHistory: history,
+        updatedAt: Date.now(),
+      } as never);
+      await addDiaryEntry({
+        entryType: 'propagation_stage',
+        cropId: crop.id,
+        cropName: crop.cropName,
+        variety: crop.variety,
+        description: `${propMethod.label}: ${propCurrent} → ${stage}`,
+        details: `Propagation milestone updated on ${date}`,
+      });
+      toast.success(`Propagation: ${stage}`);
+    } catch (e) {
+      console.error('[details] propagation stage update failed', { id: crop.id, stage, e });
+      toast.error('Could not update propagation stage: ' + (e instanceof Error ? e.message : String(e)));
+    }
+  }
+
 
   async function handleAddTracking() {
     if (!crop) return;
@@ -527,8 +591,12 @@ export function CropDetailsScreen() {
   async function handleDeleteObservation(oid: string) {
     if (!window.confirm('Delete this observation and its updates?')) return;
     try {
+      const obs = await db.observationLogs.get(oid).catch(() => undefined);
+      const linkedTags = await db.farmPoints.where('linkedObservationId').equals(oid).toArray().catch((): FarmPoint[] => []);
       const entries = await db.observationEntries.where('observationId').equals(oid).toArray().catch((): ObservationEntry[] => []);
       await Promise.all(entries.map(e => db.observationEntries.delete(e.id)));
+      await Promise.all(linkedTags.map(pt => db.farmPoints.delete(pt.id)));
+      if (obs?.pointTagId) await deletePointTag(obs.pointTagId);
       await db.observationLogs.delete(oid);
       if (editingObsId === oid) setEditingObsId(null);
       toast.success('Observation deleted');
@@ -759,13 +827,24 @@ export function CropDetailsScreen() {
             className="shrink-0 w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-sm hover:bg-gray-200" title="Edit crop">
             ✎
           </button>
-          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white" style={{ backgroundColor: STAGE_COLORS[normalizedCurrent] ?? '#9e9e9e' }}>
-            {normalizedCurrent}
+          <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white" style={{ backgroundColor: (propMethod ? PROP_STAGE_COLORS[propCurrent] : STAGE_COLORS[normalizedCurrent]) ?? '#9e9e9e' }}>
+            {propMethod ? `${propMethod.label} · ${propCurrent}` : normalizedCurrent}
           </span>
         </div>
         {/* Milestone progress bar */}
         <div className="max-w-md mx-auto px-4 pb-3 relative">
-          <CenteredMilestone currentIdx={currentIdx} normalizedCurrent={normalizedCurrent} stageDateMap={stageDateMap} />
+          {propMethod ? (
+            <CenteredMilestone
+              currentIdx={propIdx}
+              normalizedCurrent={propCurrent}
+              stageDateMap={propStageDates}
+              stages={propStages}
+              gifUrl={propGif}
+              colors={PROP_STAGE_COLORS}
+            />
+          ) : (
+            <CenteredMilestone currentIdx={currentIdx} normalizedCurrent={normalizedCurrent} stageDateMap={stageDateMap} />
+          )}
           <div className="pointer-events-none absolute right-2 top-0 bottom-8 w-8 bg-gradient-to-l from-white to-transparent" />
           <div className="flex items-center gap-2 mt-2 text-[10px]">
             <span className="text-muted-foreground">Est. harvest: <strong className="text-green-700">{crop.harvestDateEstimated || '—'}</strong></span>
@@ -808,7 +887,6 @@ export function CropDetailsScreen() {
         )}
         {activeSheet === 'stages' && (
           <div className="space-y-3">
-            <PropagationCard crop={crop} />
             {(() => {
               const planted = parseDate(crop.plantingDate);
               const elapsedDays = planted ? Math.max(0, daysBetween(planted, today())) : 0;
@@ -842,6 +920,49 @@ export function CropDetailsScreen() {
                 </div>
               );
             })()}
+            {propMethod ? (
+              <div className="bg-white rounded-xl border border-gray-100 p-3 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Propagation · {propMethod.label}</p>
+                <p className="text-[11px] text-muted-foreground">{propMethod.description}</p>
+                <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold uppercase text-gray-400">Current milestone</p>
+                    <p className="text-lg font-bold text-gray-900">{propCurrent}</p>
+                    <p className="text-[10px] text-gray-500 leading-tight">
+                      {propMethod.stages[propIdx]?.hint}
+                    </p>
+                    <p className="text-[10px] text-green-700 font-semibold mt-1">
+                      Step {propIdx + 1} of {propMethod.stages.length}
+                    </p>
+                  </div>
+                <div className="flex gap-1">
+                  {propMethod.stages.map((s, i) => (
+                    <div key={s.key} className={`h-1.5 flex-1 rounded-full ${i <= propIdx ? 'bg-green-600' : 'bg-gray-200'}`} title={s.label} />
+                  ))}
+                </div>
+                <div className="space-y-1.5 pt-1">
+                  {propMethod.stages.map((s, i) => {
+                    const done = i < propIdx;
+                    const isCurrent = i === propIdx;
+                    const date = propStageDates.get(s.key);
+                    return (
+                      <button
+                        key={s.key}
+                        onClick={() => void markPropagationStage(s.key)}
+                        className={`w-full flex items-center gap-2 text-left text-xs rounded-lg px-2 py-2 border ${isCurrent ? 'border-green-600 bg-green-50' : 'border-gray-100 bg-gray-50 hover:bg-green-50'}`}
+                      >
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold ${done ? 'bg-green-600 text-white' : isCurrent ? 'border-2 border-green-600 text-green-700' : 'border border-gray-200 text-gray-400'}`}>
+                          {done ? '✓' : i + 1}
+                        </span>
+                        <span className={`flex-1 ${isCurrent ? 'font-semibold text-gray-900' : done ? 'text-gray-500' : 'text-gray-600'}`}>{s.label}</span>
+                        <span className="text-[10px] text-muted-foreground shrink-0">{date ?? (isCurrent ? 'current' : '')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground">Tap a milestone to record it. The GIF and header track follow the selected stage.</p>
+              </div>
+            ) : (
+            <>
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Stage Control</p>
               <p className="text-[11px] text-muted-foreground mt-1">Current: <strong>{normalizedCurrent}</strong> · Jump straight to any upcoming stage — missed ones are backfilled automatically.</p>
@@ -962,6 +1083,8 @@ export function CropDetailsScreen() {
                 ))}
               </div>
             </div>
+            </>
+            )}
 
             <div className="bg-white rounded-xl border border-gray-100 p-3">
               <div className="flex items-center justify-between">
@@ -1037,6 +1160,15 @@ export function CropDetailsScreen() {
               <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Observation Log</p>
               <textarea value={obsText} onChange={e => setObsText(e.target.value)} placeholder="Leaf color, pest sighting, watering, weather..."
                 className="w-full mt-2 border rounded-lg p-2 text-sm min-h-[80px]" />
+              <div className="mt-2">
+                <PointTagPicker
+                  value={obsPoint}
+                  onChange={setObsPoint}
+                  defaultLabel={`${crop.cropName} observation`}
+                  defaultKind="crop"
+                  height={180}
+                />
+              </div>
               <button onClick={handleAddObservation} className="w-full mt-2 bg-green-700 text-white rounded-lg py-2 text-sm font-semibold">Add Observation</button>
             </div>
             <div className="space-y-1.5">

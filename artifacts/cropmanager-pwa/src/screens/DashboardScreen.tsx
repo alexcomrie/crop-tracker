@@ -2,7 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { WeatherWidget } from '../components/shared/WeatherWidget';
 import { LandPlotPreview } from '../components/area/LandPlotPreview';
-import { useTodayReminders } from '../hooks/useReminders';
+import { useDueReminders, dedupeReminders } from '../hooks/useReminders';
 import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { formatDateShort, today, parseDate, formatDateDisplay, daysBetween } from '../lib/dates';
@@ -17,7 +17,11 @@ import { summarizeRepayments } from '../lib/repayments';
 
 export function DashboardScreen() {
   const navigate = useNavigate();
-  const todayReminders = useTodayReminders() ?? [];
+  const dueData = useDueReminders();
+  const todayReminders = useMemo(
+    () => [...(dueData ?? [])].sort((a, b) => (parseDate(a.sendDate)?.getTime() ?? 0) - (parseDate(b.sendDate)?.getTime() ?? 0)),
+    [dueData],
+  );
   const todayStr = formatDateShort(today());
   const { settings } = useAppStore();
   const reminderPrefs = withReminderDefaults(settings);
@@ -25,10 +29,10 @@ export function DashboardScreen() {
 
 const upcomingData = useLiveQuery(async () => {
     const all = await db.reminders.toArray()
-    return all
+    return dedupeReminders(all
       .filter(r => !r.sent && r.sendDate && r.sendDate !== todayStr && parseDate(r.sendDate) && parseDate(r.sendDate)! > today())
       .sort((a, b) => (parseDate(a.sendDate)?.getTime() || 0) - (parseDate(b.sendDate)?.getTime() || 0))
-      .slice(0, 5)
+      .slice(0, 5));
   }, [todayStr]);
   const upcomingReminders = upcomingData ?? [];
   const upcomingLoading = upcomingData === undefined;
@@ -180,6 +184,9 @@ const upcomingData = useLiveQuery(async () => {
                     <div className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[r.type] || 'bg-gray-400'}`} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[13px] text-gray-900 truncate">
+                        {r.sendDate !== todayStr && (
+                          <span className="text-red-600 font-bold mr-2 text-[11px]">overdue · {formatDateDisplay(parseDate(r.sendDate)!).split(',')[0]}</span>
+                        )}
                         {r.subject.split(':').pop()?.trim()} — {r.cropPlantName}
                       </p>
                     </div>

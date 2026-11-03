@@ -12,7 +12,7 @@ import { haversineMeters, calcArea, gpsToSvgAll, formatAreaShort } from '../../l
 import type { GeoPoint, FarmArea, FarmLand, CropAssignment, FarmPoint, FarmPointKind } from '../../types';
 
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#795548', '#607D8B'];
-const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Pot / Container', 'Hydroponic'];
+const PLANTING_METHODS = ['Seed Tray', 'Direct Bed', 'Direct Ground', 'Cuttings', 'Division', 'Grafted', 'Air Layering', 'Pot / Container', 'Hydroponic'];
 const CANVAS_W = 340;
 const CANVAS_H = 280;
 const MIN_POINT_DISTANCE = 1.5;
@@ -89,6 +89,9 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
   const [pointLat, setPointLat] = useState('');
   const [pointLng, setPointLng] = useState('');
   const [pointNotes, setPointNotes] = useState('');
+  const [pointCropId, setPointCropId] = useState('');
+  const [pointAreaId, setPointAreaId] = useState('');
+  const [pointSource, setPointSource] = useState<'gps' | 'map' | undefined>(undefined);
   const [pointBusy, setPointBusy] = useState(false);
 
   function interpolatePoints(start: GeoPoint, end: GeoPoint): GeoPoint[] {
@@ -334,6 +337,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     if (!window.confirm('Delete this land and all its plots?')) return;
     try {
       await db.farmAreas.where('landId').equals(id).delete();
+      await db.farmPoints.where('landId').equals(id).delete();
       await db.farmLands.delete(id);
       // Never leave the UI pointing at a deleted land (M7)
       if (selectedLand?.id === id) {
@@ -442,6 +446,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
       pos => {
         setPointLat(pos.coords.latitude.toFixed(6));
         setPointLng(pos.coords.longitude.toFixed(6));
+        setPointSource('gps');
         setPointBusy(false);
         toast.success('GPS position captured');
       },
@@ -458,21 +463,25 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
     const lat = Number(pointLat);
     const lng = Number(pointLng);
     if (!pointLabel.trim()) { toast.error('Enter a label for this point'); return; }
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error('Enter valid latitude and longitude, or capture GPS'); return; }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) { toast.error('Tap the map or capture your GPS to place this point'); return; }
     try {
       const pt: FarmPoint = {
-        id: generateId('FA'),
+        id: generateId('PT'),
         landId: selectedLand.id,
         point: { lat, lng },
         label: pointLabel.trim(),
         kind: pointKind,
         notes: pointNotes.trim() || undefined,
+        linkedCropId: pointCropId || undefined,
+        linkedAreaId: pointAreaId || undefined,
+        source: pointSource,
         createdAt: new Date().toISOString(),
         updatedAt: Date.now(),
       };
       await db.farmPoints.add(pt);
       setShowPointForm(false);
       setPointLabel(''); setPointNotes(''); setPointLat(''); setPointLng('');
+      setPointCropId(''); setPointAreaId(''); setPointSource(undefined);
       toast.success('Point tag saved');
     } catch (e) {
       console.error('[area] save point tag failed', { e });
@@ -743,6 +752,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             {selectedLand.points?.length >= 3 && (
               <InteractiveMap
                 mapData={[{ land: selectedLand, plots: plots || [] }]}
+                points={pointTags}
                 onSelectPlot={plot => { if (plot) toast.info(`Selected: ${plot.tag} — ${plot.name || ''}`); }}
                 editingLandId={editingLandPoints ? selectedLand.id : undefined}
                 onPointsChange={(id, points) => {
@@ -853,16 +863,55 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
                   <option value="tree">Tree</option>
                   <option value="object">Object / feature</option>
                 </select>
-                <textarea value={pointNotes} onChange={e => setPointNotes(e.target.value)} placeholder="Notes (optional)" rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
                 <div className="grid grid-cols-2 gap-2">
-                  <input value={pointLat} onChange={e => setPointLat(e.target.value)} placeholder="Latitude" className="border rounded-lg px-3 py-2 text-sm" inputMode="decimal" />
-                  <input value={pointLng} onChange={e => setPointLng(e.target.value)} placeholder="Longitude" className="border rounded-lg px-3 py-2 text-sm" inputMode="decimal" />
+                  <select value={pointCropId} onChange={e => setPointCropId(e.target.value)} className="w-full border rounded-lg px-2 py-2 text-xs bg-white" aria-label="Link point to crop">
+                    <option value="">Link crop (optional)</option>
+                    {allCrops.map(c => <option key={c.id} value={c.id}>{c.cropName}{c.variety ? ` · ${c.variety}` : ''}</option>)}
+                  </select>
+                  <select value={pointAreaId} onChange={e => setPointAreaId(e.target.value)} className="w-full border rounded-lg px-2 py-2 text-xs bg-white" aria-label="Link point to plot">
+                    <option value="">Link plot (optional)</option>
+                    {(plots || []).map(p => <option key={p.id} value={p.id}>{p.tag}{p.name ? ` · ${p.name}` : ''}</option>)}
+                  </select>
                 </div>
+                <textarea value={pointNotes} onChange={e => setPointNotes(e.target.value)} placeholder="Notes (optional)" rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                {selectedLand && (
+                  <InteractiveMap
+                    mapData={[{ land: selectedLand, plots: [] }]}
+                    points={[
+                      ...pointTags,
+                      ...(pointLat && pointLng && Number.isFinite(Number(pointLat)) && Number.isFinite(Number(pointLng)) ? [{
+                        id: 'draft-point',
+                        landId: selectedLand.id,
+                        point: { lat: Number(pointLat), lng: Number(pointLng) },
+                        label: pointLabel.trim() || 'New tag',
+                        kind: pointKind,
+                        createdAt: '',
+                        updatedAt: Date.now(),
+                      } as FarmPoint] : []),
+                    ]}
+                    onMapTap={gps => {
+                      setPointLat(gps.lat.toFixed(6));
+                      setPointLng(gps.lng.toFixed(6));
+                      setPointSource('map');
+                    }}
+                    height={200}
+                  />
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  Tap the map to place the tag, or use GPS. Raw latitude/longitude is never typed.
+                </p>
+                {pointLat && pointLng && Number.isFinite(Number(pointLat)) && Number.isFinite(Number(pointLng)) ? (
+                  <p className="text-[10px] text-green-700 font-semibold">
+                    📍 {Number(pointLat).toFixed(5)}, {Number(pointLng).toFixed(5)} · {pointSource === 'gps' ? 'GPS' : 'map'}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-amber-700 font-semibold">No position placed yet.</p>
+                )}
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => void captureGpsForPoint()} disabled={pointBusy} className="flex-1 text-xs">
                     {pointBusy ? 'Capturing…' : 'Use my GPS'}
                   </Button>
-                  <Button onClick={() => void savePointTag()} className="flex-1 text-xs bg-green-600 hover:bg-green-700">Save Tag</Button>
+                  <Button onClick={() => void savePointTag()} disabled={!pointLat || !pointLng} className="flex-1 text-xs bg-green-600 hover:bg-green-700">Save Tag</Button>
                 </div>
               </div>
             )}
@@ -870,16 +919,25 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
               <p className="text-[11px] text-muted-foreground">No point tags yet.</p>
             ) : (
               <div className="space-y-1.5">
-                {pointTags.map(pt => (
+                {pointTags.map(pt => {
+                  const linkedCrop = pt.linkedCropId ? allCrops.find(c => c.id === pt.linkedCropId) : undefined;
+                  const linkedPlot = pt.linkedAreaId ? (plots || []).find(p => p.id === pt.linkedAreaId) : undefined;
+                  return (
                   <div key={pt.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1.5">
                     <span className="text-[10px] font-bold uppercase bg-green-100 text-green-700 rounded-full px-2 py-0.5 shrink-0">{pt.kind}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate">{pt.label}</p>
                       <p className="text-[10px] text-muted-foreground truncate">{pt.point.lat.toFixed(5)}, {pt.point.lng.toFixed(5)}</p>
+                      {(linkedCrop || linkedPlot) && (
+                        <p className="text-[10px] text-purple-700 truncate">
+                          {linkedCrop ? `🌱 ${linkedCrop.cropName}` : ''}{linkedCrop && linkedPlot ? ' · ' : ''}{linkedPlot ? `🗺️ ${linkedPlot.tag}` : ''}
+                        </p>
+                      )}
                     </div>
                     <button onClick={() => void deletePointTag(pt.id)} className="text-red-400 text-xs px-1.5">✕</button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -948,6 +1006,7 @@ export function AreaMapperScreen({ onClose }: { onClose: () => void }) {
             </div>
             <LeafletMapView
               mapData={[{ land: selectedLand, plots: plots || [] }]}
+              points={pointTags}
               showGps
               onSelectPlot={plot => { if (plot) toast.info(`${plot.tag} — ${plot.name || ''}`); }}
             />

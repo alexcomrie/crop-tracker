@@ -40,6 +40,8 @@ export interface ObservationLog {
   plantName?: string;
   /** Optional GPS location for this observation. */
   location?: GeoPoint;
+  /** Farm point tag created for this observation (rendered on the land maps). */
+  pointTagId?: string;
   updatedAt: number;
 }
 
@@ -161,10 +163,14 @@ export interface Crop {
   imageDataUrl?: string;
   /** Optional GPS location for this crop planting. */
   location?: GeoPoint;
+  /** Farm point tag created for this crop (rendered on the land maps). */
+  pointTagId?: string;
   /** Propagation method when this crop record started from a cutting/graft/layer/division. */
   propagationMethod?: string;
   /** Current propagation milestone (Set/Rooted/Grafted/Air layered…), separate from plantStage. */
   propagationStage?: string;
+  /** Dated propagation milestones, used by the method-specific stage track. */
+  propagationHistory?: Array<{ stage: string; date: string }>;
   notes: string;
   daysSeedGerm: number;
   daysGermTransplant: number;
@@ -435,8 +441,23 @@ export interface FarmPoint {
   label: string;
   kind: FarmPointKind;
   notes?: string;
+  /** Optional links so a tag can be traced back from the map. */
+  linkedCropId?: string;
+  linkedAreaId?: string;
+  linkedObservationId?: string;
+  source?: 'gps' | 'map';
   createdAt: string;
   updatedAt: number;
+}
+
+/** Un-saved point tag being prepared in an observation/crop form. */
+export interface PointTagDraft {
+  landId: string;
+  point: GeoPoint;
+  label: string;
+  kind: FarmPointKind;
+  notes?: string;
+  source?: 'gps' | 'map';
 }
 
 export type DiaryEntryType = 'crop_created' | 'stage_change' | 'treatment' | 'harvest' | 'note' | 'propagation_created' | 'propagation_stage' | 'activity_log' | 'ledger' | 'pos_sale' | 'repayment';

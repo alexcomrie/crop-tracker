@@ -1,38 +1,19 @@
 import { useEffect, useRef } from 'react';
 import db from '../db/db';
-import { parseDate, today, formatDateShort } from '../lib/dates';
+import { parseDate, today } from '../lib/dates';
 import { useAppStore, withReminderDefaults, isReminderKindAllowed } from '../store/useAppStore';
 import { showSystemNotice, playTone, setAppBadge, clearAppBadge } from '../lib/notify';
-
-// Cleared notifications must survive a refresh: notified ids persist per day
-// in localStorage, so pull-to-refresh can't resurrect what was cleared.
-// A new day starts a fresh set (still-due items may alert once again).
-const NOTIFIED_KEY = 'cropmanager_notified_v1';
-const notifiedThisSession = new Set<string>();
-function loadNotified(day: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(NOTIFIED_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as { day?: string; ids?: string[] };
-      if (parsed.day === day && Array.isArray(parsed.ids)) {
-        return new Set([...notifiedThisSession, ...parsed.ids]);
-      }
-    }
-  } catch { /* corrupted entry → session set only */ }
-  return new Set(notifiedThisSession);
-}
-function saveNotified(day: string, ids: Set<string>) {
-  for (const id of ids) notifiedThisSession.add(id);
-  try {
-    localStorage.setItem(NOTIFIED_KEY, JSON.stringify({ day, ids: [...ids].slice(-200) }));
-  } catch { /* private mode → memory only */ }
-}
+import { loadDismissedIds, markDismissed } from '../lib/reminderNotifications';
 
 /**
  * Due-reminder sweeper: on launch and every minute, posts system
  * notifications (status-bar icon included) for unsent reminders whose date
  * has arrived, honours Settings (master switch + per-type), and keeps the
  * app-icon badge in sync with the due count.
+ *
+ * Dismissals persist in localStorage by reminder id (see
+ * lib/reminderNotifications) so pull-to-refresh / re-opening the app can't
+ * resurrect a cleared reminder. Old backlog is badged but never re-alerted.
  *
  * Note: browsers only deliver these while the browser/PWA process is alive
  * (foreground, background, or installed PWA). True closed-app push needs a
@@ -50,10 +31,17 @@ export function useDueNotifier() {
       try {
         const now = today().getTime();
         const all = await db.reminders.where('sendDate').above('').toArray().catch((): import('../types').Reminder[] => []);
+        // One row per reminder "slot" so duplicate generated rows can't stack
+        // alerts or inflate the badge.
+        const seen = new Set<string>();
         const due = all.filter(r => {
           if (r.sent) return false;
           const ts = r.sendDate ? parseDate(r.sendDate)?.getTime() ?? null : null;
-          return ts !== null && ts <= now;
+          if (ts === null || ts > now) return false;
+          const key = `${r.type}|${r.trackingId}|${r.subject}|${r.sendDate}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
         });
 
         // Badge always reflects the due count (or cleared).
@@ -65,13 +53,12 @@ export function useDueNotifier() {
         }
 
         if (!prefs.remindersEnabled || due.length === 0) return;
-        // Skip ancient backlog silently (still badged + listed) — only alert
-        // for items due within the last 30 days so old schedules can't flood.
+        // Only alert for items due within the last 30 days so old schedules
+        // can't flood the shade; they stay badged + listed in Reminders.
         const cutoff = now - 30 * 86400000;
-        const day = formatDateShort(today());
-        const already = loadNotified(day);
+        const dismissed = loadDismissedIds();
         const fresh = due.filter(r => {
-          if (already.has(r.id) || !isReminderKindAllowed(settings, r.type)) return false;
+          if (dismissed.has(r.id) || !isReminderKindAllowed(settings, r.type)) return false;
           const ts = r.sendDate ? parseDate(r.sendDate)?.getTime() ?? 0 : 0;
           return ts >= cutoff;
         });
@@ -82,7 +69,6 @@ export function useDueNotifier() {
         const shown = fresh.slice(0, MAX_ALERTS);
         let sounded = false;
         for (const r of shown) {
-          already.add(r.id);
           const ok = await showSystemNotice(
             { id: r.id, title: `🔔 ${r.subject}`, body: `${r.cropPlantName} · due ${r.sendDate}${r.body ? ` — ${r.body}` : ''}` },
             { silent: !prefs.reminderSound, vibrate: prefs.reminderVibrate },
@@ -94,13 +80,15 @@ export function useDueNotifier() {
           if (stopped) break;
         }
         if (fresh.length > MAX_ALERTS && !stopped) {
-          for (const r of fresh) already.add(r.id);
           await showSystemNotice(
             { id: 'more', title: `🔔 ${fresh.length - MAX_ALERTS} more reminders due`, body: 'Open Reminders to review them.' },
             { silent: !prefs.reminderSound, vibrate: false },
           );
         }
-        saveNotified(day, already);
+        // Remember even the capped-out ids: the summary covers them, and they
+        // must not individually pop later.
+        markDismissed(shown.map(r => r.id));
+        if (fresh.length > MAX_ALERTS) markDismissed(fresh.map(r => r.id));
       } catch (e) {
         console.error('[notify] due sweep failed', { e });
       }

@@ -109,3 +109,19 @@ export function propGifUrl(method: string | undefined, stage: string | undefined
   const root = base.endsWith('/') ? base : `${base}/`;
   return `${root}prop-gifs/${size}/${found.gif}`;
 }
+
+/** Stage colours for the method-specific milestone strip. */
+export const PROP_STAGE_COLORS: Record<string, string> = {
+  Set: '#9e9e9e',
+  Rooted: '#66bb6a',
+  Transplanted: '#26a69a',
+  Grafted: '#7e57c2',
+  'Bud break': '#8bc34a',
+  'Air layered': '#00acc1',
+  Replanted: '#43a047',
+  'New growth': '#2e7d32',
+};
+
+export function propStageColor(stage: string): string {
+  return PROP_STAGE_COLORS[stage] ?? '#4CAF50';
+}

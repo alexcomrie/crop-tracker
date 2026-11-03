@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useAppStore } from '../../store/useAppStore';
 import { resolveCropData } from '../../lib/cropDb';
-import { parseDate } from '../../lib/dates';
+import { parseDate, daysBetween } from '../../lib/dates';
+import { getPropMethod, propStageColor } from '../../lib/propStages';
 
 const CHART_STYLE = `
 @keyframes chartProgressive { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
@@ -31,6 +32,16 @@ function fmt(n: number | null) { return n != null ? `${n}d` : '—'; }
 
 type SortKey = 'name' | 'samples' | 'success' | 'harvests';
 
+interface PropMethodStats {
+  samples: number;
+  rooted: number;
+  completed: number;
+  /** Days from the method's first milestone to roots showing. */
+  setToRooted: number[];
+  /** Days from roots/established to the final milestone. */
+  rootedToFinal: number[];
+}
+
 interface GroupData {
   cropName: string;
   samples: number;
@@ -44,11 +55,24 @@ interface GroupData {
   totalReachedTransplanted: number;
   totalReachedHarvested: number;
   monthlyPlantings: Record<number, number>;
-  individualCrops: { id: string; name: string; variety: string; planted: string; stages: { to: string; date: string; days: number }[] }[];
+  individualCrops: {
+    id: string;
+    name: string;
+    variety: string;
+    planted: string;
+    method?: string | null;
+    stages: { to: string; date: string; days: number }[];
+    propStages: { to: string; date: string; days: number }[];
+  }[];
   varieties: Record<string, { count: number; seedToGerm: number[]; germToTransplant: number[]; transplantToHarvest: number[] }>;
   harvestLogs: HarvestLog[];
   adjustments: CropDbAdjustment[];
   dbDefaults: { g: number | null; gt: number | null; th: number | null };
+  /** Propagation-method rollup so cuttings/grafts/layers/divisions feed analysis. */
+  propMethods: Record<string, PropMethodStats>;
+  propSamples: number;
+  propRooted: number;
+  propCompleted: number;
 }
 
 export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
@@ -109,6 +133,10 @@ export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
           harvestLogs: [],
           adjustments: [],
           dbDefaults: { g: null, gt: null, th: null },
+          propMethods: {},
+          propSamples: 0,
+          propRooted: 0,
+          propCompleted: 0,
         };
       }
       return groups[key];
@@ -162,12 +190,50 @@ export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
       }
 
       const stages = stageByTracking[c.id] ?? [];
+      const method = getPropMethod(c.propagationMethod);
+      const propStagesList: { to: string; date: string; days: number }[] = [];
+      if (method) {
+        const stats = (bucket.propMethods[method.key] ??= {
+          samples: 0, rooted: 0, completed: 0, setToRooted: [], rootedToFinal: [],
+        });
+        stats.samples += 1;
+        bucket.propSamples += 1;
+
+        const history = (c.propagationHistory ?? []).filter(h => h?.stage && h?.date);
+        const sorted = [...history].sort((a, b) => (parseDate(a.date)?.getTime() ?? 0) - (parseDate(b.date)?.getTime() ?? 0));
+        const reached = new Set(sorted.map(h => h.stage));
+        if (reached.size === 0) reached.add(method.stages[0].key);
+
+        const rootedKey = method.stages.find(s => s.key === 'Rooted')?.key;
+        const finalKey = method.stages[method.stages.length - 1].key;
+        if (rootedKey && reached.has(rootedKey)) { stats.rooted += 1; bucket.propRooted += 1; }
+        if (reached.has(finalKey)) { stats.completed += 1; bucket.propCompleted += 1; }
+
+        const dateFor = (key: string) => sorted.find(h => h.stage === key)?.date;
+        const firstDate = parseDate(dateFor(method.stages[0].key) ?? c.plantingDate);
+        const rootedDate = rootedKey ? parseDate(dateFor(rootedKey) ?? '') : null;
+        if (firstDate && rootedDate) stats.setToRooted.push(daysBetween(firstDate, rootedDate));
+        const finalDate = parseDate(dateFor(finalKey) ?? '');
+        if (rootedDate && finalDate) stats.rootedToFinal.push(daysBetween(rootedDate, finalDate));
+
+        for (const h of sorted) {
+          const d = parseDate(h.date);
+          if (!d || !firstDate) continue;
+          propStagesList.push({ to: h.stage, date: h.date, days: daysBetween(firstDate, d) });
+        }
+        if (propStagesList.length === 0) {
+          propStagesList.push({ to: method.stages[0].key, date: c.plantingDate, days: 0 });
+        }
+      }
+
       bucket.individualCrops.push({
         id: c.id,
         name: `${c.cropName}${c.variety ? ` (${c.variety})` : ''}`,
         variety: c.variety,
         planted: c.plantingDate,
+        method: c.propagationMethod,
         stages,
+        propStages: propStagesList,
       });
 
       const vKey = c.variety || '(default)';
@@ -252,6 +318,7 @@ export function CropHistoryScreen({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-3">
+            <PropagationOverview groups={filtered} />
             {filtered.map(r => (
               <CropAnalysisCard key={r.cropName} data={r} expanded={!!expanded[r.cropName]} onToggle={() => toggle(r.cropName)} />
             ))}
@@ -267,22 +334,27 @@ function CropAnalysisCard({ data, expanded, onToggle }: { data: GroupData; expan
   const successRate = data.samples ? Math.round(data.totalReachedHarvested / data.samples * 100) : 0;
   const avgDays = avg(data.transplantToHarvest);
   const harvestCount = data.harvestLogs?.length ?? 0;
+  const propMethodKeys = Object.keys(data.propMethods);
 
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm">
       <button onClick={onToggle} className="w-full p-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-bold capitalize">{data.cropName.replace(/_/g, ' ')}</h3>
             <Badge variant="secondary" className="bg-gray-50 text-gray-700 border-none text-[10px]">n={data.samples}</Badge>
+            {propMethodKeys.map(m => (
+              <Badge key={m} variant="secondary" className="bg-emerald-50 text-emerald-700 border-none text-[10px]">{m} n={data.propMethods[m].samples}</Badge>
+            ))}
           </div>
           {expanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
         </div>
         {!expanded && (
-          <div className="flex gap-3 mt-2 text-[10px] text-gray-500">
+          <div className="flex gap-3 mt-2 text-[10px] text-gray-500 flex-wrap">
             <span>🌱 {successRate}% success</span>
             {avgDays != null && <span>📅 avg {avgDays}d to harvest</span>}
             {harvestCount > 0 && <span>🏆 {harvestCount} harvests</span>}
+            {data.propSamples > 0 && <span>🌿 {data.propRooted}/{data.propSamples} rooted</span>}
           </div>
         )}
       </button>
@@ -291,6 +363,7 @@ function CropAnalysisCard({ data, expanded, onToggle }: { data: GroupData; expan
         <div className="px-4 pb-4 space-y-4">
           <StageDurations data={data} />
           <SuccessFunnel data={data} />
+          {data.propSamples > 0 && <PropagationBreakdown data={data} />}
           <SeasonalCalendar data={data} />
           <LifecycleGantt data={data} />
           <DeviationTrend data={data} />
@@ -300,6 +373,34 @@ function CropAnalysisCard({ data, expanded, onToggle }: { data: GroupData; expan
           <LearningDashboard data={data} />
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─── Propagation methods overview across all crops ──────────────────────── */
+function PropagationOverview({ groups }: { groups: GroupData[] }) {
+  const totals: Record<string, { samples: number; rooted: number; completed: number }> = {};
+  for (const g of groups) {
+    for (const [method, stats] of Object.entries(g.propMethods)) {
+      const t = (totals[method] ??= { samples: 0, rooted: 0, completed: 0 });
+      t.samples += stats.samples;
+      t.rooted += stats.rooted;
+      t.completed += stats.completed;
+    }
+  }
+  const entries = Object.entries(totals);
+  if (entries.length === 0) return null;
+  return (
+    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+      <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest mb-2">Propagation methods supply data too</p>
+      <div className="flex flex-wrap gap-2">
+        {entries.map(([method, t]) => (
+          <div key={method} className="bg-white rounded-lg px-3 py-1.5 text-[11px] border border-emerald-100">
+            <span className="font-bold text-emerald-800">{method}</span>
+            <span className="text-gray-500 ml-1">n={t.samples} · rooted {t.rooted} · done {t.completed}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -376,6 +477,45 @@ function SuccessFunnel({ data }: { data: GroupData }) {
   );
 }
 
+/* ─── Propagation methods (cuttings/grafts/layers/divisions) ─────────────── */
+function PropagationBreakdown({ data }: { data: GroupData }) {
+  const entries = Object.entries(data.propMethods);
+  if (entries.length === 0) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1"><GitBranch className="w-3 h-3" /> Propagation Methods</h4>
+      <div className="space-y-2">
+        {entries.map(([method, stats]) => {
+          const rootedPct = stats.samples ? Math.round((stats.rooted / stats.samples) * 100) : 0;
+          const completedPct = stats.samples ? Math.round((stats.completed / stats.samples) * 100) : 0;
+          return (
+            <div key={method} className="bg-emerald-50 border border-emerald-100 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-emerald-800">{method}</span>
+                <Badge variant="secondary" className="bg-white text-emerald-700 border-none text-[10px]">n={stats.samples}</Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[10px] mb-2">
+                <div className="bg-white/70 rounded p-1.5 text-center">
+                  <p className="text-gray-500 uppercase">Rooted</p>
+                  <p className="font-bold text-emerald-700">{stats.rooted} ({rootedPct}%)</p>
+                </div>
+                <div className="bg-white/70 rounded p-1.5 text-center">
+                  <p className="text-gray-500 uppercase">Transplanted</p>
+                  <p className="font-bold text-emerald-700">{stats.completed} ({completedPct}%)</p>
+                </div>
+              </div>
+              <div className="flex gap-2 text-[10px] text-gray-600">
+                <span>Set→Rooted: {fmt(avg(stats.setToRooted))}</span>
+                <span>Rooted→Transplant: {fmt(avg(stats.rootedToFinal))}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── 3. Seasonal Calendar ────────────────────────────────────────────── */
 function SeasonalCalendar({ data }: { data: GroupData }) {
   const months = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ');
@@ -406,7 +546,7 @@ const STAGE_COLORS_GANTT: Record<string, string> = {
 };
 
 function LifecycleGantt({ data }: { data: GroupData }) {
-  const cropsWithStages = data.individualCrops.filter(c => c.stages.length > 0);
+  const cropsWithStages = data.individualCrops.filter(c => c.stages.length > 0 || c.propStages.length > 0);
   if (cropsWithStages.length === 0) return null;
 
   return (
@@ -416,7 +556,8 @@ function LifecycleGantt({ data }: { data: GroupData }) {
         {cropsWithStages.map(crop => {
           const planted = parseDate(crop.planted);
           if (!planted) return null;
-          const allDates = [planted, ...crop.stages.map(s => parseDate(s.date)).filter((d): d is Date => d != null)];
+          const stageList = crop.stages.length > 0 ? crop.stages : crop.propStages;
+          const allDates = [planted, ...stageList.map(s => parseDate(s.date)).filter((d): d is Date => d != null)];
           if (allDates.length < 2) return null;
           const minTime = Math.min(...allDates.map(d => d.getTime()));
           const maxTime = Math.max(...allDates.map(d => d.getTime()));
@@ -424,20 +565,25 @@ function LifecycleGantt({ data }: { data: GroupData }) {
 
           const segments: { left: number; width: number; color: string; label: string }[] = [];
           let prevTime = minTime;
-          for (const s of crop.stages) {
+          for (const s of stageList) {
             const d = parseDate(s.date);
             if (!d) continue;
             const left = ((prevTime - minTime) / range) * 100;
             const width = ((d.getTime() - prevTime) / range) * 100;
-            if (width > 1) segments.push({ left, width, color: STAGE_COLORS_GANTT[s.to] ?? '#9e9e9e', label: s.to });
+            if (width > 1) {
+              const color = crop.method
+                ? propStageColor(s.to)
+                : (STAGE_COLORS_GANTT[s.to] ?? '#9e9e9e');
+              segments.push({ left, width, color, label: s.to });
+            }
             prevTime = d.getTime();
           }
 
           return (
             <div key={crop.id} className="text-xs">
               <div className="flex items-center justify-between mb-1">
-                <span className="font-medium text-gray-700 truncate">{crop.name}</span>
-                <span className="text-[9px] text-gray-400 ml-2 shrink-0">{crop.planted} → {crop.stages[crop.stages.length - 1]?.date}</span>
+                <span className="font-medium text-gray-700 truncate">{crop.name}{crop.method ? ` · ${crop.method}` : ''}</span>
+                <span className="text-[9px] text-gray-400 ml-2 shrink-0">{crop.planted} → {stageList[stageList.length - 1]?.date}</span>
               </div>
               <div className="relative h-6 bg-gray-200/60 rounded-full overflow-hidden">
                 {segments.map((seg, i) => (

@@ -121,3 +121,39 @@ export function formatAreaShort(sqm: number): string {
   if (sqm >= 1) return `${sqm.toFixed(1)} m²`;
   return `${(sqm * 10000).toFixed(0)} cm²`;
 }
+
+/** Ray-casting point-in-polygon test in GPS space. */
+export function pointInPolygon(point: GeoPoint, polygon: GeoPoint[]): boolean {
+  if (polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lng;
+    const yi = polygon[i].lat;
+    const xj = polygon[j].lng;
+    const yj = polygon[j].lat;
+    if ((yi > point.lat) !== (yj > point.lat) && point.lng < ((xj - xi) * (point.lat - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** First mapped land that contains the point. */
+export function findLandForPoint<T extends { points?: GeoPoint[] }>(point: GeoPoint, lands: T[]): T | null {
+  return lands.find(land => !!land.points && land.points.length >= 3 && pointInPolygon(point, land.points)) ?? null;
+}
+
+/** Nearest mapped land by distance to its centroid — used when GPS is just outside. */
+export function nearestLandForPoint<T extends { points?: GeoPoint[] }>(point: GeoPoint, lands: T[]): T | null {
+  let best: { land: T; distance: number } | null = null;
+  for (const land of lands) {
+    if (!land.points || land.points.length < 3) continue;
+    const center = land.points.reduce(
+      (acc, p) => ({ lat: acc.lat + p.lat / land.points!.length, lng: acc.lng + p.lng / land.points!.length }),
+      { lat: 0, lng: 0 },
+    );
+    const distance = haversineMeters(point, center);
+    if (!best || distance < best.distance) best = { land, distance };
+  }
+  return best?.land ?? null;
+}

@@ -1,8 +1,8 @@
 import React from 'react';
-import { MapContainer, TileLayer, Polygon, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Marker, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { FarmLand, FarmArea } from '../../types';
+import type { FarmLand, FarmArea, FarmPoint } from '../../types';
 import { landsToGeoJson, plotsToGeoJson, exportGeoJson } from '../../lib/geoJson';
 import { Layers, Maximize2, Download } from 'lucide-react';
 
@@ -21,6 +21,7 @@ interface MapEntry {
 
 interface LeafletMapViewProps {
   mapData: MapEntry[];
+  points?: FarmPoint[];
   height?: number;
   selectedPlotId?: string;
   selectedLandId?: string;
@@ -41,6 +42,26 @@ function getPlotColor(index: number): string {
   return PLOT_COLORS[index % PLOT_COLORS.length];
 }
 
+function InvalidateOnResize() {
+  const map = useMap();
+  React.useEffect(() => {
+    const invalidate = () => { try { map.invalidateSize(); } catch { /* ignore */ } };
+    invalidate();
+    const t = window.setTimeout(invalidate, 250);
+    let ro: ResizeObserver | null = null;
+    try {
+      ro = new ResizeObserver(invalidate);
+      ro.observe(map.getContainer());
+    } catch { /* older browsers */ }
+    window.addEventListener('resize', invalidate);
+    return () => {
+      window.clearTimeout(t);
+      ro?.disconnect();
+      window.removeEventListener('resize', invalidate);
+    };
+  }, [map]);
+  return null;
+}
 function GpsMarker() {
   useMap();
   const [position, setPosition] = React.useState<[number, number] | null>(null);
@@ -72,7 +93,7 @@ function GpsMarker() {
   );
 }
 
-function FitBounds({ mapData }: { mapData: MapEntry[] }) {
+function FitBounds({ mapData, points = [] }: { mapData: MapEntry[]; points?: FarmPoint[] }) {
   const map = useMap();
   React.useEffect(() => {
     const allPoints: [number, number][] = [];
@@ -82,16 +103,18 @@ function FitBounds({ mapData }: { mapData: MapEntry[] }) {
         for (const p of plot.points) allPoints.push([p.lat, p.lng]);
       }
     }
+    for (const p of points) allPoints.push([p.point.lat, p.point.lng]);
     if (allPoints.length > 0) {
       const bounds = L.latLngBounds(allPoints);
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 19 });
     }
-  }, [map, mapData]);
+  }, [map, mapData, points]);
   return null;
 }
 
 export function LeafletMapView({
   mapData,
+  points = [],
   height = 400,
   selectedPlotId,
   selectedLandId,
@@ -101,7 +124,9 @@ export function LeafletMapView({
   showGps = false,
 }: LeafletMapViewProps) {
   const [tileLayer, setTileLayer] = React.useState<'street' | 'satellite'>(initialTileLayer);
+  React.useEffect(() => { setTilesFailed(false); }, [tileLayer]);
   const [fullscreen, setFullscreen] = React.useState(false);
+  const [tilesFailed, setTilesFailed] = React.useState(false);
   const mapRef = React.useRef<HTMLDivElement>(null);
 
   const defaultCenter: [number, number] = mapData.length > 0 && mapData[0].land.points.length > 0
@@ -171,9 +196,14 @@ export function LeafletMapView({
             url={tileLayer === 'street' ? STREET_TILES : SATELLITE_TILES}
             attribution={tileLayer === 'street' ? STREET_ATTR : SATELLITE_ATTR}
             maxZoom={20}
+            eventHandlers={{
+              tileerror: () => setTilesFailed(true),
+              tileload: () => setTilesFailed(false),
+            }}
           />
 
-          <FitBounds mapData={mapData} />
+          <InvalidateOnResize />
+          <FitBounds mapData={mapData} points={points} />
 
           {mapData.map((entry) => (
             <React.Fragment key={entry.land.id}>
@@ -224,8 +254,35 @@ export function LeafletMapView({
             </React.Fragment>
           ))}
 
+          {points.map(p => (
+            <CircleMarker
+              key={p.id}
+              center={[p.point.lat, p.point.lng]}
+              radius={6}
+              pathOptions={{
+                color: p.kind === 'tree' ? '#0ea5e9' : p.kind === 'object' ? '#f59e0b' : '#16a34a',
+                fillColor: p.kind === 'tree' ? '#0ea5e9' : p.kind === 'object' ? '#f59e0b' : '#16a34a',
+                fillOpacity: 0.9,
+                weight: 2,
+              }}
+            >
+              <Popup>
+                <div className="text-xs">
+                  <p className="font-bold">{p.label}</p>
+                  <p className="text-gray-500 capitalize">{p.kind} tag</p>
+                  {p.notes && <p className="mt-1">{p.notes}</p>}
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
+
           {showGps && <GpsMarker />}
         </MapContainer>
+        {tilesFailed && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[500] bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium px-3 py-1.5 rounded-full shadow">
+            Map tiles unavailable — showing plot outlines only
+          </div>
+        )}
       </div>
 
       {/* Tile layer label */}

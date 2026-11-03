@@ -211,5 +211,10 @@ export class CropManagerDB extends Dexie {
     this.version(6).stores({
       farmPoints: 'id, landId, kind, updatedAt',
     });
+    // v7: point tags can be traced back to the crop/observation that created them,
+    // so maps and deletion can find them without scanning every row.
+    this.version(7).stores({
+      farmPoints: 'id, landId, kind, linkedCropId, linkedObservationId, updatedAt',
+    });
   }
 }

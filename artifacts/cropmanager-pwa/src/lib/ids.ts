@@ -1,4 +1,4 @@
-export type IdPrefix = 'CROP' | 'PROP' | 'REM' | 'SL' | 'HL' | 'TL' | 'BL' | 'CA' | 'PA' | 'CS' | 'CT' | 'ACT' | 'LED' | 'FA' | 'LD' | 'DE' | 'INV' | 'TR' | 'DBT' | 'RPM';
+export type IdPrefix = 'CROP' | 'PROP' | 'REM' | 'SL' | 'HL' | 'TL' | 'BL' | 'CA' | 'PA' | 'CS' | 'CT' | 'ACT' | 'LED' | 'FA' | 'LD' | 'DE' | 'INV' | 'TR' | 'DBT' | 'RPM' | 'PT';
 
 export function generateId(prefix: IdPrefix): string {
   // Large random suffix: bulkAdd creates many records within the same millisecond,

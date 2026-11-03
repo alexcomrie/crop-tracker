@@ -1,10 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { FarmArea, FarmLand, GeoPoint } from '../../types';
-import { haversineMeters, calcArea, gpsToSvgAll, projectPoints, projectionFrame, unprojectPoint } from '../../lib/geo';
+import type { FarmArea, FarmLand, FarmPoint, FarmPointKind, GeoPoint } from '../../types';
+import { haversineMeters, calcArea, projectPoint, projectPoints, projectionFrame, unprojectPoint } from '../../lib/geo';
 
 const CANVAS_W = 400;
 const CANVAS_H = 400;
 const COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FF5722', '#607D8B'];
+const POINT_COLORS: Record<FarmPointKind, string> = {
+  crop: '#16a34a',
+  tree: '#0ea5e9',
+  object: '#f59e0b',
+};
 
 interface MapEntry {
   land: FarmLand;
@@ -28,11 +33,15 @@ interface DistMeasure {
 
 interface InteractiveMapProps {
   mapData: MapEntry[];
+  points?: FarmPoint[];
   height?: number;
   selectedPlotId?: string;
   selectedLandId?: string;
+  selectedPointId?: string;
   onSelectPlot?: (plot: FarmArea | null) => void;
   onSelectLand?: (land: FarmLand | null) => void;
+  onSelectPoint?: (point: FarmPoint) => void;
+  onMapTap?: (point: GeoPoint) => void;
   readOnly?: boolean;
   editingPlotId?: string;
   editingLandId?: string;
@@ -41,11 +50,15 @@ interface InteractiveMapProps {
 
 export function InteractiveMap({
   mapData,
+  points = [],
   height = CANVAS_H,
   selectedPlotId,
   selectedLandId,
+  selectedPointId,
   onSelectPlot,
   onSelectLand,
+  onSelectPoint,
+  onMapTap,
   readOnly,
   editingPlotId,
   editingLandId,
@@ -94,12 +107,20 @@ export function InteractiveMap({
         .filter(m => m.plots.length > 0 || m.land.name.toLowerCase().includes(searchTerm.toLowerCase()))
     : mapData;
 
-  const allPolys = gpsToSvgAll(
-    filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]),
-    CANVAS_W, CANVAS_H, 15
-  );
+  const filteredPoints = points.filter(p => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return p.label.toLowerCase().includes(term) || p.kind.toLowerCase().includes(term) || (p.notes ?? '').toLowerCase().includes(term);
+  });
 
-  const allRefPoints = filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]);
+  const shapePoints = filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]);
+  // The point tags are part of the projection so a marker never falls outside
+  // the drawn land when it sits on the boundary.
+  const allRefPoints = [...shapePoints, ...filteredPoints.map(p => [p.point])];
+  const mapFrame = projectionFrame(allRefPoints, CANVAS_W, CANVAS_H, 15);
+  const allPolys = shapePoints.map(pts => (mapFrame && pts ? pts.map(p => projectPoint(p, mapFrame)) : []));
+  const pointSvg = filteredPoints.map(p => (mapFrame ? { point: p, ...projectPoint(p.point, mapFrame) } : null))
+    .filter((p): p is { point: FarmPoint; x: number; y: number } => p !== null);
 
   const editingInfo = (() => {
     if (editingPlotId) {
@@ -136,12 +157,12 @@ export function InteractiveMap({
   const svgToGps = useCallback((svgX: number, svgY: number): GeoPoint | null => {
     // Exact inverse of the shared uniform projection (M2)
     const frame = projectionFrame(
-      filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]),
+      [...filteredMapData.flatMap(m => [m.land.points, ...m.plots.map(p => p.points)]), ...filteredPoints.map(p => [p.point])],
       CANVAS_W, CANVAS_H, 15
     );
     if (!frame) return null;
     return unprojectPoint(svgX, svgY, frame);
-  }, [filteredMapData]);
+  }, [filteredMapData, filteredPoints]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -208,7 +229,7 @@ export function InteractiveMap({
     // Single-finger tap (not a pan/pinch) acts like a click for vertex select (M4)
     const tap = touchTap.current;
     touchTap.current = null;
-    if (tap && movedPx.current <= 8 && e.touches.length === 0 && !readOnly) {
+    if (tap && movedPx.current <= 8 && e.touches.length === 0 && (!readOnly || onMapTap)) {
       handleTapAt(tap.x, tap.y, false);
     }
     movedPx.current = 0;
@@ -245,13 +266,13 @@ export function InteractiveMap({
 
   function handleSvgClick(e: React.MouseEvent<SVGSVGElement>) {
     // Pan-end clicks must not select/move (M3)
-    if (dragging.current || movedPx.current > 5 || readOnly) { movedPx.current = 0; return; }
+    if (dragging.current || movedPx.current > 5 || (readOnly && !onMapTap)) { movedPx.current = 0; return; }
     movedPx.current = 0;
     handleTapAt(e.clientX, e.clientY, e.shiftKey);
   }
 
   function handleTapAt(clientX: number, clientY: number, additive: boolean) {
-    if (readOnly) return;
+    if (readOnly && !onMapTap) return;
     const svg = svgRef.current;
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
@@ -271,6 +292,12 @@ export function InteractiveMap({
           setDistTool({ a: { x: unX, y: unY, latlng: gps }, b: null });
         }
       }
+      return;
+    }
+
+    if (onMapTap) {
+      const gps = svgToGps(unX, unY);
+      if (gps) onMapTap(gps);
       return;
     }
 
@@ -556,6 +583,27 @@ export function InteractiveMap({
             );
           });
         })()}
+
+        {/* Point tags (crops, trees, objects) */}
+        {pointSvg.map(({ point: p, x, y }) => (
+          <g
+            key={p.id}
+            style={{ cursor: 'pointer' }}
+            onClick={e => { e.stopPropagation(); onSelectPoint?.(p); }}
+          >
+            <circle
+              cx={x}
+              cy={y}
+              r={selectedPointId === p.id ? 7 : 5.5}
+              fill={POINT_COLORS[p.kind] ?? '#16a34a'}
+              stroke={selectedPointId === p.id ? '#1d4ed8' : 'white'}
+              strokeWidth={selectedPointId === p.id ? 2.5 : 1.5}
+            />
+            <text x={x + 7} y={y + 3} fontSize={7} fill="#374151" fontWeight="bold">
+              {p.label}
+            </text>
+          </g>
+        ))}
 
         {/* Distance measurement line */}
         {showDist && distTool.a && (

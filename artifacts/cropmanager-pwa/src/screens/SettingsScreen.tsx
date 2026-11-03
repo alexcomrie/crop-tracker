@@ -6,9 +6,10 @@ import { useAppStore } from '../store/useAppStore';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 import { DataManagement } from '../components/settings/DataManagement';
 import type { AppSettings } from '../types';
-import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2, UserRound } from 'lucide-react';
+import { CloudRain, Save, Check, Smartphone, Download, Info, Share2, Bell, Wallet, MapPin, Loader2, UserRound, Eraser } from 'lucide-react';
 import { REM_TYPES } from '../components/reminders/ReminderForm';
 import { notifyPermission, requestNotifyPermission, playTone } from '../lib/notify';
+import { clearAllDueNotifications } from '../lib/reminderNotifications';
 import { resolveCurrentLocation } from '../lib/location';
 import type { ReminderTone } from '../types';
 
@@ -22,6 +23,7 @@ export function SettingsScreen() {
   const [perm, setPerm] = useState(() => notifyPermission());
   const [locating, setLocating] = useState(false);
   const [locMsg, setLocMsg] = useState('');
+  const [notifMsg, setNotifMsg] = useState('');
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [installNote, setInstallNote] = useState('');
 
@@ -63,6 +65,16 @@ export function SettingsScreen() {
   async function handleEnableNotifications() {
     const p = await requestNotifyPermission();
     setPerm(p);
+  }
+
+  async function handleClearNotifications() {
+    if (!window.confirm('Clear all past-due notifications? They will be marked done and will not return.')) return;
+    try {
+      const count = await clearAllDueNotifications();
+      setNotifMsg(count > 0 ? `Cleared ${count} past-due notification${count === 1 ? '' : 's'}` : 'No past-due notifications to clear');
+    } catch (e) {
+      setNotifMsg('Could not clear notifications: ' + (e instanceof Error ? e.message : String(e)));
+    }
   }
 
   // Reminder prefs apply + persist instantly (no SAVE needed) so the
@@ -231,6 +243,11 @@ export function SettingsScreen() {
             <button onClick={() => playTone(local.reminderTone ?? 'chime')} className="text-xs font-semibold text-green-700 bg-green-50 rounded-lg px-2 py-1.5">Test</button>
           </span>
         </div>
+        <Button variant="outline" className="w-full h-9 text-xs gap-2 text-amber-700 border-amber-200 bg-amber-50" onClick={() => void handleClearNotifications()}>
+          <Eraser className="w-4 h-4" />
+          Clear past-due notifications
+        </Button>
+        {notifMsg && <p className="text-[10px] text-amber-700 font-medium leading-tight">{notifMsg}</p>}
         <div className="pt-1">
           <p className="text-[11px] font-semibold text-gray-500 uppercase mb-1.5">Show these on device</p>
           <div className="grid grid-cols-2 gap-1.5">

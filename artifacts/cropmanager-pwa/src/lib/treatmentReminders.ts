@@ -66,7 +66,17 @@ export async function scheduleTreatmentReminder(cropId: string, log: TreatmentKi
     .sort((a, b) => a.getTime() - b.getTime())
     .pop();
   const base = latest ?? today();
-  const sendDate = formatDateShort(addDays(base, interval));
+  // Roll forward past missed cycles: a treatment logged weeks ago with a
+  // weekly interval must not create a reminder dated in the past (which would
+  // alert immediately and then repeat on every app open).
+  let next = addDays(base, interval);
+  const todayStart = today();
+  let guard = 0;
+  while (next.getTime() <= todayStart.getTime() && guard < 500) {
+    next = addDays(next, interval);
+    guard++;
+  }
+  const sendDate = formatDateShort(next);
   await db.reminders.add({
     id: generateId('REM'),
     type: kind.rem,

@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Camera, Trash2, Save, Leaf, FlaskConical, Bug, ShieldAlert, Microscope, ImagePlus } from 'lucide-react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { toast } from 'sonner';
 import db from '../../db/db';
-import type { Crop, CropData, HarvestLog, StageLog, TreatmentLog } from '../../types';
+import type { Crop, CropData, HarvestLog, StageLog, TreatmentLog, PointTagDraft } from '../../types';
 import { parseDate, daysBetween, today } from '../../lib/dates';
 import { compressImage } from '../../lib/image';
 import { bacteriaGuidance, getCropPhRange, suggestEnvironment } from '../../lib/cropInfo';
+import { PointTagPicker } from '../area/PointTagPicker';
+import { savePointTag, deletePointTag } from '../../lib/farmPoints';
 
 interface CropInfoTabProps {
   crop: Crop;
@@ -27,8 +30,25 @@ const ENVIRONMENTS = [
 export function CropInfoTab({ crop, cropData, stageLogs, harvestLogs, treatmentLogs }: CropInfoTabProps) {
   const [imageBusy, setImageBusy] = useState(false);
   const [environment, setEnvironment] = useState(crop.environment || suggestEnvironment(crop));
-  const [locLat, setLocLat] = useState(crop.location?.lat?.toString() ?? '');
-  const [locLng, setLocLng] = useState(crop.location?.lng?.toString() ?? '');
+  const [point, setPoint] = useState<PointTagDraft | null>(null);
+  const existingTag = useLiveQuery(
+    async () => (crop.pointTagId ? await db.farmPoints.get(crop.pointTagId) : undefined),
+    [crop.pointTagId],
+  );
+  React.useEffect(() => {
+    setPoint(null);
+  }, [crop.id]);
+  React.useEffect(() => {
+    if (!existingTag) return;
+    setPoint({
+      landId: existingTag.landId,
+      point: existingTag.point,
+      label: existingTag.label,
+      kind: existingTag.kind,
+      notes: existingTag.notes,
+      source: existingTag.source,
+    });
+  }, [existingTag]);
   const [phMin, setPhMin] = useState(crop.soilPhMin?.toString() ?? '');
   const [phMax, setPhMax] = useState(crop.soilPhMax?.toString() ?? '');
   const [phActual, setPhActual] = useState(crop.soilPhActual?.toString() ?? '');
@@ -89,11 +109,20 @@ export function CropInfoTab({ crop, cropData, stageLogs, harvestLogs, treatmentL
         const n = Number(v);
         return v.trim() === '' || !Number.isFinite(n) ? undefined : n;
       };
-      const lat = Number(locLat);
-      const lng = Number(locLng);
+      let pointTagId = crop.pointTagId;
+      let location = crop.location;
+      if (point) {
+        pointTagId = await savePointTag(point, { linkedCropId: crop.id }, crop.pointTagId);
+        location = point.point;
+      } else {
+        await deletePointTag(crop.pointTagId);
+        pointTagId = undefined;
+        location = undefined;
+      }
       await updateCrop({
         environment,
-        location: Number.isFinite(lat) && Number.isFinite(lng) && locLat.trim() && locLng.trim() ? { lat, lng } : undefined,
+        pointTagId,
+        location,
         soilPhMin: parse(phMin),
         soilPhMax: parse(phMax),
         soilPhActual: parse(phActual),
@@ -156,9 +185,13 @@ export function CropInfoTab({ crop, cropData, stageLogs, harvestLogs, treatmentL
             </select>
           </div>
           <div className="col-span-2">
-            <p className="text-[9px] font-bold uppercase text-gray-400">Location (optional)</p>
-            <button type="button" onClick={() => { if (!navigator.geolocation) { toast.error('GPS not available'); return; } navigator.geolocation.getCurrentPosition(p => { setLocLat(p.coords.latitude.toFixed(6)); setLocLng(p.coords.longitude.toFixed(6)); toast.success('Location captured'); }, () => toast.error('Could not read GPS')); }} className="mt-0.5 w-full text-xs text-amber-700 font-semibold border border-amber-200 rounded-lg py-1.5">Tag my current location (GPS)</button>
-            {(locLat && locLng) && <p className="text-[10px] text-muted-foreground mt-0.5">Tagged: {locLat}, {locLng}</p>}
+            <PointTagPicker
+              value={point}
+              onChange={setPoint}
+              defaultLabel={`${crop.cropName} planting`}
+              defaultKind="crop"
+              height={200}
+            />
           </div>
           <Info label="Planting method" value={crop.plantingMethod || '—'} />
           <Info label="Planted" value={crop.plantingDate || '—'} />

@@ -7,7 +7,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import db from '../db/db';
 import { formatDateShort, today, parseDate, formatDateDisplay, daysBetween } from '../lib/dates';
 import { markReminderDone } from '../hooks/useReminders';
-import { CheckCircle2, Sprout, Wallet, ChevronRight, AlertTriangle } from 'lucide-react';
+import { clearAllDueNotifications } from '../lib/reminderNotifications';
+import { CheckCircle2, Sprout, Wallet, ChevronRight, AlertTriangle, CheckCheck } from 'lucide-react';
 import { setAppBadge, clearAppBadge, playAlert } from '../lib/notifications';
 import { useAppStore, withReminderDefaults, isReminderKindAllowed } from '../store/useAppStore';
 import { TYPE_EMOJI, TYPE_DOT, TYPE_TAG } from '../lib/reminderUi';
@@ -26,6 +27,22 @@ export function DashboardScreen() {
   const { settings } = useAppStore();
   const reminderPrefs = withReminderDefaults(settings);
   const visibleToday = todayReminders.filter(r => reminderPrefs.remindersEnabled && isReminderKindAllowed(settings, r.type));
+  const overdueCount = visibleToday.filter(r => r.sendDate !== todayStr).length;
+
+  // Past-due tasks are swept automatically once a day so a stale backlog can
+  // never pile up on the dashboard. Today's tasks stay actionable; anything
+  // already behind us gets marked done and stays quiet across reloads.
+  useEffect(() => {
+    if (overdueCount === 0) return;
+    const key = `past_cleared_${todayStr}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+    clearAllDueNotifications().catch(e => console.warn('[dashboard] past reminder sweep failed', e));
+  }, [todayStr, overdueCount]);
 
 const upcomingData = useLiveQuery(async () => {
     const all = await db.reminders.toArray()
@@ -161,6 +178,20 @@ const upcomingData = useLiveQuery(async () => {
             <h2 className="text-[11px] font-bold text-gray-500 uppercase tracking-[0.08em]">
               Tasks — {formatDateDisplay(today())}
             </h2>
+            {overdueCount > 0 && (
+              <button
+                onClick={async () => {
+                  try {
+                    await clearAllDueNotifications();
+                  } catch (e) {
+                    console.warn('[dashboard] clear past failed', e);
+                  }
+                }}
+                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-white border border-gray-200 rounded-full px-2.5 py-1 active:scale-95 transition-all"
+              >
+                <CheckCheck className="w-3 h-3" /> Clear past
+              </button>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">

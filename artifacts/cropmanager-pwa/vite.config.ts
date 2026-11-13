@@ -19,6 +19,10 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registration lives in src/lib/pwaUpdater.ts so we can poll for new
+      // deploys and drive the multi-pass reload sequence. Leaving this on
+      // would inject a second, competing registerSW.js.
+      injectRegister: null,
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
         id: "/cropmanager",
